@@ -11,8 +11,14 @@ object BleConstants {
     /** type(1) + roomId(2) + version(1) + chunkIndex(1) + chunkCount(1). */
     const val HEADER_SIZE_BYTES = 6
 
-    /** Legacy BLE advertising payload is 31 bytes total; this is what's left after AD/manufacturer overhead. */
-    const val MAX_CHUNK_PAYLOAD_BYTES = 18
+    /**
+     * Legacy BLE advertising payload is 31 bytes total. After the mandatory 3-byte Flags AD
+     * structure and the 4-byte Manufacturer Specific Data header (length+type+company ID),
+     * 24 bytes are left for our own header+payload — 18 would use every remaining byte with
+     * zero margin, which real devices have been observed to silently reject (advertising just
+     * never goes out, no error surfaced) rather than reliably erroring. Leaving real headroom.
+     */
+    const val MAX_CHUNK_PAYLOAD_BYTES = 12
 
     const val MAX_CHUNK_COUNT = 256
 

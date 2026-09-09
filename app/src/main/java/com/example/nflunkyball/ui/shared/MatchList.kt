@@ -16,7 +16,9 @@ import com.example.nflunkyball.model.Match
 
 /**
  * [onRecordResult] is null for viewers (read-only) and a callback for the organizer, which is
- * what hides/shows the "Record" action — same composable serves both roles.
+ * what hides/shows the record/edit action — same composable serves both roles. Recording is
+ * never final: a match with a result already gets an "Edit" button instead of "Record", so
+ * typos can be corrected rather than being stuck.
  */
 @Composable
 fun MatchRow(
@@ -41,8 +43,10 @@ fun MatchRow(
                     )
                 }
             }
-            if (match.result == null && onRecordResult != null) {
-                TextButton(onClick = { onRecordResult(match) }) { Text("Record") }
+            if (onRecordResult != null) {
+                TextButton(onClick = { onRecordResult(match) }) {
+                    Text(if (match.result == null) "Record" else "Edit")
+                }
             }
         }
         HorizontalDivider(Modifier.padding(top = 6.dp))

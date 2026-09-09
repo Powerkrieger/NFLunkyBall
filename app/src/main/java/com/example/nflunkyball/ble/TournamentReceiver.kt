@@ -2,7 +2,9 @@ package com.example.nflunkyball.ble
 
 import android.annotation.SuppressLint
 import android.bluetooth.BluetoothAdapter
+import android.util.Log
 import com.example.nflunkyball.model.Tournament
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -11,6 +13,8 @@ import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
+
+private const val TAG = "TournamentReceiver"
 
 /**
  * Viewer role: scans for a room's broadcast [Tournament] state and can send emoji reactions.
@@ -33,15 +37,22 @@ class TournamentReceiver(private val adapter: BluetoothAdapter) {
 
         receiveJob = scope.launch {
             val scanner = adapter.bluetoothLeScanner ?: return@launch
-            scanner.manufacturerDataFlow()
-                .mapNotNull { PacketCodec.decodeStateChunk(it) }
-                .filter { it.roomId == roomId }
-                .collect { packet ->
-                    val complete = reassembler.receive(packet) ?: return@collect
-                    runCatching {
-                        json.decodeFromString(Tournament.serializer(), complete.decodeToString())
-                    }.onSuccess { _tournament.value = it }
-                }
+            try {
+                scanner.manufacturerDataFlow()
+                    .mapNotNull { PacketCodec.decodeStateChunk(it) }
+                    .filter { it.roomId == roomId }
+                    .collect { packet ->
+                        val complete = reassembler.receive(packet) ?: return@collect
+                        runCatching {
+                            json.decodeFromString(Tournament.serializer(), complete.decodeToString())
+                        }.onSuccess { _tournament.value = it }
+                            .onFailure { Log.w(TAG, "Failed to parse reassembled tournament state", it) }
+                    }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.e(TAG, "Scan for room $roomId stopped unexpectedly", e)
+            }
         }
     }
 

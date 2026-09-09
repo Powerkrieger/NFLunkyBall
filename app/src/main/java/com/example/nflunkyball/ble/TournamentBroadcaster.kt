@@ -2,7 +2,9 @@ package com.example.nflunkyball.ble
 
 import android.annotation.SuppressLint
 import android.bluetooth.BluetoothAdapter
+import android.util.Log
 import com.example.nflunkyball.model.Tournament
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
@@ -23,6 +25,8 @@ import kotlinx.serialization.json.Json
  * `ble/` package docs / the project plan for why (needs to scale to ~20 simultaneous viewers,
  * past Bluetooth Classic's ~7-connection piconet limit).
  */
+private const val TAG = "TournamentBroadcaster"
+
 class TournamentBroadcaster(private val adapter: BluetoothAdapter) {
 
     private val json = Json { encodeDefaults = true }
@@ -40,10 +44,16 @@ class TournamentBroadcaster(private val adapter: BluetoothAdapter) {
 
         scanJob = scope.launch {
             val scanner = adapter.bluetoothLeScanner ?: return@launch
-            scanner.manufacturerDataFlow()
-                .mapNotNull { PacketCodec.decodeEmoji(it) }
-                .filter { it.roomId == roomId }
-                .collect { _emojiEvents.emit(it) }
+            try {
+                scanner.manufacturerDataFlow()
+                    .mapNotNull { PacketCodec.decodeEmoji(it) }
+                    .filter { it.roomId == roomId }
+                    .collect { _emojiEvents.emit(it) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.e(TAG, "Emoji scan for room $roomId stopped unexpectedly", e)
+            }
         }
 
         var version = 0

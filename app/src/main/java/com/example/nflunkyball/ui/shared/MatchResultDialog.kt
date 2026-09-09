@@ -28,13 +28,13 @@ fun MatchResultDialog(
     onDismiss: () -> Unit,
     onConfirm: (MatchResult) -> Unit
 ) {
-    var winnerId by remember { mutableStateOf(match.teamAId) }
-    var scoreText by remember { mutableStateOf("") }
+    var winnerId by remember { mutableStateOf(match.result?.winnerId ?: match.teamAId) }
+    var scoreText by remember { mutableStateOf(match.result?.winnerScore?.toString() ?: "") }
     val score = scoreText.toIntOrNull()
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Record result") },
+        title = { Text(if (match.result == null) "Record result" else "Edit result") },
         text = {
             Column {
                 Text("Winner", style = MaterialTheme.typography.labelMedium)

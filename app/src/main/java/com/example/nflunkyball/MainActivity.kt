@@ -1,10 +1,21 @@
 package com.example.nflunkyball
 
+import android.content.res.Configuration
+import android.graphics.Color as AndroidColor
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -27,11 +38,28 @@ import com.example.nflunkyball.ui.viewer.ViewerViewModel
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
+
+        // Explicit light/dark bar style (rather than relying on enableEdgeToEdge()'s auto
+        // detection) so status/nav bar icons reliably match our fixed theme colors instead of
+        // ever landing on white-on-white. Content itself is edge-to-edge (required on API 35+
+        // regardless), so it's padded away from the bars below via WindowInsets.safeDrawing.
+        val isDarkTheme = (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
+            Configuration.UI_MODE_NIGHT_YES
+        val barStyle = if (isDarkTheme) {
+            SystemBarStyle.dark(AndroidColor.TRANSPARENT)
+        } else {
+            SystemBarStyle.light(AndroidColor.TRANSPARENT, AndroidColor.TRANSPARENT)
+        }
+        enableEdgeToEdge(statusBarStyle = barStyle, navigationBarStyle = barStyle)
+
         setContent {
             NFLunkyBallTheme {
-                PermissionsGate {
-                    NfLunkyBallApp()
+                Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+                    Box(Modifier.windowInsetsPadding(WindowInsets.safeDrawing)) {
+                        PermissionsGate {
+                            NfLunkyBallApp()
+                        }
+                    }
                 }
             }
         }
