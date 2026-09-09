@@ -13,6 +13,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -36,7 +38,10 @@ fun HostingScreen(
         // silently no-op-ing if it was off when this screen first appeared.
         LaunchedEffect(Unit) { viewModel.startHosting() }
 
-        val roomId = viewModel.roomId
+        val tournament by viewModel.tournament.collectAsState()
+        // Derived from the tournament's own stable id rather than stored separately, so the
+        // same QR/code stays valid for viewers even if the organizer's app restarts mid-event.
+        val roomId = tournament?.id?.let { RoomCode.forTournament(it) }
         val account = viewModel.organizerAccount
         val readPassword = viewModel.readPassword
 

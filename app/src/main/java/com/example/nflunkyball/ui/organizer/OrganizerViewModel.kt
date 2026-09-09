@@ -47,9 +47,6 @@ class OrganizerViewModel(application: Application) : AndroidViewModel(applicatio
 
     val tournament: StateFlow<Tournament?> = repository.tournament
 
-    var roomId by mutableStateOf<Int?>(null)
-        private set
-
     var organizerAccount by mutableStateOf(credentialsStore.loadAccount())
         private set
 
@@ -99,7 +96,7 @@ class OrganizerViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun startHosting() {
         val adapter = bluetoothAdapter ?: return
-        val id = roomId ?: RoomCode.generate().also { roomId = it }
+        val id = tournament.value?.id?.let { RoomCode.forTournament(it) } ?: return
         broadcaster?.start(id, repository.tournament.filterNotNull(), viewModelScope)
         viewModelScope.launch {
             broadcaster?.emojiEvents?.collect { packet ->
@@ -154,7 +151,6 @@ class OrganizerViewModel(application: Application) : AndroidViewModel(applicatio
      *  "Host a tournament" starts fresh instead of resuming a dead one. */
     fun clearTournament() {
         stopHosting()
-        roomId = null
         repository.clear()
     }
 

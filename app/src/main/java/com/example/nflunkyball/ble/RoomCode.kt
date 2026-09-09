@@ -10,7 +10,15 @@ private const val ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
  */
 object RoomCode {
 
-    fun generate(): Int = (0..0xFFFF).random()
+    /**
+     * Deterministic room id for a given tournament (derived from its own stable UUID, already
+     * persisted), rather than a fresh random one each time hosting (re)starts — so the same
+     * QR/code stays valid for viewers across an organizer app restart mid-event instead of
+     * silently going stale. String.hashCode()'s algorithm is part of the Java/Kotlin spec
+     * (a fixed polynomial over the characters), so this is stable across runs/devices, not an
+     * implementation detail that could change.
+     */
+    fun forTournament(tournamentId: String): Int = tournamentId.hashCode() and 0xFFFF
 
     fun encode(roomId: Int): String {
         require(roomId in 0..0xFFFF) { "roomId must fit in 16 bits" }

@@ -1,6 +1,7 @@
 package com.example.nflunkyball.ble
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
@@ -26,5 +27,30 @@ class RoomCodeTest {
         assertNull(RoomCode.decode("ABC")) // too short
         assertNull(RoomCode.decode("ABCDE")) // too long
         assertNull(RoomCode.decode("ILOU")) // characters excluded from Crockford base32
+    }
+
+    @Test
+    fun `forTournament is deterministic for the same tournament id`() {
+        val id = "c2f2d160-3339-4f35-b1ab-8a43ad5a049e"
+        assertEquals(RoomCode.forTournament(id), RoomCode.forTournament(id))
+    }
+
+    @Test
+    fun `forTournament stays within the 16-bit room id range`() {
+        val ids = listOf("a", "some-tournament-uuid", "", "!!!", "🍺🍺🍺")
+        for (id in ids) {
+            val roomId = RoomCode.forTournament(id)
+            assert(roomId in 0..0xFFFF) { "roomId $roomId for \"$id\" is out of range" }
+        }
+    }
+
+    @Test
+    fun `forTournament differs for different tournament ids (in practice)`() {
+        // Not a strict guarantee (it's a hash), but collisions between two arbitrary UUIDs
+        // should be vanishingly rare -- this just catches an accidental constant-output bug.
+        assertNotEquals(
+            RoomCode.forTournament("11111111-1111-1111-1111-111111111111"),
+            RoomCode.forTournament("22222222-2222-2222-2222-222222222222")
+        )
     }
 }
