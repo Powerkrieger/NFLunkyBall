@@ -2,11 +2,14 @@ package com.example.nflunkyball.model
 
 import kotlinx.serialization.Serializable
 
-/** winnerId = 0 seconds by definition; loserSeconds = time the losing team took to finish their drink. */
+/**
+ * loserId = 0 by definition; winnerScore = seconds/points credited to the winner,
+ * taken from the loser's remaining beer. A forfeit is recorded as a flat 300.
+ */
 @Serializable
 data class MatchResult(
     val winnerId: String,
-    val loserSeconds: Int
+    val winnerScore: Int
 )
 
 @Serializable

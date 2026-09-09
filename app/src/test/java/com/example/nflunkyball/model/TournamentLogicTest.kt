@@ -31,9 +31,9 @@ class TournamentLogicTest {
             name = "Group A",
             teamIds = listOf("A", "B", "C"),
             matches = listOf(
-                Match("m1", "A", "B", MatchResult(winnerId = "A", loserSeconds = 12)),
-                Match("m2", "A", "C", MatchResult(winnerId = "A", loserSeconds = 8)),
-                Match("m3", "B", "C", MatchResult(winnerId = "B", loserSeconds = 20))
+                Match("m1", "A", "B", MatchResult(winnerId = "A", winnerScore = 12)),
+                Match("m2", "A", "C", MatchResult(winnerId = "A", winnerScore = 8)),
+                Match("m3", "B", "C", MatchResult(winnerId = "B", winnerScore = 20))
             )
         )
 
@@ -53,9 +53,9 @@ class TournamentLogicTest {
             name = "Group A",
             teamIds = listOf("B", "A"), // deliberately out of "expected" order
             matches = listOf(
-                Match("m1", "A", "B", MatchResult(winnerId = "A", loserSeconds = 5)),
-                Match("m2", "A", "C", MatchResult(winnerId = "C", loserSeconds = 5)),
-                Match("m3", "B", "C", MatchResult(winnerId = "B", loserSeconds = 5))
+                Match("m1", "A", "B", MatchResult(winnerId = "A", winnerScore = 5)),
+                Match("m2", "A", "C", MatchResult(winnerId = "C", winnerScore = 5)),
+                Match("m3", "B", "C", MatchResult(winnerId = "B", winnerScore = 5))
             )
         )
 
