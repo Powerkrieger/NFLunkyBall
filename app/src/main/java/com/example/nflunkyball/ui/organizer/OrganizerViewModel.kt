@@ -150,6 +150,14 @@ class OrganizerViewModel(application: Application) : AndroidViewModel(applicatio
         repository.update { it.copy(phase = TournamentPhase.FINISHED) }
     }
 
+    /** Called once the organizer is done with a finished tournament (after upload) so the next
+     *  "Host a tournament" starts fresh instead of resuming a dead one. */
+    fun clearTournament() {
+        stopHosting()
+        roomId = null
+        repository.clear()
+    }
+
     /** [inviteCode] is the whole code an admin generated (bundles the server URL + token) —
      *  see InvitePayload for why the app never hardcodes a server address itself. */
     fun linkAccount(

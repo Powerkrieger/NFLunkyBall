@@ -20,6 +20,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.example.nflunkyball.model.TournamentPhase
 import com.example.nflunkyball.ui.HomeScreen
 import com.example.nflunkyball.ui.organizer.BracketScreen
 import com.example.nflunkyball.ui.organizer.GroupStageScreen
@@ -76,10 +77,13 @@ private fun NfLunkyBallApp() {
         composable("home") {
             HomeScreen(
                 onHost = {
-                    val destination = if (organizerViewModel.organizerAccount != null) {
-                        "organizer/setup"
-                    } else {
-                        "organizer/link_account"
+                    // Resume an in-progress tournament (e.g. the app got killed mid-event)
+                    // instead of dropping the organizer into a blank "New tournament" form and
+                    // silently orphaning what's already on disk.
+                    val destination = when {
+                        organizerViewModel.organizerAccount == null -> "organizer/link_account"
+                        organizerViewModel.tournament.value != null -> "organizer/hosting"
+                        else -> "organizer/setup"
                     }
                     navController.navigate(destination)
                 },
@@ -105,7 +109,16 @@ private fun NfLunkyBallApp() {
         composable("organizer/hosting") {
             HostingScreen(
                 viewModel = organizerViewModel,
-                onContinue = { navController.navigate("organizer/group_stage") }
+                onContinue = {
+                    // Resuming a tournament that already reached the bracket phase should land
+                    // back on BracketScreen, not restart at GroupStageScreen.
+                    val destination = if (organizerViewModel.tournament.value?.phase == TournamentPhase.BRACKET) {
+                        "organizer/bracket"
+                    } else {
+                        "organizer/group_stage"
+                    }
+                    navController.navigate(destination)
+                }
             )
         }
         composable("organizer/group_stage") {
@@ -122,9 +135,8 @@ private fun NfLunkyBallApp() {
                 viewModel = organizerViewModel,
                 onFinish = {
                     organizerViewModel.finishTournament()
-                    if (organizerViewModel.organizerAccount != null) {
-                        organizerViewModel.uploadToHistory()
-                    }
+                    organizerViewModel.uploadToHistory()
+                    organizerViewModel.clearTournament()
                     navController.popBackStack(route = "home", inclusive = false)
                 }
             )
