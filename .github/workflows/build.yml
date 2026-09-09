@@ -44,14 +44,17 @@ jobs:
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: ./gradlew assembleRelease
 
+      - name: Rename APK
+        run: cp app/build/outputs/apk/release/app-release.apk app/build/outputs/apk/release/nflunkyball.apk
+
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: NFLunkyBall-${{ github.sha }}
-          path: app/build/outputs/apk/release/app-release.apk
+          path: app/build/outputs/apk/release/nflunkyball.apk
 
       - name: Publish GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          files: app/build/outputs/apk/release/app-release.apk
+          files: app/build/outputs/apk/release/nflunkyball.apk

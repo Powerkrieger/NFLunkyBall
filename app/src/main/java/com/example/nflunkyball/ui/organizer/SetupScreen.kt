@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
@@ -13,9 +15,11 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
@@ -30,14 +34,23 @@ import java.util.UUID
 
 @Composable
 fun SetupScreen(
+    viewModel: OrganizerViewModel,
     onStart: (name: String, teams: List<Team>, groupAssignments: Map<String, List<String>>) -> Unit
 ) {
+    LaunchedEffect(Unit) { viewModel.loadKnownCompetitors() }
+
     var tournamentName by remember { mutableStateOf("") }
     var teamNameInput by remember { mutableStateOf("") }
     var groupNameInput by remember { mutableStateOf("") }
     val teams = remember { mutableStateListOf<Team>() }
     val groupNames = remember { mutableStateListOf<String>() }
     val assignments = remember { mutableStateMapOf<String, String>() } // teamId -> groupName
+
+    fun addTeam(name: String) {
+        if (name.isNotBlank() && teams.none { it.name.equals(name, ignoreCase = true) }) {
+            teams.add(Team(id = UUID.randomUUID().toString(), name = name.trim()))
+        }
+    }
 
     Column(
         Modifier
@@ -62,15 +75,30 @@ fun SetupScreen(
                 modifier = Modifier.weight(1f)
             )
             Button(
-                onClick = {
-                    if (teamNameInput.isNotBlank()) {
-                        teams.add(Team(id = UUID.randomUUID().toString(), name = teamNameInput.trim()))
-                        teamNameInput = ""
-                    }
-                },
+                onClick = { addTeam(teamNameInput); teamNameInput = "" },
                 modifier = Modifier.padding(start = 8.dp)
             ) { Text("Add") }
         }
+
+        val addedNames = teams.map { it.name.lowercase() }.toSet()
+        val suggestions = viewModel.knownCompetitorNames.filter { it.lowercase() !in addedNames }
+        if (suggestions.isNotEmpty()) {
+            Text(
+                "Known players",
+                style = MaterialTheme.typography.labelMedium,
+                modifier = Modifier.padding(top = 8.dp)
+            )
+            LazyRow(Modifier.padding(top = 4.dp)) {
+                items(suggestions) { name ->
+                    SuggestionChip(
+                        onClick = { addTeam(name) },
+                        label = { Text(name) },
+                        modifier = Modifier.padding(end = 8.dp)
+                    )
+                }
+            }
+        }
+
         teams.forEach { team ->
             Row(
                 Modifier.fillMaxWidth().padding(vertical = 4.dp),

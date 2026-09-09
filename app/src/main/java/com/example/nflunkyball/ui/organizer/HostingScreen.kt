@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -25,10 +24,11 @@ import com.example.nflunkyball.qr.JoinPayloadCodec
 import com.example.nflunkyball.qr.QrCodeGenerator
 import com.example.nflunkyball.server.DEFAULT_SERVER_URL
 
+/** Reached only once the organizer has a linked account (see MainActivity's routing), so
+ *  [account] here is always non-null in practice. */
 @Composable
 fun HostingScreen(
     viewModel: OrganizerViewModel,
-    onLinkAccount: () -> Unit,
     onContinue: () -> Unit
 ) {
     LaunchedEffect(Unit) { viewModel.startHosting() }
@@ -45,11 +45,7 @@ fun HostingScreen(
 
         if (roomId != null) {
             val code = RoomCode.encode(roomId)
-            val payload = JoinPayload(
-                room = code,
-                server = if (account != null) DEFAULT_SERVER_URL else null,
-                pw = if (account != null) readPassword else null
-            )
+            val payload = JoinPayload(room = code, server = DEFAULT_SERVER_URL, pw = readPassword)
             val qrContent = remember(payload) { JoinPayloadCodec.encode(payload) }
             val bitmap = remember(qrContent) { QrCodeGenerator.generate(qrContent) }
             Image(
@@ -64,13 +60,7 @@ fun HostingScreen(
 
         Spacer(Modifier.height(24.dp))
 
-        if (account == null) {
-            OutlinedButton(onClick = onLinkAccount) {
-                Text("Link organizer account (optional, for history)")
-            }
-        } else {
-            Text("Linked as ${account.displayName}", style = MaterialTheme.typography.bodyMedium)
-        }
+        account?.let { Text("Hosting as ${it.displayName}", style = MaterialTheme.typography.bodyMedium) }
 
         Button(onClick = onContinue, modifier = Modifier.fillMaxWidth().padding(top = 24.dp)) {
             Text("Continue to scoring")

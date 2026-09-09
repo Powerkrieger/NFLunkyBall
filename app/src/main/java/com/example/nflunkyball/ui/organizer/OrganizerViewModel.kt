@@ -59,10 +59,26 @@ class OrganizerViewModel(application: Application) : AndroidViewModel(applicatio
     var uploadStatus by mutableStateOf<String?>(null)
         private set
 
+    var knownCompetitorNames by mutableStateOf<List<String>>(emptyList())
+        private set
+
     private val _emojiEvents = MutableSharedFlow<String>(extraBufferCapacity = 32)
     val emojiEvents: SharedFlow<String> = _emojiEvents
 
     fun canHost(): Boolean = BleCapability.canAdvertise(getApplication())
+
+    /** Known players from past tournaments this group has recorded, so the organizer can pick
+     *  existing ones instead of retyping — also how a returning organizer confirms their
+     *  account is actually registered with the group before starting a new tournament. */
+    fun loadKnownCompetitors() {
+        val password = readPassword ?: return
+        viewModelScope.launch {
+            when (val result = serverApi.listCompetitors(password)) {
+                is ServerResult.Success -> knownCompetitorNames = result.value.map { it.name }.sorted()
+                is ServerResult.Failure -> Unit
+            }
+        }
+    }
 
     fun startTournament(name: String, teams: List<Team>, groupAssignments: Map<String, List<String>>) {
         val groups = groupAssignments.map { (groupName, teamIds) ->

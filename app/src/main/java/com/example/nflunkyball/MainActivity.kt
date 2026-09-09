@@ -47,12 +47,29 @@ private fun NfLunkyBallApp() {
     NavHost(navController = navController, startDestination = "home") {
         composable("home") {
             HomeScreen(
-                onHost = { navController.navigate("organizer/setup") },
+                onHost = {
+                    val destination = if (organizerViewModel.organizerAccount != null) {
+                        "organizer/setup"
+                    } else {
+                        "organizer/link_account"
+                    }
+                    navController.navigate(destination)
+                },
                 onJoin = { navController.navigate("viewer/join") }
             )
         }
+        composable("organizer/link_account") {
+            LinkAccountScreen(
+                viewModel = organizerViewModel,
+                onDone = {
+                    navController.navigate("organizer/setup") {
+                        popUpTo("organizer/link_account") { inclusive = true }
+                    }
+                }
+            )
+        }
         composable("organizer/setup") {
-            SetupScreen { name, teams, groups ->
+            SetupScreen(viewModel = organizerViewModel) { name, teams, groups ->
                 organizerViewModel.startTournament(name, teams, groups)
                 navController.navigate("organizer/hosting")
             }
@@ -60,12 +77,8 @@ private fun NfLunkyBallApp() {
         composable("organizer/hosting") {
             HostingScreen(
                 viewModel = organizerViewModel,
-                onLinkAccount = { navController.navigate("organizer/link_account") },
                 onContinue = { navController.navigate("organizer/group_stage") }
             )
-        }
-        composable("organizer/link_account") {
-            LinkAccountScreen(viewModel = organizerViewModel, onDone = { navController.popBackStack() })
         }
         composable("organizer/group_stage") {
             GroupStageScreen(
