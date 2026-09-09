@@ -43,7 +43,7 @@ class OrganizerViewModel(application: Application) : AndroidViewModel(applicatio
     private val credentialsStore = ServerCredentialsStore(application)
     private val bluetoothAdapter: BluetoothAdapter? =
         application.getSystemService(BluetoothManager::class.java)?.adapter
-    private val broadcaster = bluetoothAdapter?.let { TournamentBroadcaster(it) }
+    private val broadcaster = bluetoothAdapter?.let { TournamentBroadcaster(it, application) }
 
     val tournament: StateFlow<Tournament?> = repository.tournament
 
@@ -124,6 +124,38 @@ class OrganizerViewModel(application: Application) : AndroidViewModel(applicatio
         repository.update { it.copy(phase = TournamentPhase.BRACKET) }
     }
 
+    /** Adds a new team to an in-progress group, generating matches against every team already
+     *  in it — existing results are untouched, only the new pairings are appended. */
+    fun addPlayer(groupId: String, playerName: String) {
+        val name = playerName.trim()
+        if (name.isBlank()) return
+        repository.update { t ->
+            val newTeam = Team(id = UUID.randomUUID().toString(), name = name)
+            t.copy(
+                teams = t.teams + newTeam,
+                groups = t.groups.map { g ->
+                    if (g.id != groupId) g
+                    else g.copy(
+                        teamIds = g.teamIds + newTeam.id,
+                        matches = g.matches + g.teamIds.map { existingTeamId ->
+                            Match(id = UUID.randomUUID().toString(), teamAId = existingTeamId, teamBId = newTeam.id)
+                        }
+                    )
+                }
+            )
+        }
+    }
+
+    /** Starts a new, empty round-robin group mid-tournament — e.g. once enough late arrivals
+     *  show up to field a second group. Add players to it afterwards via [addPlayer]. */
+    fun addGroup(groupName: String) {
+        val name = groupName.trim()
+        if (name.isBlank()) return
+        repository.update { t ->
+            t.copy(groups = t.groups + Group(id = UUID.randomUUID().toString(), name = name, teamIds = emptyList()))
+        }
+    }
+
     fun addBracketMatch(teamAId: String, teamBId: String, roundLabel: String) {
         repository.update { t ->
             t.copy(
@@ -147,8 +179,9 @@ class OrganizerViewModel(application: Application) : AndroidViewModel(applicatio
         repository.update { it.copy(phase = TournamentPhase.FINISHED) }
     }
 
-    /** Called once the organizer is done with a finished tournament (after upload) so the next
-     *  "Host a tournament" starts fresh instead of resuming a dead one. */
+    /** Called once the organizer is done with a finished tournament (after upload), or when
+     *  abandoning an in-progress one from the settings menu, so the next "Host a tournament"
+     *  starts fresh instead of resuming a dead one. */
     fun clearTournament() {
         stopHosting()
         repository.clear()

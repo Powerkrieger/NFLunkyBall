@@ -1,6 +1,5 @@
 package com.example.nflunkyball.ui.organizer
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -15,16 +14,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.unit.dp
 import com.example.nflunkyball.ble.RoomCode
 import com.example.nflunkyball.qr.JoinPayload
-import com.example.nflunkyball.qr.JoinPayloadCodec
-import com.example.nflunkyball.qr.QrCodeGenerator
 import com.example.nflunkyball.ui.shared.BluetoothGate
+import com.example.nflunkyball.ui.shared.RoomCodeDisplay
 
 /** Reached only once the organizer has a linked account (see MainActivity's routing), so
  *  [account] here is always non-null in practice. */
@@ -54,14 +50,7 @@ fun HostingScreen(
             if (roomId != null) {
                 val code = RoomCode.encode(roomId)
                 val payload = JoinPayload(room = code, server = account?.serverUrl, pw = readPassword)
-                val qrContent = remember(payload) { JoinPayloadCodec.encode(payload) }
-                val bitmap = remember(qrContent) { QrCodeGenerator.generate(qrContent) }
-                Image(
-                    bitmap = bitmap.asImageBitmap(),
-                    contentDescription = "Join QR code",
-                    modifier = Modifier.padding(24.dp)
-                )
-                Text(code, style = MaterialTheme.typography.displaySmall)
+                RoomCodeDisplay(payload)
             } else {
                 CircularProgressIndicator(Modifier.padding(24.dp))
             }

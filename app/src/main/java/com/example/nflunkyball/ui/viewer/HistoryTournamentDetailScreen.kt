@@ -15,6 +15,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -25,14 +26,25 @@ import com.example.nflunkyball.ui.shared.MatchList
 import com.example.nflunkyball.ui.shared.StandingsTable
 
 @Composable
-fun HistoryTournamentDetailScreen(viewModel: ViewerViewModel, tournamentId: Int) {
+fun HistoryTournamentDetailScreen(viewModel: ViewerViewModel, savedId: String) {
+    val saved by viewModel.savedTournaments.collectAsState()
+    val entry = saved.find { it.id == savedId }
     var tournament by remember { mutableStateOf<Tournament?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
 
-    LaunchedEffect(tournamentId) {
-        when (val result = viewModel.fetchTournamentDetail(tournamentId)) {
-            is ServerResult.Success -> tournament = result.value
-            is ServerResult.Failure -> error = result.message
+    LaunchedEffect(savedId, entry?.cachedTournamentJson) {
+        val cachedJson = entry?.cachedTournamentJson
+        val serverId = entry?.serverId
+        when {
+            cachedJson != null -> {
+                tournament = viewModel.decodeCachedTournament(cachedJson)
+                if (tournament == null) error = "Couldn't read this tournament's saved data"
+            }
+            serverId != null -> when (val result = viewModel.fetchTournamentDetail(serverId)) {
+                is ServerResult.Success -> tournament = result.value
+                is ServerResult.Failure -> error = result.message
+            }
+            else -> error = "This tournament isn't available yet"
         }
     }
 

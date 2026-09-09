@@ -14,7 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
 @Composable
-fun HomeScreen(onHost: () -> Unit, onJoin: () -> Unit) {
+fun HomeScreen(onHost: () -> Unit, onJoin: () -> Unit, onMyTournaments: () -> Unit) {
     Column(
         Modifier.fillMaxSize().padding(24.dp),
         verticalArrangement = Arrangement.Center,
@@ -26,6 +26,9 @@ fun HomeScreen(onHost: () -> Unit, onJoin: () -> Unit) {
         }
         Button(onClick = onJoin, modifier = Modifier.fillMaxWidth().padding(top = 16.dp)) {
             Text("Join a tournament")
+        }
+        Button(onClick = onMyTournaments, modifier = Modifier.fillMaxWidth().padding(top = 16.dp)) {
+            Text("My tournaments")
         }
     }
 }

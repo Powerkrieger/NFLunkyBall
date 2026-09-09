@@ -2,11 +2,14 @@ package com.example.nflunkyball.ble
 
 import android.annotation.SuppressLint
 import android.bluetooth.BluetoothAdapter
+import android.bluetooth.le.BluetoothLeAdvertiser
+import android.content.Context
 import android.util.Log
 import com.example.nflunkyball.model.Tournament
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -27,9 +30,12 @@ import kotlinx.serialization.json.Json
  */
 private const val TAG = "TournamentBroadcaster"
 
-class TournamentBroadcaster(private val adapter: BluetoothAdapter) {
+class TournamentBroadcaster(private val adapter: BluetoothAdapter, private val context: Context) {
 
-    private val json = Json { encodeDefaults = true }
+    // encodeDefaults=false (the kotlinx default) — every default-valued field omitted from the
+    // wire payload shrinks the chunk count on this bandwidth-starved transport; decoding still
+    // fills defaults back in regardless of whether the JSON was explicit about them.
+    private val json = Json
 
     private val _emojiEvents = MutableSharedFlow<EmojiPacket>(extraBufferCapacity = 32)
     val emojiEvents: SharedFlow<EmojiPacket> = _emojiEvents
@@ -76,13 +82,57 @@ class TournamentBroadcaster(private val adapter: BluetoothAdapter) {
     private suspend fun broadcastCycle(roomId: Int, version: Int, tournament: Tournament) {
         val advertiser = adapter.bluetoothLeAdvertiser ?: return
         val bytes = json.encodeToString(Tournament.serializer(), tournament).encodeToByteArray()
-        val chunks = ChunkedMessage.chunk(roomId, version, bytes)
+        val useExtended = BleCapability.supportsExtendedAdvertising(context)
+        Log.d(TAG, "Broadcasting v=$version roomId=$roomId totalBytes=${bytes.size} extended=$useExtended")
 
+        // Always cycle the legacy stream — every device, extended-capable or not, can decode
+        // it. Extended devices ALSO get the much-shorter extended stream in parallel; whichever
+        // finishes reassembling first wins (see TournamentReceiver). Broadcasting extended-only
+        // would silently strand any receiver whose BLE stack can't parse extended manufacturer
+        // data, which is a real failure mode observed on real (if older) hardware, not a
+        // hypothetical one.
+        coroutineScope {
+            launch {
+                cycleChunks(
+                    advertiser,
+                    ChunkedMessage.chunk(roomId, version, bytes, BleConstants.MAX_CHUNK_PAYLOAD_BYTES, BleConstants.TYPE_STATE_CHUNK),
+                    useExtended = false
+                )
+            }
+            if (useExtended) {
+                launch {
+                    cycleChunks(
+                        advertiser,
+                        ChunkedMessage.chunk(
+                            roomId, version, bytes,
+                            BleCapability.extendedChunkPayloadBytes(context),
+                            BleConstants.TYPE_STATE_CHUNK_EXTENDED
+                        ),
+                        useExtended = true
+                    )
+                }
+            }
+        }
+    }
+
+    @SuppressLint("MissingPermission")
+    private suspend fun cycleChunks(
+        advertiser: BluetoothLeAdvertiser,
+        chunks: List<StateChunkPacket>,
+        useExtended: Boolean
+    ) {
+        Log.d(TAG, "Cycling ${chunks.size} chunks extended=$useExtended")
         // Keep cycling this version's chunks until a newer Tournament value replaces it
-        // (collectLatest cancels this coroutine as soon as that happens).
+        // (collectLatest cancels the enclosing broadcastCycle coroutine as soon as that happens,
+        // which cancels both this and its sibling stream together).
         while (currentCoroutineContext().isActive) {
             for (chunkPacket in chunks) {
-                advertiser.burst(PacketCodec.encodeStateChunk(chunkPacket), BleConstants.CHUNK_INTERVAL_MS)
+                val packetBytes = PacketCodec.encodeStateChunk(chunkPacket)
+                if (useExtended) {
+                    advertiser.burstExtended(packetBytes, BleConstants.CHUNK_INTERVAL_MS)
+                } else {
+                    advertiser.burst(packetBytes, BleConstants.CHUNK_INTERVAL_MS)
+                }
             }
         }
     }

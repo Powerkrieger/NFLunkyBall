@@ -4,6 +4,9 @@ import android.annotation.SuppressLint
 import android.bluetooth.le.AdvertiseCallback
 import android.bluetooth.le.AdvertiseData
 import android.bluetooth.le.AdvertiseSettings
+import android.bluetooth.le.AdvertisingSet
+import android.bluetooth.le.AdvertisingSetCallback
+import android.bluetooth.le.AdvertisingSetParameters
 import android.bluetooth.le.BluetoothLeAdvertiser
 import android.util.Log
 import kotlinx.coroutines.CompletableDeferred
@@ -49,4 +52,41 @@ suspend fun BluetoothLeAdvertiser.burst(payload: ByteArray, durationMs: Long) {
     val didStart = started.await()
     delay(durationMs)
     if (didStart) stopAdvertising(callback)
+}
+
+/**
+ * Same contract as [burst] but over a Bluetooth 5 extended (non-legacy) advertising set, which
+ * accepts payloads far past the legacy 31-byte ceiling. Caller is responsible for checking
+ * [BleCapability.supportsExtendedAdvertising] first — this assumes the hardware/OS combo
+ * actually supports it.
+ */
+@SuppressLint("MissingPermission")
+suspend fun BluetoothLeAdvertiser.burstExtended(payload: ByteArray, durationMs: Long) {
+    val parameters = AdvertisingSetParameters.Builder()
+        .setLegacyMode(false)
+        .setConnectable(false)
+        .setInterval(AdvertisingSetParameters.INTERVAL_LOW)
+        .build()
+    val data = AdvertiseData.Builder()
+        .setIncludeDeviceName(false)
+        .setIncludeTxPowerLevel(false)
+        .addManufacturerData(BleConstants.MANUFACTURER_ID, payload)
+        .build()
+
+    val started = CompletableDeferred<AdvertisingSet?>()
+    val callback = object : AdvertisingSetCallback() {
+        override fun onAdvertisingSetStarted(advertisingSet: AdvertisingSet?, txPower: Int, status: Int) {
+            if (status == AdvertisingSetCallback.ADVERTISE_SUCCESS) {
+                started.complete(advertisingSet)
+            } else {
+                Log.w(TAG, "Extended advertising failed to start (payload ${payload.size}B): status=$status")
+                started.complete(null)
+            }
+        }
+    }
+
+    startAdvertisingSet(parameters, data, null, null, null, callback)
+    val set = started.await()
+    delay(durationMs)
+    if (set != null) stopAdvertisingSet(callback)
 }

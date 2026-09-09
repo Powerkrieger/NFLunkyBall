@@ -87,7 +87,8 @@ private fun NfLunkyBallApp() {
                     }
                     navController.navigate(destination)
                 },
-                onJoin = { navController.navigate("viewer/join") }
+                onJoin = { navController.navigate("viewer/join") },
+                onMyTournaments = { navController.navigate("viewer/history") }
             )
         }
         composable("organizer/link_account") {
@@ -127,7 +128,8 @@ private fun NfLunkyBallApp() {
                 onAdvanceToBracket = {
                     organizerViewModel.advanceToBracket()
                     navController.navigate("organizer/bracket")
-                }
+                },
+                onAbandoned = { navController.popBackStack(route = "home", inclusive = false) }
             )
         }
         composable("organizer/bracket") {
@@ -138,7 +140,8 @@ private fun NfLunkyBallApp() {
                     organizerViewModel.uploadToHistory()
                     organizerViewModel.clearTournament()
                     navController.popBackStack(route = "home", inclusive = false)
-                }
+                },
+                onAbandoned = { navController.popBackStack(route = "home", inclusive = false) }
             )
         }
         composable("viewer/join") {
@@ -153,13 +156,18 @@ private fun NfLunkyBallApp() {
         composable("viewer/history") {
             HistoryScreen(
                 viewModel = viewerViewModel,
-                onOpenTournament = { id -> navController.navigate("viewer/history/$id") }
+                onOpenTournament = { id -> navController.navigate("viewer/history/$id") },
+                onReconnected = {
+                    navController.navigate("viewer/scoreboard") {
+                        popUpTo("viewer/history") { inclusive = true }
+                    }
+                }
             )
         }
         composable("viewer/history/{id}") { backStackEntry ->
-            val id = backStackEntry.arguments?.getString("id")?.toIntOrNull()
+            val id = backStackEntry.arguments?.getString("id")
             if (id != null) {
-                HistoryTournamentDetailScreen(viewModel = viewerViewModel, tournamentId = id)
+                HistoryTournamentDetailScreen(viewModel = viewerViewModel, savedId = id)
             }
         }
     }

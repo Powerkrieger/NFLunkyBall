@@ -10,8 +10,10 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -27,21 +29,25 @@ import com.example.nflunkyball.model.Team
 import com.example.nflunkyball.ui.shared.MatchList
 import com.example.nflunkyball.ui.shared.MatchResultDialog
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun BracketScreen(viewModel: OrganizerViewModel, onFinish: () -> Unit) {
+fun BracketScreen(viewModel: OrganizerViewModel, onFinish: () -> Unit, onAbandoned: () -> Unit) {
     val tournament by viewModel.tournament.collectAsState()
     val current = tournament ?: return
     val teamNames = current.teams.associate { it.id to it.name }
     var pendingMatch by remember { mutableStateOf<Match?>(null) }
     var showAddMatch by remember { mutableStateOf(false) }
 
+    Scaffold(
+        topBar = { OrganizerTopBar("${current.name} — Bracket", current, viewModel, onAbandoned) }
+    ) { padding ->
     Column(
         Modifier
             .fillMaxSize()
+            .padding(padding)
             .padding(16.dp)
             .verticalScroll(rememberScrollState())
     ) {
-        Text("Bracket", style = MaterialTheme.typography.headlineSmall)
         MatchList(
             matches = current.bracketMatches,
             teamNames = teamNames,
@@ -55,6 +61,7 @@ fun BracketScreen(viewModel: OrganizerViewModel, onFinish: () -> Unit) {
             onClick = onFinish,
             modifier = Modifier.fillMaxWidth().padding(top = 24.dp, bottom = 24.dp)
         ) { Text("Finish Tournament") }
+    }
     }
 
     pendingMatch?.let { match ->

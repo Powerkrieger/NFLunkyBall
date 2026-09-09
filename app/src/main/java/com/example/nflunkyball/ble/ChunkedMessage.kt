@@ -3,16 +3,22 @@ package com.example.nflunkyball.ble
 object ChunkedMessage {
 
     /** Splits [payload] into a sequence of [StateChunkPacket]s, all sharing the same [version]. */
-    fun chunk(roomId: Int, version: Int, payload: ByteArray): List<StateChunkPacket> {
+    fun chunk(
+        roomId: Int,
+        version: Int,
+        payload: ByteArray,
+        maxChunkPayloadBytes: Int = BleConstants.MAX_CHUNK_PAYLOAD_BYTES,
+        packetType: Byte = BleConstants.TYPE_STATE_CHUNK
+    ): List<StateChunkPacket> {
         val pieces = if (payload.isEmpty()) {
             listOf(ByteArray(0))
         } else {
-            payload.toList().chunked(BleConstants.MAX_CHUNK_PAYLOAD_BYTES).map { it.toByteArray() }
+            payload.toList().chunked(maxChunkPayloadBytes).map { it.toByteArray() }
         }
         require(pieces.size <= BleConstants.MAX_CHUNK_COUNT) { "Payload too large to broadcast in chunks" }
         val count = pieces.size
         return pieces.mapIndexed { index, bytes ->
-            StateChunkPacket(roomId, version, index, count, bytes)
+            StateChunkPacket(roomId, version, index, count, bytes, packetType)
         }
     }
 }

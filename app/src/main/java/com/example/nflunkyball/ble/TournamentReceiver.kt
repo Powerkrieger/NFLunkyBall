@@ -33,7 +33,12 @@ class TournamentReceiver(private val adapter: BluetoothAdapter) {
     fun start(roomId: Int, scope: CoroutineScope) {
         stop()
         _tournament.value = null
-        val reassembler = ChunkReassembler()
+        // Legacy and extended-advertising chunk streams carry the same tournament version but
+        // are chunked independently (different max payload sizes), so each needs its own
+        // reassembler — mixing chunkIndex values from the two would corrupt both. Whichever
+        // stream this device can actually decode (every device should manage legacy; extended
+        // is a bonus where supported) completes and updates the shared state first.
+        val reassemblers = mutableMapOf<Byte, ChunkReassembler>()
 
         receiveJob = scope.launch {
             val scanner = adapter.bluetoothLeScanner ?: return@launch
@@ -42,6 +47,7 @@ class TournamentReceiver(private val adapter: BluetoothAdapter) {
                     .mapNotNull { PacketCodec.decodeStateChunk(it) }
                     .filter { it.roomId == roomId }
                     .collect { packet ->
+                        val reassembler = reassemblers.getOrPut(packet.packetType) { ChunkReassembler() }
                         val complete = reassembler.receive(packet) ?: return@collect
                         runCatching {
                             json.decodeFromString(Tournament.serializer(), complete.decodeToString())
