@@ -14,7 +14,6 @@ import com.example.nflunkyball.ble.TournamentReceiver
 import com.example.nflunkyball.model.Tournament
 import com.example.nflunkyball.qr.JoinPayload
 import com.example.nflunkyball.server.CompetitorStats
-import com.example.nflunkyball.server.DEFAULT_SERVER_URL
 import com.example.nflunkyball.server.ServerApi
 import com.example.nflunkyball.server.ServerCredentialsStore
 import com.example.nflunkyball.server.ServerResult
@@ -48,20 +47,23 @@ class ViewerViewModel(application: Application) : AndroidViewModel(application) 
     fun join(payload: JoinPayload) {
         joinPayload = payload
         payload.pw?.let { credentialsStore.saveReadPassword(it) }
+        payload.server?.let { credentialsStore.saveViewerServerUrl(it) }
         val roomId = RoomCode.decode(payload.room) ?: return
         receiver?.start(roomId, viewModelScope)
     }
+
+    private fun resolveServerUrl(): String? = joinPayload?.server ?: credentialsStore.loadViewerServerUrl()
 
     fun sendEmoji(emoji: String) {
         val roomId = joinPayload?.let { RoomCode.decode(it.room) } ?: return
         viewModelScope.launch { receiver?.sendEmoji(roomId, EmojiPalette.codeFor(emoji)) }
     }
 
-    fun readPasswordAvailable(): Boolean =
-        (joinPayload?.pw ?: credentialsStore.loadReadPassword()) != null
+    fun historyAvailable(): Boolean =
+        (joinPayload?.pw ?: credentialsStore.loadReadPassword()) != null && resolveServerUrl() != null
 
     fun loadHistory() {
-        val server = joinPayload?.server ?: DEFAULT_SERVER_URL
+        val server = resolveServerUrl() ?: return
         val password = joinPayload?.pw ?: credentialsStore.loadReadPassword() ?: return
         val api = ServerApi(server)
         viewModelScope.launch {
@@ -81,7 +83,7 @@ class ViewerViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     suspend fun fetchTournamentDetail(id: Int): ServerResult<Tournament> {
-        val server = joinPayload?.server ?: DEFAULT_SERVER_URL
+        val server = resolveServerUrl() ?: return ServerResult.Failure("No server address available")
         val password = joinPayload?.pw ?: credentialsStore.loadReadPassword()
             ?: return ServerResult.Failure("No read password available")
         return when (val result = ServerApi(server).getTournamentJson(id, password)) {

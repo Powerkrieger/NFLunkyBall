@@ -15,8 +15,6 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
-const val DEFAULT_SERVER_URL = "https://REDACTED-SERVER-HOST"
-
 @Serializable
 data class RegisterRequest(
     @SerialName("display_name") val displayName: String,
@@ -25,7 +23,10 @@ data class RegisterRequest(
 )
 
 @Serializable
-data class RegisterResponse(@SerialName("account_id") val accountId: Int)
+data class RegisterResponse(
+    @SerialName("account_id") val accountId: Int,
+    @SerialName("read_password") val readPassword: String
+)
 
 @Serializable
 data class UploadRequest(
@@ -55,7 +56,9 @@ private suspend fun <T> serverCall(block: suspend () -> T): ServerResult<T> =
         onFailure = { ServerResult.Failure(it.message ?: "Request failed") }
     )
 
-class ServerApi(private val baseUrl: String = DEFAULT_SERVER_URL) {
+/** [baseUrl] always comes from a decoded [InvitePayload] or [com.example.nflunkyball.qr.JoinPayload] —
+ *  never hardcoded, see those types' docs for why. */
+class ServerApi(private val baseUrl: String) {
 
     private val client = HttpClient(CIO) {
         install(ContentNegotiation) { json(Json { ignoreUnknownKeys = true }) }

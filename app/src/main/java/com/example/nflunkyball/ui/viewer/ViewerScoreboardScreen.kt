@@ -46,7 +46,7 @@ fun ViewerScoreboardScreen(viewModel: ViewerViewModel, onOpenHistory: () -> Unit
                         style = MaterialTheme.typography.headlineSmall,
                         modifier = Modifier.weight(1f)
                     )
-                    if (viewModel.readPasswordAvailable()) {
+                    if (viewModel.historyAvailable()) {
                         TextButton(onClick = onOpenHistory) { Text("History") }
                     }
                 }

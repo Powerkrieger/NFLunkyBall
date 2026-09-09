@@ -22,6 +22,7 @@ import com.example.nflunkyball.model.TournamentPhase
 import com.example.nflunkyball.model.generateRoundRobinMatches
 import com.example.nflunkyball.persistence.TournamentRepository
 import com.example.nflunkyball.server.Ed25519
+import com.example.nflunkyball.server.InvitePayloadCodec
 import com.example.nflunkyball.server.OrganizerAccount
 import com.example.nflunkyball.server.ServerCredentialsStore
 import com.example.nflunkyball.server.ServerApi
@@ -40,7 +41,6 @@ class OrganizerViewModel(application: Application) : AndroidViewModel(applicatio
     private val uploadJson = Json { encodeDefaults = true }
     private val repository = TournamentRepository(application)
     private val credentialsStore = ServerCredentialsStore(application)
-    private val serverApi = ServerApi()
     private val bluetoothAdapter: BluetoothAdapter? =
         application.getSystemService(BluetoothManager::class.java)?.adapter
     private val broadcaster = bluetoothAdapter?.let { TournamentBroadcaster(it) }
@@ -71,9 +71,10 @@ class OrganizerViewModel(application: Application) : AndroidViewModel(applicatio
      *  existing ones instead of retyping — also how a returning organizer confirms their
      *  account is actually registered with the group before starting a new tournament. */
     fun loadKnownCompetitors() {
+        val account = organizerAccount ?: return
         val password = readPassword ?: return
         viewModelScope.launch {
-            when (val result = serverApi.listCompetitors(password)) {
+            when (val result = ServerApi(account.serverUrl).listCompetitors(password)) {
                 is ServerResult.Success -> knownCompetitorNames = result.value.map { it.name }.sorted()
                 is ServerResult.Failure -> Unit
             }
@@ -149,27 +150,34 @@ class OrganizerViewModel(application: Application) : AndroidViewModel(applicatio
         repository.update { it.copy(phase = TournamentPhase.FINISHED) }
     }
 
+    /** [inviteCode] is the whole code an admin generated (bundles the server URL + token) —
+     *  see InvitePayload for why the app never hardcodes a server address itself. */
     fun linkAccount(
         displayName: String,
-        inviteToken: String,
-        groupReadPassword: String,
+        inviteCode: String,
         onResult: (Boolean, String) -> Unit
     ) {
+        val invite = InvitePayloadCodec.decode(inviteCode)
+        if (invite == null) {
+            onResult(false, "That doesn't look like a valid invite code")
+            return
+        }
         viewModelScope.launch {
             val keyPair = Ed25519.generateKeyPair()
             val publicKeyB64 = Base64.encodeToString(keyPair.publicKeyBytes, Base64.NO_WRAP)
-            when (val result = serverApi.register(displayName, inviteToken, publicKeyB64)) {
+            when (val result = ServerApi(invite.server).register(displayName, invite.token, publicKeyB64)) {
                 is ServerResult.Success -> {
                     val account = OrganizerAccount(
                         accountId = result.value.accountId,
                         displayName = displayName,
+                        serverUrl = invite.server,
                         privateKeySeed = keyPair.privateKeySeed,
                         publicKeyBytes = keyPair.publicKeyBytes
                     )
                     credentialsStore.saveAccount(account)
-                    credentialsStore.saveReadPassword(groupReadPassword)
+                    credentialsStore.saveReadPassword(result.value.readPassword)
                     organizerAccount = account
-                    readPassword = groupReadPassword
+                    readPassword = result.value.readPassword
                     onResult(true, "Linked as $displayName")
                 }
                 is ServerResult.Failure -> onResult(false, result.message)
@@ -187,7 +195,9 @@ class OrganizerViewModel(application: Application) : AndroidViewModel(applicatio
             val message = "${current.id}|$timestamp|${sha256Hex(bodyJson)}"
             val signature = Ed25519.sign(account.privateKeySeed, message.toByteArray())
             val signatureB64 = Base64.encodeToString(signature, Base64.NO_WRAP)
-            uploadStatus = when (val result = serverApi.uploadTournament(account.accountId, timestamp, signatureB64, bodyJson)) {
+            val result = ServerApi(account.serverUrl)
+                .uploadTournament(account.accountId, timestamp, signatureB64, bodyJson)
+            uploadStatus = when (result) {
                 is ServerResult.Success -> "Uploaded"
                 is ServerResult.Failure -> "Failed: ${result.message}"
             }

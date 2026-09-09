@@ -22,7 +22,6 @@ import com.example.nflunkyball.ble.RoomCode
 import com.example.nflunkyball.qr.JoinPayload
 import com.example.nflunkyball.qr.JoinPayloadCodec
 import com.example.nflunkyball.qr.QrCodeGenerator
-import com.example.nflunkyball.server.DEFAULT_SERVER_URL
 
 /** Reached only once the organizer has a linked account (see MainActivity's routing), so
  *  [account] here is always non-null in practice. */
@@ -45,7 +44,7 @@ fun HostingScreen(
 
         if (roomId != null) {
             val code = RoomCode.encode(roomId)
-            val payload = JoinPayload(room = code, server = DEFAULT_SERVER_URL, pw = readPassword)
+            val payload = JoinPayload(room = code, server = account?.serverUrl, pw = readPassword)
             val qrContent = remember(payload) { JoinPayloadCodec.encode(payload) }
             val bitmap = remember(qrContent) { QrCodeGenerator.generate(qrContent) }
             Image(

@@ -8,6 +8,7 @@ import androidx.security.crypto.MasterKey
 data class OrganizerAccount(
     val accountId: Int,
     val displayName: String,
+    val serverUrl: String,
     val privateKeySeed: ByteArray,
     val publicKeyBytes: ByteArray
 )
@@ -32,17 +33,19 @@ class ServerCredentialsStore(context: Context) {
         val accountId = prefs.getInt(KEY_ACCOUNT_ID, -1)
         if (accountId == -1) return null
         val displayName = prefs.getString(KEY_DISPLAY_NAME, null) ?: return null
+        val serverUrl = prefs.getString(KEY_SERVER_URL, null) ?: return null
         val privateKeySeed = prefs.getString(KEY_PRIVATE_KEY, null)
             ?.let { Base64.decode(it, Base64.NO_WRAP) } ?: return null
         val publicKeyBytes = prefs.getString(KEY_PUBLIC_KEY, null)
             ?.let { Base64.decode(it, Base64.NO_WRAP) } ?: return null
-        return OrganizerAccount(accountId, displayName, privateKeySeed, publicKeyBytes)
+        return OrganizerAccount(accountId, displayName, serverUrl, privateKeySeed, publicKeyBytes)
     }
 
     fun saveAccount(account: OrganizerAccount) {
         prefs.edit()
             .putInt(KEY_ACCOUNT_ID, account.accountId)
             .putString(KEY_DISPLAY_NAME, account.displayName)
+            .putString(KEY_SERVER_URL, account.serverUrl)
             .putString(KEY_PRIVATE_KEY, Base64.encodeToString(account.privateKeySeed, Base64.NO_WRAP))
             .putString(KEY_PUBLIC_KEY, Base64.encodeToString(account.publicKeyBytes, Base64.NO_WRAP))
             .apply()
@@ -54,6 +57,14 @@ class ServerCredentialsStore(context: Context) {
         prefs.edit().putString(KEY_READ_PASSWORD, password).apply()
     }
 
+    /** Last known server address for a pure viewer (never linked an organizer account) —
+     *  so returning to History after reopening the app works without rescanning a QR. */
+    fun loadViewerServerUrl(): String? = prefs.getString(KEY_VIEWER_SERVER_URL, null)
+
+    fun saveViewerServerUrl(serverUrl: String) {
+        prefs.edit().putString(KEY_VIEWER_SERVER_URL, serverUrl).apply()
+    }
+
     fun clear() {
         prefs.edit().clear().apply()
     }
@@ -61,8 +72,10 @@ class ServerCredentialsStore(context: Context) {
     private companion object {
         const val KEY_ACCOUNT_ID = "account_id"
         const val KEY_DISPLAY_NAME = "display_name"
+        const val KEY_SERVER_URL = "server_url"
         const val KEY_PRIVATE_KEY = "private_key_seed"
         const val KEY_PUBLIC_KEY = "public_key"
         const val KEY_READ_PASSWORD = "read_password"
+        const val KEY_VIEWER_SERVER_URL = "viewer_server_url"
     }
 }
