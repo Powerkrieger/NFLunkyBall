@@ -17,6 +17,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.example.nflunkyball.qr.JoinPayloadCodec
+import com.example.nflunkyball.ui.shared.BluetoothGate
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
 
@@ -36,40 +37,42 @@ fun JoinScreen(viewModel: ViewerViewModel, onJoined: () -> Unit) {
         }
     }
 
-    Column(
-        Modifier.fillMaxWidth().padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text("Join a tournament", style = MaterialTheme.typography.headlineSmall)
+    BluetoothGate {
+        Column(
+            Modifier.fillMaxWidth().padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text("Join a tournament", style = MaterialTheme.typography.headlineSmall)
 
-        Button(
-            onClick = { scanLauncher.launch(ScanOptions().setOrientationLocked(false).setBeepEnabled(false)) },
-            modifier = Modifier.fillMaxWidth().padding(top = 24.dp)
-        ) { Text("Scan QR code") }
+            Button(
+                onClick = { scanLauncher.launch(ScanOptions().setOrientationLocked(false).setBeepEnabled(false)) },
+                modifier = Modifier.fillMaxWidth().padding(top = 24.dp)
+            ) { Text("Scan QR code") }
 
-        Text("or", modifier = Modifier.padding(vertical = 16.dp))
+            Text("or", modifier = Modifier.padding(vertical = 16.dp))
 
-        OutlinedTextField(
-            value = manualCode,
-            onValueChange = { manualCode = it },
-            label = { Text("Enter code") },
-            modifier = Modifier.fillMaxWidth()
-        )
-        error?.let {
-            Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 8.dp))
+            OutlinedTextField(
+                value = manualCode,
+                onValueChange = { manualCode = it },
+                label = { Text("Enter code") },
+                modifier = Modifier.fillMaxWidth()
+            )
+            error?.let {
+                Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 8.dp))
+            }
+            Button(
+                onClick = {
+                    val payload = JoinPayloadCodec.decode(manualCode)
+                    if (payload != null) {
+                        viewModel.join(payload)
+                        onJoined()
+                    } else {
+                        error = "Enter a valid code"
+                    }
+                },
+                enabled = manualCode.isNotBlank(),
+                modifier = Modifier.fillMaxWidth().padding(top = 16.dp)
+            ) { Text("Join") }
         }
-        Button(
-            onClick = {
-                val payload = JoinPayloadCodec.decode(manualCode)
-                if (payload != null) {
-                    viewModel.join(payload)
-                    onJoined()
-                } else {
-                    error = "Enter a valid code"
-                }
-            },
-            enabled = manualCode.isNotBlank(),
-            modifier = Modifier.fillMaxWidth().padding(top = 16.dp)
-        ) { Text("Join") }
     }
 }

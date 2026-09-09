@@ -9,6 +9,10 @@ object BleCapability {
     fun bluetoothAdapter(context: Context): BluetoothAdapter? =
         context.getSystemService(BluetoothManager::class.java)?.adapter
 
+    /** False both when there's no Bluetooth hardware at all and when it's just turned off. */
+    fun isBluetoothEnabled(context: Context): Boolean =
+        bluetoothAdapter(context)?.isEnabled == true
+
     /** Scanning (viewing scores) works on effectively every device with Bluetooth enabled. */
     fun canScan(context: Context): Boolean =
         bluetoothAdapter(context)?.isEnabled == true

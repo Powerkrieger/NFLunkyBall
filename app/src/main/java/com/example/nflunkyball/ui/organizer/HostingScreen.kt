@@ -22,6 +22,7 @@ import com.example.nflunkyball.ble.RoomCode
 import com.example.nflunkyball.qr.JoinPayload
 import com.example.nflunkyball.qr.JoinPayloadCodec
 import com.example.nflunkyball.qr.QrCodeGenerator
+import com.example.nflunkyball.ui.shared.BluetoothGate
 
 /** Reached only once the organizer has a linked account (see MainActivity's routing), so
  *  [account] here is always non-null in practice. */
@@ -30,39 +31,43 @@ fun HostingScreen(
     viewModel: OrganizerViewModel,
     onContinue: () -> Unit
 ) {
-    LaunchedEffect(Unit) { viewModel.startHosting() }
+    BluetoothGate {
+        // Inside the gate so it only starts once Bluetooth is confirmed on, rather than
+        // silently no-op-ing if it was off when this screen first appeared.
+        LaunchedEffect(Unit) { viewModel.startHosting() }
 
-    val roomId = viewModel.roomId
-    val account = viewModel.organizerAccount
-    val readPassword = viewModel.readPassword
+        val roomId = viewModel.roomId
+        val account = viewModel.organizerAccount
+        val readPassword = viewModel.readPassword
 
-    Column(
-        Modifier.fillMaxSize().padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text("Share this to let people watch", style = MaterialTheme.typography.titleMedium)
+        Column(
+            Modifier.fillMaxSize().padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text("Share this to let people watch", style = MaterialTheme.typography.titleMedium)
 
-        if (roomId != null) {
-            val code = RoomCode.encode(roomId)
-            val payload = JoinPayload(room = code, server = account?.serverUrl, pw = readPassword)
-            val qrContent = remember(payload) { JoinPayloadCodec.encode(payload) }
-            val bitmap = remember(qrContent) { QrCodeGenerator.generate(qrContent) }
-            Image(
-                bitmap = bitmap.asImageBitmap(),
-                contentDescription = "Join QR code",
-                modifier = Modifier.padding(24.dp)
-            )
-            Text(code, style = MaterialTheme.typography.displaySmall)
-        } else {
-            CircularProgressIndicator(Modifier.padding(24.dp))
-        }
+            if (roomId != null) {
+                val code = RoomCode.encode(roomId)
+                val payload = JoinPayload(room = code, server = account?.serverUrl, pw = readPassword)
+                val qrContent = remember(payload) { JoinPayloadCodec.encode(payload) }
+                val bitmap = remember(qrContent) { QrCodeGenerator.generate(qrContent) }
+                Image(
+                    bitmap = bitmap.asImageBitmap(),
+                    contentDescription = "Join QR code",
+                    modifier = Modifier.padding(24.dp)
+                )
+                Text(code, style = MaterialTheme.typography.displaySmall)
+            } else {
+                CircularProgressIndicator(Modifier.padding(24.dp))
+            }
 
-        Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(24.dp))
 
-        account?.let { Text("Hosting as ${it.displayName}", style = MaterialTheme.typography.bodyMedium) }
+            account?.let { Text("Hosting as ${it.displayName}", style = MaterialTheme.typography.bodyMedium) }
 
-        Button(onClick = onContinue, modifier = Modifier.fillMaxWidth().padding(top = 24.dp)) {
-            Text("Continue to scoring")
+            Button(onClick = onContinue, modifier = Modifier.fillMaxWidth().padding(top = 24.dp)) {
+                Text("Continue to scoring")
+            }
         }
     }
 }
