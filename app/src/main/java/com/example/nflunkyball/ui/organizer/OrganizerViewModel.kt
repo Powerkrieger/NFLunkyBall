@@ -21,6 +21,7 @@ import com.example.nflunkyball.model.Tournament
 import com.example.nflunkyball.model.TournamentPhase
 import com.example.nflunkyball.model.generateRoundRobinMatches
 import com.example.nflunkyball.persistence.AppSettingsStore
+import com.example.nflunkyball.persistence.MatchDrinkStore
 import com.example.nflunkyball.persistence.TournamentRepository
 import com.example.nflunkyball.server.Ed25519
 import com.example.nflunkyball.server.InvitePayloadCodec
@@ -28,6 +29,8 @@ import com.example.nflunkyball.server.OrganizerAccount
 import com.example.nflunkyball.server.ServerCredentialsStore
 import com.example.nflunkyball.server.ServerApi
 import com.example.nflunkyball.server.ServerResult
+import com.example.nflunkyball.server.UploadTournament
+import com.example.nflunkyball.server.toUploadPayload
 import java.security.MessageDigest
 import java.util.UUID
 import kotlinx.coroutines.Job
@@ -51,6 +54,7 @@ class OrganizerViewModel(application: Application) : AndroidViewModel(applicatio
     private val repository = TournamentRepository(application)
     private val credentialsStore = ServerCredentialsStore(application)
     private val settingsStore = AppSettingsStore(application)
+    private val drinkStore = MatchDrinkStore(application)
     private val bluetoothAdapter: BluetoothAdapter? =
         application.getSystemService(BluetoothManager::class.java)?.adapter
     private val broadcaster = bluetoothAdapter?.let { TournamentBroadcaster(it, application) }
@@ -340,7 +344,20 @@ class OrganizerViewModel(application: Application) : AndroidViewModel(applicatio
     fun clearTournament() {
         stopHosting()
         repository.clear()
+        drinkStore.clear()
     }
+
+    /** Recorded locally only (see [MatchDrinkStore]) — never touches [repository], so it's never
+     *  part of what BLE broadcasting or live sync serialize. Only reaches the server via
+     *  [uploadToHistory]. */
+    fun recordDrink(matchId: String, drink: String) {
+        val trimmed = drink.trim()
+        if (trimmed.isBlank()) return
+        drinkStore.set(matchId, trimmed)
+    }
+
+    /** Distinct previously-entered drinks, for autocomplete suggestions when recording a new one. */
+    fun knownDrinks(): List<String> = drinkStore.all().values.distinct().sorted()
 
     /** [inviteCode] is the whole code an admin generated (bundles the server URL + token) —
      *  see InvitePayload for why the app never hardcodes a server address itself. */
@@ -397,7 +414,9 @@ class OrganizerViewModel(application: Application) : AndroidViewModel(applicatio
         val current = tournament.value ?: return
         viewModelScope.launch {
             uploadStatus = "Uploading…"
-            val bodyJson = uploadJson.encodeToString(Tournament.serializer(), current)
+            // The one and only place drink choices ever leave this device — see MatchDrinkStore.
+            val payload = current.toUploadPayload(drinkStore.all())
+            val bodyJson = uploadJson.encodeToString(UploadTournament.serializer(), payload)
             val timestamp = System.currentTimeMillis() / 1000
             val message = "${current.id}|$timestamp|${sha256Hex(bodyJson)}"
             val signature = Ed25519.sign(account.privateKeySeed, message.toByteArray())

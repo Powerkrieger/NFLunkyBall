@@ -4,10 +4,14 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
+import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -25,11 +29,13 @@ import com.example.nflunkyball.model.MatchResult
 fun MatchResultDialog(
     match: Match,
     teamNames: Map<String, String>,
+    knownDrinks: List<String> = emptyList(),
     onDismiss: () -> Unit,
-    onConfirm: (MatchResult) -> Unit
+    onConfirm: (MatchResult, drink: String) -> Unit
 ) {
     var winnerId by remember { mutableStateOf(match.result?.winnerId ?: match.teamAId) }
     var scoreText by remember { mutableStateOf(match.result?.winnerScore?.toString() ?: "") }
+    var drink by remember { mutableStateOf("") }
     val score = scoreText.toIntOrNull()
 
     AlertDialog(
@@ -51,11 +57,31 @@ fun MatchResultDialog(
                     label = { Text("Winner's score (seconds, 300 = forfeit)") },
                     singleLine = true
                 )
+                Spacer(Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = drink,
+                    onValueChange = { drink = it },
+                    // Deliberately not synced anywhere live — see MatchDrinkStore's doc for why
+                    // this stays organizer-only until the tournament is finished and uploaded.
+                    label = { Text("Drink (optional, organizer-only)") },
+                    singleLine = true
+                )
+                if (knownDrinks.isNotEmpty()) {
+                    LazyRow(Modifier.padding(top = 4.dp)) {
+                        items(knownDrinks) { name ->
+                            SuggestionChip(
+                                onClick = { drink = name },
+                                label = { Text(name) },
+                                modifier = Modifier.padding(end = 8.dp)
+                            )
+                        }
+                    }
+                }
             }
         },
         confirmButton = {
             TextButton(
-                onClick = { onConfirm(MatchResult(winnerId = winnerId, winnerScore = score!!)) },
+                onClick = { onConfirm(MatchResult(winnerId = winnerId, winnerScore = score!!), drink) },
                 enabled = score != null
             ) { Text("Save") }
         },
