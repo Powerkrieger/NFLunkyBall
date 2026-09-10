@@ -5,15 +5,18 @@ import kotlinx.serialization.json.Json
 
 /**
  * What the organizer's QR code (or manually-typed fallback) carries. [room] is always present
- * and is all a viewer needs for live BLE score viewing — [server]/[pw] are only included once
- * the organizer has linked an account and synced history, giving scanning viewers automatic
- * read access to the history server too.
+ * and is all a viewer needs for live BLE score viewing — [server]/[pw]/[tid] are only included
+ * once the organizer has linked an account (required before hosting, so in practice always),
+ * giving scanning viewers automatic read access to the history server too. [tid] (the
+ * tournament's own UUID, not the lossy 16-bit [com.example.nflunkyball.ble.RoomCode]) is what a
+ * viewer needs to poll server-backed live sync — see [ViewerViewModel.join].
  */
 @Serializable
 data class JoinPayload(
     val room: String,
     val server: String? = null,
-    val pw: String? = null
+    val pw: String? = null,
+    val tid: String? = null
 )
 
 object JoinPayloadCodec {

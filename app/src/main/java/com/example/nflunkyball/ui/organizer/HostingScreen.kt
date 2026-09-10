@@ -29,24 +29,25 @@ fun HostingScreen(
     viewModel: OrganizerViewModel,
     onContinue: () -> Unit
 ) {
-    // BLE live sync is opt-in (see SettingsScreen) — only gate this screen behind the Bluetooth
-    // radio being on when we're actually going to use it.
-    if (viewModel.bleEnabled()) {
+    // BLE is an opt-in fallback (see SettingsScreen) — only gate this screen behind the
+    // Bluetooth radio being on when we're actually going to use it. Server mode needs no gate.
+    if (viewModel.useBleSync()) {
         BluetoothGate {
             // Inside the gate so it only starts once Bluetooth is confirmed on, rather than
             // silently no-op-ing if it was off when this screen first appeared.
             LaunchedEffect(Unit) { viewModel.startHosting() }
-            HostingScreenContent(viewModel, bleEnabled = true, onContinue)
+            HostingScreenContent(viewModel, useBleSync = true, onContinue)
         }
     } else {
-        HostingScreenContent(viewModel, bleEnabled = false, onContinue)
+        LaunchedEffect(Unit) { viewModel.startHosting() }
+        HostingScreenContent(viewModel, useBleSync = false, onContinue)
     }
 }
 
 @Composable
 private fun HostingScreenContent(
     viewModel: OrganizerViewModel,
-    bleEnabled: Boolean,
+    useBleSync: Boolean,
     onContinue: () -> Unit
 ) {
     val tournament by viewModel.tournament.collectAsState()
@@ -56,6 +57,7 @@ private fun HostingScreenContent(
     val account = viewModel.organizerAccount
     val readPassword = viewModel.readPassword
     val broadcastVersion by viewModel.broadcastVersion.collectAsState()
+    val serverSyncStatus by viewModel.serverSyncStatus.collectAsState()
 
     Column(
         Modifier.fillMaxSize().padding(24.dp),
@@ -63,9 +65,9 @@ private fun HostingScreenContent(
     ) {
         Text("Share this to let people watch", style = MaterialTheme.typography.titleMedium)
 
-        if (roomId != null) {
+        if (roomId != null && tournament != null) {
             val code = RoomCode.encode(roomId)
-            val payload = JoinPayload(room = code, server = account?.serverUrl, pw = readPassword)
+            val payload = JoinPayload(room = code, server = account?.serverUrl, pw = readPassword, tid = tournament?.id)
             RoomCodeDisplay(payload)
         } else {
             CircularProgressIndicator(Modifier.padding(24.dp))
@@ -73,15 +75,11 @@ private fun HostingScreenContent(
 
         Spacer(Modifier.height(24.dp))
 
-        if (bleEnabled) {
+        if (useBleSync) {
             val versionText = broadcastVersion?.let { "Broadcasting version $it" } ?: "Starting broadcast…"
             Text(versionText, style = MaterialTheme.typography.bodyMedium)
         } else {
-            Text(
-                "Live sync over Bluetooth is off. Turn it on in Settings if you want viewers " +
-                    "to see live scores.",
-                style = MaterialTheme.typography.bodyMedium
-            )
+            Text(serverSyncStatus ?: "Starting sync…", style = MaterialTheme.typography.bodyMedium)
         }
 
         account?.let { Text("Hosting as ${it.displayName}", style = MaterialTheme.typography.bodyMedium) }

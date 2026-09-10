@@ -76,10 +76,10 @@ fun JoinScreen(viewModel: ViewerViewModel, onJoined: () -> Unit) {
         }
     }
 
-    // Bluetooth is only actually needed here when the BLE live-sync toggle is on — gating the
+    // Bluetooth is only actually needed here when BLE sync is the active mode — gating the
     // whole screen behind "Bluetooth must be on" otherwise would block entering a join code for
-    // no reason.
-    if (viewModel.bleEnabled()) {
+    // no reason (server mode needs no Bluetooth at all).
+    if (viewModel.useBleSync()) {
         BluetoothGate { content() }
     } else {
         content()

@@ -60,12 +60,10 @@ fun ViewerScoreboardScreen(viewModel: ViewerViewModel, onOpenHistory: () -> Unit
                 .verticalScroll(rememberScrollState())
                 .padding(bottom = 72.dp)
         ) {
-            if (!viewModel.bleEnabled()) {
-                Text(
-                    "Live sync over Bluetooth is off. Turn it on in Settings to see live scores.",
-                    style = MaterialTheme.typography.bodyLarge
-                )
-            } else {
+            // Chunk-reassembly progress only applies to BLE mode — server mode has no equivalent
+            // (a single request either has the latest state or it doesn't), so it shows nothing
+            // extra here; "Waiting for the organizer's scores…" below covers the empty case.
+            if (viewModel.useBleSync()) {
                 val progress = receiveProgress
                 if (progress != null) {
                     Text(

@@ -7,9 +7,11 @@ import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.request.post
+import io.ktor.client.request.put
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
+import io.ktor.http.isSuccess
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -84,6 +86,31 @@ class ServerApi(private val baseUrl: String) {
         client.post("$baseUrl/tournaments") {
             contentType(ContentType.Application.Json)
             setBody(UploadRequest(accountId, timestamp, signatureBase64, bodyJson))
+        }.body()
+    }
+
+    /** Organizer-side push for server-backed live sync (the alternative to BLE broadcasting,
+     *  see AppSettingsStore) — called on every score change, unlike [uploadTournament] which is
+     *  a manual one-shot archive upload. Upserts on the server, so no conflict handling here. */
+    suspend fun pushLiveTournament(
+        tournamentId: String,
+        accountId: Int,
+        timestamp: Long,
+        signatureBase64: String,
+        bodyJson: String
+    ): ServerResult<Unit> = serverCall {
+        val response = client.put("$baseUrl/tournaments/live/$tournamentId") {
+            contentType(ContentType.Application.Json)
+            setBody(UploadRequest(accountId, timestamp, signatureBase64, bodyJson))
+        }
+        check(response.status.isSuccess()) { "Live push failed: ${response.status}" }
+    }
+
+    /** Viewer-side poll for server-backed live sync. Returns the raw JSON text, same as
+     *  [getTournamentJson] — the app's own Tournament serializer decodes it from here. */
+    suspend fun getLiveTournamentJson(tournamentId: String, readPassword: String): ServerResult<String> = serverCall {
+        client.get("$baseUrl/tournaments/live/$tournamentId") {
+            header("X-Read-Password", readPassword)
         }.body()
     }
 

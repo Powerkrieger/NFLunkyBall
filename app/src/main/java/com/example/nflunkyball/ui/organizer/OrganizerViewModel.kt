@@ -30,10 +30,12 @@ import com.example.nflunkyball.server.ServerApi
 import com.example.nflunkyball.server.ServerResult
 import java.security.MessageDigest
 import java.util.UUID
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
@@ -51,8 +53,15 @@ class OrganizerViewModel(application: Application) : AndroidViewModel(applicatio
     val tournament: StateFlow<Tournament?> = repository.tournament
 
     /** The version currently on air, or null while hosting is off/not yet started — see
-     *  [HostingScreen]'s "broadcasting version N" status. */
+     *  [HostingScreen]'s "broadcasting version N" status. Only moves in BLE mode. */
     val broadcastVersion: StateFlow<Int?> = broadcaster?.broadcastVersion ?: MutableStateFlow(null)
+
+    /** Server-mode counterpart to [broadcastVersion] — null until the first push attempt.
+     *  Only moves in server mode (see [useBleSync]). */
+    private val _serverSyncStatus = MutableStateFlow<String?>(null)
+    val serverSyncStatus: StateFlow<String?> = _serverSyncStatus
+
+    private var serverSyncJob: Job? = null
 
     var organizerAccount by mutableStateOf(credentialsStore.loadAccount())
         private set
@@ -74,7 +83,7 @@ class OrganizerViewModel(application: Application) : AndroidViewModel(applicatio
     /** Read fresh each time rather than cached at construction — this ViewModel outlives a
      *  single visit to the Settings screen, so a toggle flipped there mid-session must be seen
      *  the next time hosting actually starts. */
-    fun bleEnabled(): Boolean = settingsStore.isBleEnabled()
+    fun useBleSync(): Boolean = settingsStore.useBleSync()
 
     /** Known players from past tournaments this group has recorded, so the organizer can pick
      *  existing ones instead of retyping — also how a returning organizer confirms their
@@ -107,18 +116,55 @@ class OrganizerViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     fun startHosting() {
-        val adapter = bluetoothAdapter ?: return
-        val id = tournament.value?.id?.let { RoomCode.forTournament(it) } ?: return
-        broadcaster?.start(id, repository.tournament.filterNotNull(), viewModelScope)
-        viewModelScope.launch {
-            broadcaster?.emojiEvents?.collect { packet ->
-                _emojiEvents.emit(EmojiPalette.emojiFor(packet.emojiCode))
+        if (useBleSync()) {
+            val adapter = bluetoothAdapter ?: return
+            val id = tournament.value?.id?.let { RoomCode.forTournament(it) } ?: return
+            broadcaster?.start(id, repository.tournament.filterNotNull(), viewModelScope)
+            viewModelScope.launch {
+                broadcaster?.emojiEvents?.collect { packet ->
+                    _emojiEvents.emit(EmojiPalette.emojiFor(packet.emojiCode))
+                }
             }
+        } else {
+            startServerSync()
         }
     }
 
     fun stopHosting() {
         broadcaster?.stop()
+        serverSyncJob?.cancel()
+        serverSyncJob = null
+        _serverSyncStatus.value = null
+    }
+
+    /** Server-mode counterpart to [TournamentBroadcaster.start] — pushes the current state to
+     *  the live-sync endpoint every time it changes, instead of advertising it over BLE. Needs
+     *  a linked account to sign with, which hosting already requires (see MainActivity's
+     *  routing). */
+    private fun startServerSync() {
+        val account = organizerAccount ?: return
+        serverSyncJob?.cancel()
+        _serverSyncStatus.value = "Starting sync…"
+        serverSyncJob = viewModelScope.launch {
+            repository.tournament.filterNotNull().collectLatest { current ->
+                pushLiveState(account, current)
+            }
+        }
+    }
+
+    private suspend fun pushLiveState(account: OrganizerAccount, current: Tournament) {
+        _serverSyncStatus.value = "Syncing…"
+        val bodyJson = uploadJson.encodeToString(Tournament.serializer(), current)
+        val timestamp = System.currentTimeMillis() / 1000
+        val message = "${current.id}|$timestamp|${sha256Hex(bodyJson)}"
+        val signature = Ed25519.sign(account.privateKeySeed, message.toByteArray())
+        val signatureB64 = Base64.encodeToString(signature, Base64.NO_WRAP)
+        val result = ServerApi(account.serverUrl)
+            .pushLiveTournament(current.id, account.accountId, timestamp, signatureB64, bodyJson)
+        _serverSyncStatus.value = when (result) {
+            is ServerResult.Success -> "Synced"
+            is ServerResult.Failure -> "Sync failed: ${result.message}"
+        }
     }
 
     fun recordGroupMatchResult(groupId: String, matchId: String, result: MatchResult) {
@@ -259,5 +305,6 @@ class OrganizerViewModel(application: Application) : AndroidViewModel(applicatio
 
     override fun onCleared() {
         broadcaster?.stop()
+        serverSyncJob?.cancel()
     }
 }

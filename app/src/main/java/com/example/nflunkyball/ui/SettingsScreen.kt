@@ -30,7 +30,7 @@ import com.example.nflunkyball.persistence.AppSettingsStore
 fun SettingsScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     val settingsStore = remember { AppSettingsStore(context) }
-    var bleEnabled by remember { mutableStateOf(settingsStore.isBleEnabled()) }
+    var useBleSync by remember { mutableStateOf(settingsStore.useBleSync()) }
 
     Scaffold(
         topBar = {
@@ -50,19 +50,20 @@ fun SettingsScreen(onBack: () -> Unit) {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column(Modifier.weight(1f)) {
-                    Text("Live sync over Bluetooth", style = MaterialTheme.typography.titleMedium)
+                    Text("Use Bluetooth instead of server", style = MaterialTheme.typography.titleMedium)
                     Text(
-                        "Experimental: broadcasts and receives tournament scores directly " +
-                            "between phones over Bluetooth, no server needed. Off by default.",
+                        "Live scores sync through the server by default. Turn this on to sync " +
+                            "directly between phones over Bluetooth instead — useful with no " +
+                            "internet, but only works at close range.",
                         style = MaterialTheme.typography.bodySmall,
                         modifier = Modifier.padding(top = 4.dp)
                     )
                 }
                 Switch(
-                    checked = bleEnabled,
+                    checked = useBleSync,
                     onCheckedChange = {
-                        bleEnabled = it
-                        settingsStore.setBleEnabled(it)
+                        useBleSync = it
+                        settingsStore.setUseBleSync(it)
                     }
                 )
             }

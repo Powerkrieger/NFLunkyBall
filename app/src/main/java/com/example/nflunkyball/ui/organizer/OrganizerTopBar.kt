@@ -48,13 +48,18 @@ fun OrganizerTopBar(
     var showRoomCode by remember { mutableStateOf(false) }
     var showAbandonConfirm by remember { mutableStateOf(false) }
     val broadcastVersion by viewModel.broadcastVersion.collectAsState()
+    val serverSyncStatus by viewModel.serverSyncStatus.collectAsState()
 
     TopAppBar(
         title = {
             Column {
                 Text(title)
-                if (viewModel.bleEnabled() && broadcastVersion != null) {
-                    Text("Broadcasting v$broadcastVersion", style = MaterialTheme.typography.labelSmall)
+                if (viewModel.useBleSync()) {
+                    if (broadcastVersion != null) {
+                        Text("Broadcasting v$broadcastVersion", style = MaterialTheme.typography.labelSmall)
+                    }
+                } else {
+                    serverSyncStatus?.let { Text(it, style = MaterialTheme.typography.labelSmall) }
                 }
             }
         },
@@ -108,7 +113,7 @@ fun OrganizerTopBar(
     if (showRoomCode) {
         val roomId = RoomCode.forTournament(tournament.id)
         val account = viewModel.organizerAccount
-        val payload = JoinPayload(room = RoomCode.encode(roomId), server = account?.serverUrl, pw = viewModel.readPassword)
+        val payload = JoinPayload(room = RoomCode.encode(roomId), server = account?.serverUrl, pw = viewModel.readPassword, tid = tournament.id)
         AlertDialog(
             onDismissRequest = { showRoomCode = false },
             title = { Text("Share this to let people watch") },

@@ -8,7 +8,12 @@ class JoinPayloadTest {
 
     @Test
     fun `encode decode round trips a full payload`() {
-        val payload = JoinPayload(room = "ABCD", server = "https://REDACTED-SERVER-HOST", pw = "secret")
+        val payload = JoinPayload(
+            room = "ABCD",
+            server = "https://REDACTED-SERVER-HOST",
+            pw = "secret",
+            tid = "11111111-1111-1111-1111-111111111111"
+        )
         val decoded = JoinPayloadCodec.decode(JoinPayloadCodec.encode(payload))
         assertEquals(payload, decoded)
     }
