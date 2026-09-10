@@ -13,7 +13,9 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.filter
@@ -39,6 +41,11 @@ class TournamentBroadcaster(private val adapter: BluetoothAdapter, private val c
 
     private val _emojiEvents = MutableSharedFlow<EmojiPacket>(extraBufferCapacity = 32)
     val emojiEvents: SharedFlow<EmojiPacket> = _emojiEvents
+
+    /** The version currently being cycled out over BLE, so the hosting UI can show "broadcasting
+     *  version N" — null whenever nothing is actively broadcasting. */
+    private val _broadcastVersion = MutableStateFlow<Int?>(null)
+    val broadcastVersion: StateFlow<Int?> = _broadcastVersion
 
     private var broadcastJob: Job? = null
     private var scanJob: Job? = null
@@ -66,6 +73,7 @@ class TournamentBroadcaster(private val adapter: BluetoothAdapter, private val c
         broadcastJob = scope.launch {
             tournamentUpdates.collectLatest { tournament ->
                 version = (version + 1) % 256
+                _broadcastVersion.value = version
                 broadcastCycle(roomId, version, tournament)
             }
         }
@@ -76,43 +84,57 @@ class TournamentBroadcaster(private val adapter: BluetoothAdapter, private val c
         scanJob?.cancel()
         broadcastJob = null
         scanJob = null
+        _broadcastVersion.value = null
     }
 
     @SuppressLint("MissingPermission")
     private suspend fun broadcastCycle(roomId: Int, version: Int, tournament: Tournament) {
         val advertiser = adapter.bluetoothLeAdvertiser ?: return
-        val bytes = json.encodeToString(Tournament.serializer(), tournament).encodeToByteArray()
+        val rawBytes = json.encodeToString(Tournament.serializer(), tournament).encodeToByteArray()
+        // Tournament JSON is heavily repetitive (field names, UUID-shaped ids) and gzips down to
+        // a fraction of its raw size — the difference between a real multi-group tournament
+        // fitting in BleConstants.MAX_CHUNK_COUNT legacy chunks and it not (which used to throw
+        // out of ChunkedMessage.chunk and crash the whole app, see chunkOrNull below).
+        val bytes = GzipCodec.compress(rawBytes)
         val useExtended = BleCapability.supportsExtendedAdvertising(context)
-        Log.d(TAG, "Broadcasting v=$version roomId=$roomId totalBytes=${bytes.size} extended=$useExtended")
+        Log.d(TAG, "Broadcasting v=$version roomId=$roomId rawBytes=${rawBytes.size} gzipBytes=${bytes.size} extended=$useExtended")
 
-        // Always cycle the legacy stream — every device, extended-capable or not, can decode
-        // it. Extended devices ALSO get the much-shorter extended stream in parallel; whichever
-        // finishes reassembling first wins (see TournamentReceiver). Broadcasting extended-only
-        // would silently strand any receiver whose BLE stack can't parse extended manufacturer
-        // data, which is a real failure mode observed on real (if older) hardware, not a
-        // hypothetical one.
+        val legacyChunks = chunkOrNull(roomId, version, bytes, BleConstants.MAX_CHUNK_PAYLOAD_BYTES, BleConstants.TYPE_STATE_CHUNK)
+        val extendedChunks = if (useExtended) {
+            chunkOrNull(roomId, version, bytes, BleCapability.extendedChunkPayloadBytes(context), BleConstants.TYPE_STATE_CHUNK_EXTENDED)
+        } else null
+
+        // Always cycle the legacy stream when it fits — every device, extended-capable or not,
+        // can decode it. Extended devices ALSO get the much-shorter extended stream in parallel;
+        // whichever finishes reassembling first wins (see TournamentReceiver). Broadcasting
+        // extended-only would silently strand any receiver whose BLE stack can't parse extended
+        // manufacturer data, which is a real failure mode observed on real (if older) hardware,
+        // not a hypothetical one.
         coroutineScope {
-            launch {
-                cycleChunks(
-                    advertiser,
-                    ChunkedMessage.chunk(roomId, version, bytes, BleConstants.MAX_CHUNK_PAYLOAD_BYTES, BleConstants.TYPE_STATE_CHUNK),
-                    useExtended = false
-                )
+            if (legacyChunks != null) {
+                launch { cycleChunks(advertiser, legacyChunks, useExtended = false) }
             }
-            if (useExtended) {
-                launch {
-                    cycleChunks(
-                        advertiser,
-                        ChunkedMessage.chunk(
-                            roomId, version, bytes,
-                            BleCapability.extendedChunkPayloadBytes(context),
-                            BleConstants.TYPE_STATE_CHUNK_EXTENDED
-                        ),
-                        useExtended = true
-                    )
-                }
+            if (extendedChunks != null) {
+                launch { cycleChunks(advertiser, extendedChunks, useExtended = true) }
             }
         }
+    }
+
+    /** Null (with a logged warning) instead of throwing when [bytes] still doesn't fit in
+     *  [BleConstants.MAX_CHUNK_COUNT] chunks even after gzip. Skipping just this stream for this
+     *  version beats crashing the whole broadcaster — the other stream (or a smaller future
+     *  version) may still get through. */
+    private fun chunkOrNull(
+        roomId: Int,
+        version: Int,
+        bytes: ByteArray,
+        maxChunkPayloadBytes: Int,
+        packetType: Byte
+    ): List<StateChunkPacket>? = try {
+        ChunkedMessage.chunk(roomId, version, bytes, maxChunkPayloadBytes, packetType)
+    } catch (e: IllegalArgumentException) {
+        Log.w(TAG, "v=$version (${bytes.size} gzip bytes) too large for packetType=$packetType: ${e.message}")
+        null
     }
 
     @SuppressLint("MissingPermission")

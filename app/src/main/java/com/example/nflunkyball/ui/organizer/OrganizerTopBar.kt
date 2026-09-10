@@ -16,6 +16,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -46,9 +47,17 @@ fun OrganizerTopBar(
     var showAddGroup by remember { mutableStateOf(false) }
     var showRoomCode by remember { mutableStateOf(false) }
     var showAbandonConfirm by remember { mutableStateOf(false) }
+    val broadcastVersion by viewModel.broadcastVersion.collectAsState()
 
     TopAppBar(
-        title = { Text(title) },
+        title = {
+            Column {
+                Text(title)
+                if (viewModel.bleEnabled() && broadcastVersion != null) {
+                    Text("Broadcasting v$broadcastVersion", style = MaterialTheme.typography.labelSmall)
+                }
+            }
+        },
         actions = {
             IconButton(onClick = { menuExpanded = true }) {
                 Icon(Icons.Default.MoreVert, contentDescription = "Tournament settings")

@@ -25,6 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.example.nflunkyball.ble.EmojiPalette
 import com.example.nflunkyball.model.standings
+import com.example.nflunkyball.ui.shared.ChunkProgressBar
 import com.example.nflunkyball.ui.shared.MatchList
 import com.example.nflunkyball.ui.shared.RoomCodeDisplay
 import com.example.nflunkyball.ui.shared.StandingsTable
@@ -32,6 +33,7 @@ import com.example.nflunkyball.ui.shared.StandingsTable
 @Composable
 fun ViewerScoreboardScreen(viewModel: ViewerViewModel, onOpenHistory: () -> Unit) {
     val tournament by viewModel.tournament.collectAsState()
+    val receiveProgress by viewModel.receiveProgress.collectAsState()
     var showInvite by remember { mutableStateOf(false) }
 
     if (showInvite) {
@@ -58,6 +60,22 @@ fun ViewerScoreboardScreen(viewModel: ViewerViewModel, onOpenHistory: () -> Unit
                 .verticalScroll(rememberScrollState())
                 .padding(bottom = 72.dp)
         ) {
+            if (!viewModel.bleEnabled()) {
+                Text(
+                    "Live sync over Bluetooth is off. Turn it on in Settings to see live scores.",
+                    style = MaterialTheme.typography.bodyLarge
+                )
+            } else {
+                val progress = receiveProgress
+                if (progress != null) {
+                    Text(
+                        "Reading state of version ${progress.version}",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    ChunkProgressBar(progress, modifier = Modifier.padding(top = 4.dp, bottom = 12.dp))
+                }
+            }
+
             val current = tournament
             if (current == null) {
                 Text("Waiting for the organizer's scores…", style = MaterialTheme.typography.bodyLarge)

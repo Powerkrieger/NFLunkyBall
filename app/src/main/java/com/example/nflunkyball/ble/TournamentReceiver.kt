@@ -27,6 +27,11 @@ class TournamentReceiver(private val adapter: BluetoothAdapter) {
     private val _tournament = MutableStateFlow<Tournament?>(null)
     val tournament: StateFlow<Tournament?> = _tournament
 
+    /** How much of the in-flight version has arrived so far, for a "reading state of version N"
+     *  UI — null whenever nothing has been received yet (or since the last [stop]). */
+    private val _receiveProgress = MutableStateFlow<ChunkProgress?>(null)
+    val receiveProgress: StateFlow<ChunkProgress?> = _receiveProgress
+
     private var receiveJob: Job? = null
 
     @SuppressLint("MissingPermission")
@@ -48,9 +53,12 @@ class TournamentReceiver(private val adapter: BluetoothAdapter) {
                     .filter { it.roomId == roomId }
                     .collect { packet ->
                         val reassembler = reassemblers.getOrPut(packet.packetType) { ChunkReassembler() }
-                        val complete = reassembler.receive(packet) ?: return@collect
+                        val complete = reassembler.receive(packet)
+                        _receiveProgress.value = bestProgress(reassemblers)
+                        if (complete == null) return@collect
                         runCatching {
-                            json.decodeFromString(Tournament.serializer(), complete.decodeToString())
+                            val decompressed = GzipCodec.decompress(complete)
+                            json.decodeFromString(Tournament.serializer(), decompressed.decodeToString())
                         }.onSuccess { _tournament.value = it }
                             .onFailure { Log.w(TAG, "Failed to parse reassembled tournament state", it) }
                     }
@@ -62,9 +70,22 @@ class TournamentReceiver(private val adapter: BluetoothAdapter) {
         }
     }
 
+    /** Prefer the extended stream once it has any data — it always has far fewer chunks, so
+     *  it's both a faster read on capable hardware and a nicer bar to watch. Devices that can't
+     *  decode extended manufacturer data at all (a real hardware gap, not hypothetical — see
+     *  BleConstants) simply never populate that reassembler, so this naturally falls back to
+     *  the legacy stream's progress for them. */
+    private fun bestProgress(reassemblers: Map<Byte, ChunkReassembler>): ChunkProgress? {
+        reassemblers[BleConstants.TYPE_STATE_CHUNK_EXTENDED]?.progress()
+            ?.takeIf { it.receivedIndices.isNotEmpty() }
+            ?.let { return it }
+        return reassemblers[BleConstants.TYPE_STATE_CHUNK]?.progress()
+    }
+
     fun stop() {
         receiveJob?.cancel()
         receiveJob = null
+        _receiveProgress.value = null
     }
 
     @SuppressLint("MissingPermission")

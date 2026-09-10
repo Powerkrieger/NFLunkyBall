@@ -37,7 +37,7 @@ fun JoinScreen(viewModel: ViewerViewModel, onJoined: () -> Unit) {
         }
     }
 
-    BluetoothGate {
+    val content: @Composable () -> Unit = {
         Column(
             Modifier.fillMaxWidth().padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
@@ -74,5 +74,14 @@ fun JoinScreen(viewModel: ViewerViewModel, onJoined: () -> Unit) {
                 modifier = Modifier.fillMaxWidth().padding(top = 16.dp)
             ) { Text("Join") }
         }
+    }
+
+    // Bluetooth is only actually needed here when the BLE live-sync toggle is on — gating the
+    // whole screen behind "Bluetooth must be on" otherwise would block entering a join code for
+    // no reason.
+    if (viewModel.bleEnabled()) {
+        BluetoothGate { content() }
+    } else {
+        content()
     }
 }

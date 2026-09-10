@@ -13,11 +13,12 @@ import kotlinx.serialization.json.Json
 /**
  * One tournament a viewer knows about, either because they joined it live over BLE ([joinPayload]
  * lets them reconnect) or because it was downloaded from the backend ([serverId] lets it be
- * re-fetched). [id] is the dedupe key: the 4-char room code for anything joined live (known the
- * instant [JoinPayload] is decoded, before any BLE data arrives), or `"server:<id>"` for
- * tournaments only ever seen via the backend. A tournament watched live through to FINISHED and
- * later also discovered via backend sync ends up as two entries — there's no shared id space
- * between a locally-derived room code and the backend's own tournament id to merge them by.
+ * re-fetched). [id] is the dedupe key: the 4-char room code, known the instant a [JoinPayload] is
+ * decoded (before any BLE data arrives) for anything joined live, and derived from the
+ * downloaded body's own tournament id (see `ViewerViewModel.cacheFinishedTournament`) for
+ * anything discovered via the backend — both paths land on the same code for the same tournament,
+ * so a backend sync naturally folds into (replaces) a stale local entry rather than duplicating
+ * it. Falls back to `"server:<id>"` only if a downloaded body somehow fails to decode.
  */
 @Serializable
 data class SavedTournament(

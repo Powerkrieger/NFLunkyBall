@@ -49,9 +49,20 @@ suspend fun BluetoothLeAdvertiser.burst(payload: ByteArray, durationMs: Long) {
     }
 
     startAdvertising(settings, data, callback)
-    val didStart = started.await()
-    delay(durationMs)
-    if (didStart) stopAdvertising(callback)
+    try {
+        started.await()
+        delay(durationMs)
+    } finally {
+        // Unconditional and in `finally`: if this coroutine gets cancelled (e.g. collectLatest
+        // tearing down this chunk's burst to broadcast a newer tournament version) while still
+        // inside await()/delay() above, a plain `if (didStart) stopAdvertising(...)` placed
+        // after them would never run — cancellation throws right there and skips it. That
+        // leaves the legacy advertisement running forever, silently consuming one of the
+        // device's limited concurrent-advertisement slots. Do this every time regardless of
+        // whether start actually succeeded — stopping an advertisement that never started is a
+        // harmless no-op.
+        stopAdvertising(callback)
+    }
 }
 
 /**
@@ -86,7 +97,11 @@ suspend fun BluetoothLeAdvertiser.burstExtended(payload: ByteArray, durationMs: 
     }
 
     startAdvertisingSet(parameters, data, null, null, null, callback)
-    val set = started.await()
-    delay(durationMs)
-    if (set != null) stopAdvertisingSet(callback)
+    try {
+        started.await()
+        delay(durationMs)
+    } finally {
+        // See the matching comment in burst() above — same leak, same fix.
+        stopAdvertisingSet(callback)
+    }
 }

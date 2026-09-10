@@ -20,6 +20,7 @@ import com.example.nflunkyball.model.Team
 import com.example.nflunkyball.model.Tournament
 import com.example.nflunkyball.model.TournamentPhase
 import com.example.nflunkyball.model.generateRoundRobinMatches
+import com.example.nflunkyball.persistence.AppSettingsStore
 import com.example.nflunkyball.persistence.TournamentRepository
 import com.example.nflunkyball.server.Ed25519
 import com.example.nflunkyball.server.InvitePayloadCodec
@@ -30,6 +31,7 @@ import com.example.nflunkyball.server.ServerResult
 import java.security.MessageDigest
 import java.util.UUID
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.filterNotNull
@@ -41,11 +43,16 @@ class OrganizerViewModel(application: Application) : AndroidViewModel(applicatio
     private val uploadJson = Json { encodeDefaults = true }
     private val repository = TournamentRepository(application)
     private val credentialsStore = ServerCredentialsStore(application)
+    private val settingsStore = AppSettingsStore(application)
     private val bluetoothAdapter: BluetoothAdapter? =
         application.getSystemService(BluetoothManager::class.java)?.adapter
     private val broadcaster = bluetoothAdapter?.let { TournamentBroadcaster(it, application) }
 
     val tournament: StateFlow<Tournament?> = repository.tournament
+
+    /** The version currently on air, or null while hosting is off/not yet started — see
+     *  [HostingScreen]'s "broadcasting version N" status. */
+    val broadcastVersion: StateFlow<Int?> = broadcaster?.broadcastVersion ?: MutableStateFlow(null)
 
     var organizerAccount by mutableStateOf(credentialsStore.loadAccount())
         private set
@@ -63,6 +70,11 @@ class OrganizerViewModel(application: Application) : AndroidViewModel(applicatio
     val emojiEvents: SharedFlow<String> = _emojiEvents
 
     fun canHost(): Boolean = BleCapability.canAdvertise(getApplication())
+
+    /** Read fresh each time rather than cached at construction — this ViewModel outlives a
+     *  single visit to the Settings screen, so a toggle flipped there mid-session must be seen
+     *  the next time hosting actually starts. */
+    fun bleEnabled(): Boolean = settingsStore.isBleEnabled()
 
     /** Known players from past tournaments this group has recorded, so the organizer can pick
      *  existing ones instead of retyping — also how a returning organizer confirms their

@@ -23,6 +23,11 @@ object ChunkedMessage {
     }
 }
 
+/** Snapshot of how much of [version]'s [totalCount] chunks have arrived so far, and exactly
+ *  which indices — enough for a UI to draw a per-chunk "which packets are missing" bar rather
+ *  than just a plain percentage. */
+data class ChunkProgress(val version: Int, val receivedIndices: Set<Int>, val totalCount: Int)
+
 /**
  * Buffers incoming [StateChunkPacket]s for a single room and reassembles the full payload once
  * every chunk of the current [version] has arrived. Not thread-safe — callers should confine
@@ -48,5 +53,11 @@ class ChunkReassembler {
             buffer.write(chunks[index] ?: return null)
         }
         return buffer.toByteArray()
+    }
+
+    /** Null until the first chunk of any version has arrived. */
+    fun progress(): ChunkProgress? {
+        if (currentVersion < 0) return null
+        return ChunkProgress(currentVersion, chunks.keys.toSet(), expectedCount)
     }
 }
