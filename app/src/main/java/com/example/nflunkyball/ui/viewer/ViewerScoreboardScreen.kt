@@ -25,6 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.example.nflunkyball.ble.EmojiPalette
 import com.example.nflunkyball.model.standings
+import com.example.nflunkyball.ui.shared.BluetoothStatusRow
 import com.example.nflunkyball.ui.shared.ChunkProgressBar
 import com.example.nflunkyball.ui.shared.MatchList
 import com.example.nflunkyball.ui.shared.RoomCodeDisplay
@@ -60,10 +61,12 @@ fun ViewerScoreboardScreen(viewModel: ViewerViewModel, onOpenHistory: () -> Unit
                 .verticalScroll(rememberScrollState())
                 .padding(bottom = 72.dp)
         ) {
-            // Chunk-reassembly progress only applies to BLE mode — server mode has no equivalent
-            // (a single request either has the latest state or it doesn't), so it shows nothing
-            // extra here; "Waiting for the organizer's scores…" below covers the empty case.
+            // BLE status/progress only applies to BLE mode — server mode has no equivalent (a
+            // single request either has the latest state or it doesn't, and needs no radio), so
+            // this shows nothing extra there; "Waiting for the organizer's scores…" below covers
+            // the empty case for both modes.
             if (viewModel.useBleSync()) {
+                BluetoothStatusRow(modifier = Modifier.padding(bottom = 8.dp))
                 val progress = receiveProgress
                 if (progress != null) {
                     Text(

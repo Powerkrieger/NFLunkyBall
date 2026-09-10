@@ -37,15 +37,22 @@ import com.example.nflunkyball.ble.BleCapability
 import com.example.nflunkyball.model.TournamentPhase
 import com.example.nflunkyball.persistence.SavedTournament
 import com.example.nflunkyball.server.CompetitorStats
+import com.example.nflunkyball.ui.organizer.OrganizerViewModel
 
 @Composable
 fun HistoryScreen(
     viewModel: ViewerViewModel,
+    organizerViewModel: OrganizerViewModel,
     onOpenTournament: (String) -> Unit,
-    onReconnected: () -> Unit
+    onReconnected: () -> Unit,
+    onResumeHosting: () -> Unit
 ) {
     LaunchedEffect(Unit) { viewModel.loadHistory() }
     val saved by viewModel.savedTournaments.collectAsState()
+    // TournamentRepository (behind OrganizerViewModel) is a separate single-slot store from the
+    // viewer's saved-tournaments list above, so a tournament this device is hosting wouldn't
+    // otherwise show up here at all — surfaced explicitly instead.
+    val hostedTournament by organizerViewModel.tournament.collectAsState()
     var tabIndex by remember { mutableIntStateOf(0) }
     var showBluetoothOff by remember { mutableStateOf(false) }
     var pendingRemoval by remember { mutableStateOf<SavedTournament?>(null) }
@@ -82,7 +89,7 @@ fun HistoryScreen(
         }
         viewModel.historyStatus?.let { Text(it, modifier = Modifier.padding(16.dp)) }
         if (tabIndex == 0) {
-            if (saved.isEmpty()) {
+            if (saved.isEmpty() && hostedTournament == null) {
                 Box(Modifier.fillMaxSize().padding(16.dp), contentAlignment = Alignment.TopCenter) {
                     Text(
                         "No tournaments yet — join one, or check back once the organizer finishes.",
@@ -91,6 +98,11 @@ fun HistoryScreen(
                 }
             } else {
                 LazyColumn(Modifier.fillMaxSize().padding(16.dp)) {
+                    hostedTournament?.let { hosted ->
+                        item {
+                            HostedTournamentRow(name = hosted.name, phase = hosted.phase, onClick = onResumeHosting)
+                        }
+                    }
                     items(saved) { entry ->
                         SavedTournamentRow(
                             entry = entry,
@@ -98,7 +110,9 @@ fun HistoryScreen(
                                 if (entry.phase == TournamentPhase.FINISHED) {
                                     onOpenTournament(entry.id)
                                 } else if (entry.joinPayload != null) {
-                                    if (BleCapability.isBluetoothEnabled(context)) {
+                                    // Bluetooth is only actually needed to reconnect in BLE
+                                    // mode — server mode's reconnect never touches it.
+                                    if (!viewModel.useBleSync() || BleCapability.isBluetoothEnabled(context)) {
                                         viewModel.reconnect(entry)
                                         onReconnected()
                                     } else {
@@ -119,6 +133,23 @@ fun HistoryScreen(
             }
         }
     }
+}
+
+@Composable
+private fun HostedTournamentRow(name: String, phase: TournamentPhase, onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 4.dp),
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Column(Modifier.weight(1f).padding(vertical = 4.dp)) {
+            Text(name, style = MaterialTheme.typography.titleMedium)
+            Text(
+                "Hosting · ${phase.name.lowercase().replace('_', ' ')} · tap to continue",
+                style = MaterialTheme.typography.bodySmall
+            )
+        }
+    }
+    HorizontalDivider()
 }
 
 @Composable

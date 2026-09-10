@@ -161,12 +161,14 @@ private fun NfLunkyBallApp() {
         composable("viewer/history") {
             HistoryScreen(
                 viewModel = viewerViewModel,
+                organizerViewModel = organizerViewModel,
                 onOpenTournament = { id -> navController.navigate("viewer/history/$id") },
                 onReconnected = {
                     navController.navigate("viewer/scoreboard") {
                         popUpTo("viewer/history") { inclusive = true }
                     }
-                }
+                },
+                onResumeHosting = { navController.navigate("organizer/hosting") }
             )
         }
         composable("viewer/history/{id}") { backStackEntry ->

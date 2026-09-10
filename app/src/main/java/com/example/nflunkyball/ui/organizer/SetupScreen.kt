@@ -28,6 +28,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.unit.dp
 import com.example.nflunkyball.model.Team
 import java.util.UUID
@@ -39,6 +40,7 @@ fun SetupScreen(
 ) {
     LaunchedEffect(Unit) { viewModel.loadKnownCompetitors() }
 
+    val focusManager = LocalFocusManager.current
     var tournamentName by remember { mutableStateOf("") }
     var teamNameInput by remember { mutableStateOf("") }
     var groupNameInput by remember { mutableStateOf("") }
@@ -65,6 +67,29 @@ fun SetupScreen(
             label = { Text("Tournament name") },
             modifier = Modifier.fillMaxWidth().padding(top = 12.dp)
         )
+
+        // Groups first — teams get assigned to a group as they're added below, so having the
+        // groups already exist here means that dropdown is never empty.
+        Text("Groups", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 24.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            OutlinedTextField(
+                value = groupNameInput,
+                onValueChange = { groupNameInput = it },
+                label = { Text("Group name") },
+                modifier = Modifier.weight(1f)
+            )
+            Button(
+                onClick = {
+                    val trimmed = groupNameInput.trim()
+                    if (trimmed.isNotBlank() && trimmed !in groupNames) {
+                        groupNames.add(trimmed)
+                        groupNameInput = ""
+                    }
+                },
+                modifier = Modifier.padding(start = 8.dp)
+            ) { Text("Add") }
+        }
+        groupNames.forEach { name -> Text("• $name", Modifier.padding(vertical = 2.dp)) }
 
         Text("Teams", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 24.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -107,7 +132,13 @@ fun SetupScreen(
             ) {
                 Text(team.name, Modifier.weight(1f))
                 var expanded by remember { mutableStateOf(false) }
-                TextButton(onClick = { expanded = true }) {
+                TextButton(onClick = {
+                    // Drop focus (and with it, the keyboard) before opening the dropdown —
+                    // otherwise the keyboard staying up shrinks the visible list and the screen
+                    // jumps around as it tries to scroll the open menu into view.
+                    focusManager.clearFocus()
+                    expanded = true
+                }) {
                     Text(assignments[team.id] ?: "Assign group")
                 }
                 DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
@@ -115,6 +146,7 @@ fun SetupScreen(
                         DropdownMenuItem(
                             text = { Text(groupName) },
                             onClick = {
+                                focusManager.clearFocus()
                                 assignments[team.id] = groupName
                                 expanded = false
                             }
@@ -126,27 +158,6 @@ fun SetupScreen(
                 }
             }
         }
-
-        Text("Groups", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 24.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            OutlinedTextField(
-                value = groupNameInput,
-                onValueChange = { groupNameInput = it },
-                label = { Text("Group name") },
-                modifier = Modifier.weight(1f)
-            )
-            Button(
-                onClick = {
-                    val trimmed = groupNameInput.trim()
-                    if (trimmed.isNotBlank() && trimmed !in groupNames) {
-                        groupNames.add(trimmed)
-                        groupNameInput = ""
-                    }
-                },
-                modifier = Modifier.padding(start = 8.dp)
-            ) { Text("Add") }
-        }
-        groupNames.forEach { name -> Text("• $name", Modifier.padding(vertical = 2.dp)) }
 
         val allAssigned = teams.isNotEmpty() && teams.all { assignments.containsKey(it.id) }
         Button(
