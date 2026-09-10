@@ -30,8 +30,7 @@ import com.example.nflunkyball.ui.shared.StandingsTable
 fun GroupStageScreen(
     viewModel: OrganizerViewModel,
     onAdvanceToBracket: () -> Unit,
-    onAbandoned: () -> Unit,
-    onLinkAccount: () -> Unit
+    onOpenSettings: () -> Unit
 ) {
     val tournament by viewModel.tournament.collectAsState()
     val current = tournament ?: return
@@ -39,7 +38,7 @@ fun GroupStageScreen(
     var pendingMatch by remember { mutableStateOf<Pair<String, Match>?>(null) } // groupId to match
 
     Scaffold(
-        topBar = { OrganizerTopBar(current.name, current, viewModel, onAbandoned, onLinkAccount) }
+        topBar = { OrganizerTopBar(current.name, viewModel, onOpenSettings) }
     ) { padding ->
     Column(
         Modifier

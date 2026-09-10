@@ -29,6 +29,7 @@ import com.example.nflunkyball.ui.organizer.HostingScreen
 import com.example.nflunkyball.ui.organizer.LinkAccountScreen
 import com.example.nflunkyball.ui.organizer.OrganizerViewModel
 import com.example.nflunkyball.ui.organizer.SetupScreen
+import com.example.nflunkyball.ui.organizer.TournamentSettingsScreen
 import com.example.nflunkyball.ui.shared.PermissionsGate
 import com.example.nflunkyball.ui.theme.NFLunkyBallTheme
 import com.example.nflunkyball.ui.viewer.HistoryScreen
@@ -146,8 +147,7 @@ private fun NfLunkyBallApp() {
                     organizerViewModel.advanceToBracket()
                     navController.navigate("organizer/bracket")
                 },
-                onAbandoned = { navController.popBackStack(route = "home", inclusive = false) },
-                onLinkAccount = { navController.navigate("organizer/link_account") }
+                onOpenSettings = { navController.navigate("organizer/tournament_settings") }
             )
         }
         composable("organizer/bracket") {
@@ -159,8 +159,16 @@ private fun NfLunkyBallApp() {
                     organizerViewModel.clearTournament()
                     navController.popBackStack(route = "home", inclusive = false)
                 },
-                onLinkAccount = { navController.navigate("organizer/link_account") },
-                onAbandoned = { navController.popBackStack(route = "home", inclusive = false) }
+                onOpenSettings = { navController.navigate("organizer/tournament_settings") },
+                onLinkAccount = { navController.navigate("organizer/link_account") }
+            )
+        }
+        composable("organizer/tournament_settings") {
+            TournamentSettingsScreen(
+                viewModel = organizerViewModel,
+                onBack = { navController.popBackStack() },
+                onAbandoned = { navController.popBackStack(route = "home", inclusive = false) },
+                onLinkAccount = { navController.navigate("organizer/link_account") }
             )
         }
         composable("viewer/join") {

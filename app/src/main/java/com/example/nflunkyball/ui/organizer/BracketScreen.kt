@@ -34,7 +34,7 @@ import com.example.nflunkyball.ui.shared.MatchResultDialog
 fun BracketScreen(
     viewModel: OrganizerViewModel,
     onFinish: () -> Unit,
-    onAbandoned: () -> Unit,
+    onOpenSettings: () -> Unit,
     onLinkAccount: () -> Unit
 ) {
     val tournament by viewModel.tournament.collectAsState()
@@ -45,7 +45,7 @@ fun BracketScreen(
     var showUnlinkedWarning by remember { mutableStateOf(false) }
 
     Scaffold(
-        topBar = { OrganizerTopBar("${current.name} — Bracket", current, viewModel, onAbandoned, onLinkAccount) }
+        topBar = { OrganizerTopBar("${current.name} — Bracket", viewModel, onOpenSettings) }
     ) { padding ->
     Column(
         Modifier
