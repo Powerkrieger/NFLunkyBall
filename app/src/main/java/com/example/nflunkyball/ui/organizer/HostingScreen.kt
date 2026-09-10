@@ -22,12 +22,15 @@ import com.example.nflunkyball.qr.JoinPayload
 import com.example.nflunkyball.ui.shared.BluetoothGate
 import com.example.nflunkyball.ui.shared.RoomCodeDisplay
 
-/** Reached only once the organizer has a linked account (see MainActivity's routing), so
- *  [account] here is always non-null in practice. */
+/** Normally reached only once the organizer has a linked account (see MainActivity's routing
+ *  for creating a *new* tournament) — but resuming an already-in-progress one skips that gate,
+ *  so [account] can legitimately be null here too (e.g. credentials got lost, or linking was
+ *  deferred — see the "Link organizer account" affordance below and in [OrganizerTopBar]). */
 @Composable
 fun HostingScreen(
     viewModel: OrganizerViewModel,
-    onContinue: () -> Unit
+    onContinue: () -> Unit,
+    onLinkAccount: () -> Unit
 ) {
     // BLE is an opt-in fallback (see SettingsScreen) — only gate this screen behind the
     // Bluetooth radio being on when we're actually going to use it. Server mode needs no gate.
@@ -36,11 +39,11 @@ fun HostingScreen(
             // Inside the gate so it only starts once Bluetooth is confirmed on, rather than
             // silently no-op-ing if it was off when this screen first appeared.
             LaunchedEffect(Unit) { viewModel.startHosting() }
-            HostingScreenContent(viewModel, useBleSync = true, onContinue)
+            HostingScreenContent(viewModel, useBleSync = true, onContinue, onLinkAccount)
         }
     } else {
         LaunchedEffect(Unit) { viewModel.startHosting() }
-        HostingScreenContent(viewModel, useBleSync = false, onContinue)
+        HostingScreenContent(viewModel, useBleSync = false, onContinue, onLinkAccount)
     }
 }
 
@@ -48,7 +51,8 @@ fun HostingScreen(
 private fun HostingScreenContent(
     viewModel: OrganizerViewModel,
     useBleSync: Boolean,
-    onContinue: () -> Unit
+    onContinue: () -> Unit,
+    onLinkAccount: () -> Unit
 ) {
     val tournament by viewModel.tournament.collectAsState()
     // Derived from the tournament's own stable id rather than stored separately, so the
@@ -82,7 +86,13 @@ private fun HostingScreenContent(
             Text(serverSyncStatus ?: "Starting sync…", style = MaterialTheme.typography.bodyMedium)
         }
 
-        account?.let { Text("Hosting as ${it.displayName}", style = MaterialTheme.typography.bodyMedium) }
+        if (account != null) {
+            Text("Hosting as ${account.displayName}", style = MaterialTheme.typography.bodyMedium)
+        } else {
+            Button(onClick = onLinkAccount, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
+                Text("Link organizer account")
+            }
+        }
 
         Button(onClick = onContinue, modifier = Modifier.fillMaxWidth().padding(top = 24.dp)) {
             Text("Continue to scoring")

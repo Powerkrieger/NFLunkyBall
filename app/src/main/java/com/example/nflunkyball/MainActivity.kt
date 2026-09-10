@@ -80,10 +80,13 @@ private fun NfLunkyBallApp() {
                 onHost = {
                     // Resume an in-progress tournament (e.g. the app got killed mid-event)
                     // instead of dropping the organizer into a blank "New tournament" form and
-                    // silently orphaning what's already on disk.
+                    // silently orphaning what's already on disk — checked before the account-link
+                    // gate below so an existing-but-unlinked tournament resumes normally instead
+                    // of detouring into linking and then landing back on a blank setup form
+                    // (which would silently overwrite it the moment "Start Group Stage" is hit).
                     val destination = when {
-                        organizerViewModel.organizerAccount == null -> "organizer/link_account"
                         organizerViewModel.tournament.value != null -> "organizer/hosting"
+                        organizerViewModel.organizerAccount == null -> "organizer/link_account"
                         else -> "organizer/setup"
                     }
                     navController.navigate(destination)
@@ -100,7 +103,15 @@ private fun NfLunkyBallApp() {
             LinkAccountScreen(
                 viewModel = organizerViewModel,
                 onDone = {
-                    navController.navigate("organizer/setup") {
+                    // Linking can now happen either before a tournament exists (fresh setup) or
+                    // after (added credentials back to an already-started one) — resume rather
+                    // than dropping into a blank setup form in the latter case.
+                    val destination = if (organizerViewModel.tournament.value != null) {
+                        "organizer/hosting"
+                    } else {
+                        "organizer/setup"
+                    }
+                    navController.navigate(destination) {
                         popUpTo("organizer/link_account") { inclusive = true }
                     }
                 }
@@ -124,7 +135,8 @@ private fun NfLunkyBallApp() {
                         "organizer/group_stage"
                     }
                     navController.navigate(destination)
-                }
+                },
+                onLinkAccount = { navController.navigate("organizer/link_account") }
             )
         }
         composable("organizer/group_stage") {
@@ -134,7 +146,8 @@ private fun NfLunkyBallApp() {
                     organizerViewModel.advanceToBracket()
                     navController.navigate("organizer/bracket")
                 },
-                onAbandoned = { navController.popBackStack(route = "home", inclusive = false) }
+                onAbandoned = { navController.popBackStack(route = "home", inclusive = false) },
+                onLinkAccount = { navController.navigate("organizer/link_account") }
             )
         }
         composable("organizer/bracket") {
@@ -146,6 +159,7 @@ private fun NfLunkyBallApp() {
                     organizerViewModel.clearTournament()
                     navController.popBackStack(route = "home", inclusive = false)
                 },
+                onLinkAccount = { navController.navigate("organizer/link_account") },
                 onAbandoned = { navController.popBackStack(route = "home", inclusive = false) }
             )
         }

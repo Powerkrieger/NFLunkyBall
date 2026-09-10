@@ -31,15 +31,21 @@ import com.example.nflunkyball.ui.shared.MatchResultDialog
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun BracketScreen(viewModel: OrganizerViewModel, onFinish: () -> Unit, onAbandoned: () -> Unit) {
+fun BracketScreen(
+    viewModel: OrganizerViewModel,
+    onFinish: () -> Unit,
+    onAbandoned: () -> Unit,
+    onLinkAccount: () -> Unit
+) {
     val tournament by viewModel.tournament.collectAsState()
     val current = tournament ?: return
     val teamNames = current.teams.associate { it.id to it.name }
     var pendingMatch by remember { mutableStateOf<Match?>(null) }
     var showAddMatch by remember { mutableStateOf(false) }
+    var showUnlinkedWarning by remember { mutableStateOf(false) }
 
     Scaffold(
-        topBar = { OrganizerTopBar("${current.name} — Bracket", current, viewModel, onAbandoned) }
+        topBar = { OrganizerTopBar("${current.name} — Bracket", current, viewModel, onAbandoned, onLinkAccount) }
     ) { padding ->
     Column(
         Modifier
@@ -58,10 +64,38 @@ fun BracketScreen(viewModel: OrganizerViewModel, onFinish: () -> Unit, onAbandon
             Text("Add bracket match")
         }
         Button(
-            onClick = onFinish,
+            onClick = {
+                // Finishing clears the local copy right after (see MainActivity's onFinish) —
+                // without a linked account nothing was ever uploaded, so that would silently
+                // lose the whole tournament unless the organizer explicitly says that's fine.
+                if (viewModel.organizerAccount == null) showUnlinkedWarning = true else onFinish()
+            },
             modifier = Modifier.fillMaxWidth().padding(top = 24.dp, bottom = 24.dp)
         ) { Text("Finish Tournament") }
     }
+    }
+
+    if (showUnlinkedWarning) {
+        AlertDialog(
+            onDismissRequest = { showUnlinkedWarning = false },
+            title = { Text("Not linked to a server") },
+            text = {
+                Text(
+                    "This tournament isn't linked to an organizer account, so it can't be saved " +
+                        "to history. Link an account now to save it, or finish without saving."
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { showUnlinkedWarning = false; onLinkAccount() }) {
+                    Text("Link account")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showUnlinkedWarning = false; onFinish() }) {
+                    Text("Finish without saving")
+                }
+            }
+        )
     }
 
     pendingMatch?.let { match ->

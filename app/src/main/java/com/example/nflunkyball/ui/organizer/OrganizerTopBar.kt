@@ -40,7 +40,8 @@ fun OrganizerTopBar(
     title: String,
     tournament: Tournament,
     viewModel: OrganizerViewModel,
-    onAbandoned: () -> Unit
+    onAbandoned: () -> Unit,
+    onLinkAccount: () -> Unit
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
     var showAddPlayer by remember { mutableStateOf(false) }
@@ -81,6 +82,12 @@ fun OrganizerTopBar(
                     text = { Text("Show viewer code") },
                     onClick = { menuExpanded = false; showRoomCode = true }
                 )
+                if (viewModel.organizerAccount == null) {
+                    DropdownMenuItem(
+                        text = { Text("Link organizer account") },
+                        onClick = { menuExpanded = false; onLinkAccount() }
+                    )
+                }
                 DropdownMenuItem(
                     text = { Text("Abandon tournament") },
                     onClick = { menuExpanded = false; showAbandonConfirm = true }

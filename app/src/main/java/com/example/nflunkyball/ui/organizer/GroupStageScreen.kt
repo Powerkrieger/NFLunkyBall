@@ -27,14 +27,19 @@ import com.example.nflunkyball.ui.shared.StandingsTable
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun GroupStageScreen(viewModel: OrganizerViewModel, onAdvanceToBracket: () -> Unit, onAbandoned: () -> Unit) {
+fun GroupStageScreen(
+    viewModel: OrganizerViewModel,
+    onAdvanceToBracket: () -> Unit,
+    onAbandoned: () -> Unit,
+    onLinkAccount: () -> Unit
+) {
     val tournament by viewModel.tournament.collectAsState()
     val current = tournament ?: return
     val teamNames = current.teams.associate { it.id to it.name }
     var pendingMatch by remember { mutableStateOf<Pair<String, Match>?>(null) } // groupId to match
 
     Scaffold(
-        topBar = { OrganizerTopBar(current.name, current, viewModel, onAbandoned) }
+        topBar = { OrganizerTopBar(current.name, current, viewModel, onAbandoned, onLinkAccount) }
     ) { padding ->
     Column(
         Modifier

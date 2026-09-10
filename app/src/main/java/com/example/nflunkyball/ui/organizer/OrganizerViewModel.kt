@@ -139,10 +139,19 @@ class OrganizerViewModel(application: Application) : AndroidViewModel(applicatio
 
     /** Server-mode counterpart to [TournamentBroadcaster.start] — pushes the current state to
      *  the live-sync endpoint every time it changes, instead of advertising it over BLE. Needs
-     *  a linked account to sign with, which hosting already requires (see MainActivity's
-     *  routing). */
+     *  a linked account to sign with — unlike hosting over BLE, a tournament can exist locally
+     *  with none linked yet (e.g. credentials got lost, or the organizer skipped linking and
+     *  wants to add it later — see [OrganizerTopBar]'s "Link organizer account" menu item and
+     *  [BracketScreen]'s finish-without-linking warning), so this surfaces that state instead of
+     *  silently doing nothing. Called again once linking completes to actually start syncing. */
     private fun startServerSync() {
-        val account = organizerAccount ?: return
+        val account = organizerAccount
+        if (account == null) {
+            serverSyncJob?.cancel()
+            serverSyncJob = null
+            _serverSyncStatus.value = "Not linked — link an organizer account to sync"
+            return
+        }
         serverSyncJob?.cancel()
         _serverSyncStatus.value = "Starting sync…"
         serverSyncJob = viewModelScope.launch {
