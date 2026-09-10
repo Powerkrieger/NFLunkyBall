@@ -78,20 +78,14 @@ private fun NfLunkyBallApp() {
     NavHost(navController = navController, startDestination = "home") {
         composable("home") {
             HomeScreen(
-                onHost = {
-                    // Resume an in-progress tournament (e.g. the app got killed mid-event)
-                    // instead of dropping the organizer into a blank "New tournament" form and
-                    // silently orphaning what's already on disk. An account is no longer a
-                    // prerequisite for hosting at all — see SettingsScreen's "Organizer account"
-                    // section for linking independent of any tournament; unlinked hosting just
-                    // means no server sync/history/known-players until one's linked.
-                    val destination = if (organizerViewModel.tournament.value != null) {
-                        "organizer/hosting"
-                    } else {
-                        "organizer/setup"
-                    }
-                    navController.navigate(destination)
-                },
+                // Always starts a fresh tournament — never resumes one. An in-progress
+                // tournament is no longer reachable through this button at all; it's managed
+                // exclusively via "My tournaments" from here on (SetupScreen itself guards
+                // against clobbering one that's already active). An account is also not a
+                // prerequisite for hosting — see SettingsScreen's "Organizer account" section
+                // for linking independent of any tournament; unlinked hosting just means no
+                // server sync/history/known-players until one's linked.
+                onHost = { navController.navigate("organizer/setup") },
                 onJoin = { navController.navigate("viewer/join") },
                 onMyTournaments = { navController.navigate("viewer/history") },
                 onSettings = { navController.navigate("settings") }
@@ -119,9 +113,21 @@ private fun NfLunkyBallApp() {
             )
         }
         composable("organizer/setup") {
-            SetupScreen(viewModel = organizerViewModel) { name, teams, groups ->
+            SetupScreen(
+                viewModel = organizerViewModel,
+                onNavigateToMyTournaments = {
+                    navController.navigate("viewer/history") {
+                        popUpTo("organizer/setup") { inclusive = true }
+                    }
+                }
+            ) { name, teams, groups ->
                 organizerViewModel.startTournament(name, teams, groups)
-                navController.navigate("organizer/hosting")
+                // Disentangled from this flow on purpose — once created, the tournament is
+                // managed exclusively via "My tournaments" (which already surfaces it, see
+                // HistoryScreen's "Hosting · ..." row), not by continuing forward here.
+                navController.navigate("viewer/history") {
+                    popUpTo("organizer/setup") { inclusive = true }
+                }
             }
         }
         composable("organizer/hosting") {

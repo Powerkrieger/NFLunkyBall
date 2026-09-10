@@ -20,6 +20,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
@@ -36,8 +37,20 @@ import java.util.UUID
 @Composable
 fun SetupScreen(
     viewModel: OrganizerViewModel,
+    onNavigateToMyTournaments: () -> Unit,
     onStart: (name: String, teams: List<Team>, groupAssignments: Map<String, List<String>>) -> Unit
 ) {
+    // Only one tournament fits in TournamentRepository's single slot at a time — "Host a
+    // tournament" always lands here now (see MainActivity), so this is the one place that has
+    // to actively guard against silently clobbering whatever's already in progress, rather than
+    // relying on the caller to have checked first.
+    val activeTournament by viewModel.tournament.collectAsState()
+    val blocking = activeTournament
+    if (blocking != null) {
+        ActiveTournamentGuard(name = blocking.name, onNavigateToMyTournaments = onNavigateToMyTournaments)
+        return
+    }
+
     LaunchedEffect(Unit) { viewModel.loadKnownCompetitors() }
 
     val focusManager = LocalFocusManager.current
@@ -170,5 +183,25 @@ fun SetupScreen(
             enabled = tournamentName.isNotBlank() && allAssigned,
             modifier = Modifier.fillMaxWidth().padding(top = 24.dp, bottom = 24.dp)
         ) { Text("Start Group Stage") }
+    }
+}
+
+@Composable
+private fun ActiveTournamentGuard(name: String, onNavigateToMyTournaments: () -> Unit) {
+    Column(
+        Modifier.fillMaxSize().padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text("You already have an active tournament", style = MaterialTheme.typography.headlineSmall)
+        Text(
+            "\"$name\" is still in progress on this device. Finish or abandon it before " +
+                "starting another one.",
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.padding(top = 8.dp)
+        )
+        Button(
+            onClick = onNavigateToMyTournaments,
+            modifier = Modifier.fillMaxWidth().padding(top = 24.dp)
+        ) { Text("Go to My tournaments") }
     }
 }
