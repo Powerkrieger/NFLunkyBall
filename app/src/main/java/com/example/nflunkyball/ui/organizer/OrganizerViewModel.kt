@@ -40,6 +40,11 @@ import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 
+/** Whether the currently linked account can actually reach the server and sync, as opposed to
+ *  merely having credentials stored locally — see [OrganizerViewModel.checkAccountSyncStatus]
+ *  and [SettingsScreen]'s "Organizer account" section, which surfaces this. */
+enum class AccountSyncStatus { CHECKING, CAN_SYNC, REVOKED, UNKNOWN }
+
 class OrganizerViewModel(application: Application) : AndroidViewModel(application) {
 
     private val uploadJson = Json { encodeDefaults = true }
@@ -69,6 +74,11 @@ class OrganizerViewModel(application: Application) : AndroidViewModel(applicatio
     var readPassword by mutableStateOf(credentialsStore.loadReadPassword())
         private set
 
+    /** Null until [checkAccountSyncStatus] has been called (or when there's no linked account
+     *  to check at all). */
+    private val _accountSyncStatus = MutableStateFlow<AccountSyncStatus?>(null)
+    val accountSyncStatus: StateFlow<AccountSyncStatus?> = _accountSyncStatus
+
     var uploadStatus by mutableStateOf<String?>(null)
         private set
 
@@ -79,6 +89,25 @@ class OrganizerViewModel(application: Application) : AndroidViewModel(applicatio
     val emojiEvents: SharedFlow<String> = _emojiEvents
 
     fun canHost(): Boolean = BleCapability.canAdvertise(getApplication())
+
+    /** Actually asks the server whether the linked account can sync (not revoked), rather than
+     *  just trusting that credentials exist locally — an admin revoking it from the other end
+     *  leaves no local trace otherwise (see [AccountSyncStatus]). */
+    fun checkAccountSyncStatus() {
+        val account = organizerAccount
+        val password = readPassword
+        if (account == null || password == null) {
+            _accountSyncStatus.value = null
+            return
+        }
+        _accountSyncStatus.value = AccountSyncStatus.CHECKING
+        viewModelScope.launch {
+            _accountSyncStatus.value = when (val result = ServerApi(account.serverUrl).getAccountStatus(account.accountId, password)) {
+                is ServerResult.Success -> if (result.value.revoked) AccountSyncStatus.REVOKED else AccountSyncStatus.CAN_SYNC
+                is ServerResult.Failure -> AccountSyncStatus.UNKNOWN
+            }
+        }
+    }
 
     /** Read fresh each time rather than cached at construction — this ViewModel outlives a
      *  single visit to the Settings screen, so a toggle flipped there mid-session must be seen
@@ -305,6 +334,7 @@ class OrganizerViewModel(application: Application) : AndroidViewModel(applicatio
         credentialsStore.clearAccount()
         organizerAccount = null
         knownCompetitorNames = emptyList()
+        _accountSyncStatus.value = null
     }
 
     fun uploadToHistory() {

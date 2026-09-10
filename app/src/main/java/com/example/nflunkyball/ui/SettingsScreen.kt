@@ -20,15 +20,19 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.example.nflunkyball.persistence.AppSettingsStore
+import com.example.nflunkyball.ui.organizer.AccountSyncStatus
 import com.example.nflunkyball.ui.organizer.OrganizerViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -43,6 +47,13 @@ fun SettingsScreen(
     var useBleSync by remember { mutableStateOf(settingsStore.useBleSync()) }
     var showUnlinkConfirm by remember { mutableStateOf(false) }
     val account = organizerViewModel.organizerAccount
+    val syncStatus by organizerViewModel.accountSyncStatus.collectAsState()
+
+    // Keyed on the account id (not just "is one linked") so unlinking and linking a different
+    // one re-checks, rather than showing stale status for whichever account was checked first.
+    LaunchedEffect(account?.accountId) {
+        if (account != null) organizerViewModel.checkAccountSyncStatus()
+    }
 
     Scaffold(
         topBar = {
@@ -73,6 +84,20 @@ fun SettingsScreen(
                 modifier = Modifier.padding(top = 4.dp)
             )
             if (account != null) {
+                val (statusText, statusColor) = when (syncStatus) {
+                    null, AccountSyncStatus.CHECKING -> "Checking sync status…" to Color.Unspecified
+                    AccountSyncStatus.CAN_SYNC -> "Can sync" to Color.Unspecified
+                    AccountSyncStatus.REVOKED ->
+                        "This account has been revoked and can't sync — add a new invite token " +
+                            "to restore access." to MaterialTheme.colorScheme.error
+                    AccountSyncStatus.UNKNOWN -> "Couldn't check sync status (offline?)" to Color.Unspecified
+                }
+                Text(
+                    statusText,
+                    color = statusColor,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
                 OutlinedButton(onClick = { showUnlinkConfirm = true }, modifier = Modifier.padding(top = 12.dp)) {
                     Text("Unlink account")
                 }

@@ -47,6 +47,13 @@ data class TournamentSummary(val id: Int, val name: String, val date: String, va
 @Serializable
 data class CompetitorStats(val id: Int, val name: String, val wins: Int, val losses: Int)
 
+@Serializable
+data class AccountStatus(
+    val id: Int,
+    @SerialName("display_name") val displayName: String,
+    val revoked: Boolean
+)
+
 sealed interface ServerResult<out T> {
     data class Success<T>(val value: T) : ServerResult<T>
     data class Failure(val message: String) : ServerResult<Nothing>
@@ -129,6 +136,15 @@ class ServerApi(private val baseUrl: String) {
 
     suspend fun listCompetitors(readPassword: String): ServerResult<List<CompetitorStats>> = serverCall {
         client.get("$baseUrl/competitors") {
+            header("X-Read-Password", readPassword)
+        }.body()
+    }
+
+    /** Lets a linked device check whether its own account still works (e.g. an admin revoked
+     *  it) — see SettingsScreen's "Organizer account" section, which shows this rather than
+     *  just whether credentials exist locally. */
+    suspend fun getAccountStatus(accountId: Int, readPassword: String): ServerResult<AccountStatus> = serverCall {
+        client.get("$baseUrl/accounts/$accountId") {
             header("X-Read-Password", readPassword)
         }.body()
     }
