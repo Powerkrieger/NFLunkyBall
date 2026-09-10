@@ -6,10 +6,13 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -30,10 +33,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.dp
 import com.example.nflunkyball.persistence.AppSettingsStore
 import com.example.nflunkyball.ui.organizer.AccountSyncStatus
 import com.example.nflunkyball.ui.organizer.OrganizerViewModel
+import com.example.nflunkyball.ui.theme.Spacing
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -67,69 +70,84 @@ fun SettingsScreen(
             )
         }
     ) { padding ->
-        Column(Modifier.padding(padding).padding(16.dp)) {
-            Text("Organizer account", style = MaterialTheme.typography.titleMedium)
-            Text(
-                // Deliberately independent of any tournament: an account only controls whether
-                // this device can sync/save to a server and pull known-player suggestions —
-                // hosting and scoring a tournament (over Bluetooth at least) works without one.
-                if (account != null) {
-                    "Linked as ${account.displayName} (${account.serverUrl})"
-                } else {
-                    "Not linked. Without an account, tournaments can still be hosted and scored " +
-                        "over Bluetooth, but can't be synced to a server, saved to history, or " +
-                        "use known-player suggestions."
-                },
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(top = 4.dp)
-            )
-            if (account != null) {
-                val (statusText, statusColor) = when (syncStatus) {
-                    null, AccountSyncStatus.CHECKING -> "Checking sync status…" to Color.Unspecified
-                    AccountSyncStatus.CAN_SYNC -> "Can sync" to Color.Unspecified
-                    AccountSyncStatus.REVOKED ->
-                        "This account has been revoked and can't sync — add a new invite token " +
-                            "to restore access." to MaterialTheme.colorScheme.error
-                    AccountSyncStatus.UNKNOWN -> "Couldn't check sync status (offline?)" to Color.Unspecified
-                }
-                Text(
-                    statusText,
-                    color = statusColor,
-                    style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.padding(top = 4.dp)
-                )
-                OutlinedButton(onClick = { showUnlinkConfirm = true }, modifier = Modifier.padding(top = 12.dp)) {
-                    Text("Unlink account")
-                }
-            } else {
-                Button(onClick = onLinkAccount, modifier = Modifier.padding(top = 12.dp)) {
-                    Text("Link organizer account")
+        Column(
+            Modifier.fillMaxSize().padding(padding).padding(Spacing.md),
+            verticalArrangement = Arrangement.spacedBy(Spacing.md)
+        ) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Column(Modifier.padding(Spacing.md)) {
+                    Text("Organizer account", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        // Deliberately independent of any tournament: an account only controls
+                        // whether this device can sync/save to a server and pull known-player
+                        // suggestions — hosting and scoring a tournament (over Bluetooth at
+                        // least) works without one.
+                        if (account != null) {
+                            "Linked as ${account.displayName} (${account.serverUrl})"
+                        } else {
+                            "Not linked. Without an account, tournaments can still be hosted and " +
+                                "scored over Bluetooth, but can't be synced to a server, saved to " +
+                                "history, or use known-player suggestions."
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(top = Spacing.xs)
+                    )
+                    if (account != null) {
+                        val (statusText, statusColor) = when (syncStatus) {
+                            null, AccountSyncStatus.CHECKING -> "Checking sync status…" to Color.Unspecified
+                            AccountSyncStatus.CAN_SYNC -> "Can sync" to Color.Unspecified
+                            AccountSyncStatus.REVOKED ->
+                                "This account has been revoked and can't sync — add a new invite " +
+                                    "token to restore access." to MaterialTheme.colorScheme.error
+                            AccountSyncStatus.UNKNOWN -> "Couldn't check sync status (offline?)" to Color.Unspecified
+                        }
+                        Text(
+                            statusText,
+                            color = statusColor,
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.padding(top = Spacing.xs)
+                        )
+                        OutlinedButton(
+                            onClick = { showUnlinkConfirm = true },
+                            modifier = Modifier.padding(top = Spacing.sm)
+                        ) { Text("Unlink account") }
+                    } else {
+                        Button(onClick = onLinkAccount, modifier = Modifier.padding(top = Spacing.sm)) {
+                            Text("Link organizer account")
+                        }
+                    }
                 }
             }
 
-            HorizontalDivider(Modifier.padding(vertical = 24.dp))
-
-            Row(
-                Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
             ) {
-                Column(Modifier.weight(1f)) {
-                    Text("Use Bluetooth instead of server", style = MaterialTheme.typography.titleMedium)
-                    Text(
-                        "Live scores sync through the server by default. Turn this on to sync " +
-                            "directly between phones over Bluetooth instead — useful with no " +
-                            "internet, but only works at close range.",
-                        style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.padding(top = 4.dp)
+                Row(
+                    Modifier.fillMaxWidth().padding(Spacing.md),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Use Bluetooth instead of server", style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            "Live scores sync through the server by default. Turn this on to sync " +
+                                "directly between phones over Bluetooth instead — useful with no " +
+                                "internet, but only works at close range.",
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.padding(top = Spacing.xs)
+                        )
+                    }
+                    Switch(
+                        checked = useBleSync,
+                        onCheckedChange = {
+                            useBleSync = it
+                            settingsStore.setUseBleSync(it)
+                        }
                     )
                 }
-                Switch(
-                    checked = useBleSync,
-                    onCheckedChange = {
-                        useBleSync = it
-                        settingsStore.setUseBleSync(it)
-                    }
-                )
             }
         }
     }

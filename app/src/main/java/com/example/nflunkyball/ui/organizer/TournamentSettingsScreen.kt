@@ -1,6 +1,6 @@
 package com.example.nflunkyball.ui.organizer
 
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -8,8 +8,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -25,10 +26,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.unit.dp
 import com.example.nflunkyball.ble.RoomCode
 import com.example.nflunkyball.qr.JoinPayload
 import com.example.nflunkyball.ui.shared.RoomCodeDisplay
+import com.example.nflunkyball.ui.theme.Spacing
 
 /**
  * Full page (not a popup) reached from [OrganizerTopBar]'s three-dot icon — a real back button
@@ -63,7 +64,10 @@ fun TournamentSettingsScreen(
             )
         }
     ) { padding ->
-        Column(Modifier.fillMaxSize().padding(padding)) {
+        Column(
+            Modifier.fillMaxSize().padding(padding).padding(Spacing.md),
+            verticalArrangement = Arrangement.spacedBy(Spacing.sm)
+        ) {
             SettingsRow("Manage players", onClick = onManagePlayers)
             SettingsRow("Manage groups", onClick = onManageGroups)
             SettingsRow("Show viewer code") { showRoomCode = true }
@@ -113,18 +117,21 @@ private fun SettingsRow(
     destructive: Boolean = false,
     onClick: () -> Unit
 ) {
-    Text(
-        text,
-        color = when {
-            !enabled -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
-            destructive -> MaterialTheme.colorScheme.error
-            else -> Color.Unspecified
-        },
-        style = MaterialTheme.typography.bodyLarge,
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(enabled = enabled, onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 16.dp)
-    )
-    HorizontalDivider()
+    Card(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+    ) {
+        Text(
+            text,
+            color = when {
+                !enabled -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                destructive -> MaterialTheme.colorScheme.error
+                else -> Color.Unspecified
+            },
+            style = MaterialTheme.typography.bodyLarge,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.md, vertical = Spacing.md)
+        )
+    }
 }

@@ -13,6 +13,8 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -30,9 +32,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import com.example.nflunkyball.model.Group
 import com.example.nflunkyball.ui.shared.RenameDialog
+import com.example.nflunkyball.ui.theme.Spacing
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -55,7 +57,7 @@ fun ManageGroupsScreen(viewModel: OrganizerViewModel, onBack: () -> Unit) {
             )
         }
     ) { padding ->
-        Column(Modifier.fillMaxSize().padding(padding).padding(16.dp)) {
+        Column(Modifier.fillMaxSize().padding(padding).padding(Spacing.md)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 OutlinedTextField(
                     value = newGroupName,
@@ -66,42 +68,46 @@ fun ManageGroupsScreen(viewModel: OrganizerViewModel, onBack: () -> Unit) {
                 Button(
                     onClick = { viewModel.addGroup(newGroupName); newGroupName = "" },
                     enabled = newGroupName.isNotBlank(),
-                    modifier = Modifier.padding(start = 8.dp)
+                    modifier = Modifier.padding(start = Spacing.sm)
                 ) { Text("Add") }
             }
 
-            HorizontalDivider(Modifier.padding(vertical = 16.dp))
+            HorizontalDivider(Modifier.padding(vertical = Spacing.md))
 
-            LazyColumn {
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                 items(current.groups, key = { it.id }) { group ->
                     val removable = viewModel.canRemoveGroup(group.id)
-                    Row(
-                        Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
                     ) {
-                        Column(Modifier.weight(1f)) {
-                            Text(group.name, style = MaterialTheme.typography.bodyLarge)
-                            Text(
-                                "${group.teamIds.size} player" + if (group.teamIds.size == 1) "" else "s",
-                                style = MaterialTheme.typography.bodySmall
-                            )
-                            if (!removable) {
+                        Row(
+                            Modifier.fillMaxWidth().padding(horizontal = Spacing.md, vertical = Spacing.sm),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(Modifier.weight(1f)) {
+                                Text(group.name, style = MaterialTheme.typography.bodyLarge)
                                 Text(
-                                    "Has players — remove them first",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.error
+                                    "${group.teamIds.size} player" + if (group.teamIds.size == 1) "" else "s",
+                                    style = MaterialTheme.typography.bodySmall
                                 )
+                                if (!removable) {
+                                    Text(
+                                        "Has players — remove them first",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.error
+                                    )
+                                }
+                            }
+                            IconButton(onClick = { renamingGroup = group }) {
+                                Icon(Icons.Default.Edit, contentDescription = "Rename ${group.name}")
+                            }
+                            IconButton(onClick = { viewModel.removeGroup(group.id) }, enabled = removable) {
+                                Icon(Icons.Default.Delete, contentDescription = "Remove ${group.name}")
                             }
                         }
-                        IconButton(onClick = { renamingGroup = group }) {
-                            Icon(Icons.Default.Edit, contentDescription = "Rename ${group.name}")
-                        }
-                        IconButton(onClick = { viewModel.removeGroup(group.id) }, enabled = removable) {
-                            Icon(Icons.Default.Delete, contentDescription = "Remove ${group.name}")
-                        }
                     }
-                    HorizontalDivider()
                 }
             }
         }
