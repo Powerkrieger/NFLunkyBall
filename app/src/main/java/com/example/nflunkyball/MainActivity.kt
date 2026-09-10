@@ -27,6 +27,8 @@ import com.example.nflunkyball.ui.organizer.BracketScreen
 import com.example.nflunkyball.ui.organizer.GroupStageScreen
 import com.example.nflunkyball.ui.organizer.HostingScreen
 import com.example.nflunkyball.ui.organizer.LinkAccountScreen
+import com.example.nflunkyball.ui.organizer.ManageGroupsScreen
+import com.example.nflunkyball.ui.organizer.ManagePlayersScreen
 import com.example.nflunkyball.ui.organizer.OrganizerViewModel
 import com.example.nflunkyball.ui.organizer.SetupScreen
 import com.example.nflunkyball.ui.organizer.TournamentSettingsScreen
@@ -122,12 +124,16 @@ private fun NfLunkyBallApp() {
                 }
             ) { name, teams, groups ->
                 organizerViewModel.startTournament(name, teams, groups)
-                // Disentangled from this flow on purpose — once created, the tournament is
-                // managed exclusively via "My tournaments" (which already surfaces it, see
-                // HistoryScreen's "Hosting · ..." row), not by continuing forward here.
+                // Go straight to the QR/room-code screen so it's immediately shareable — but
+                // rewrite the back stack first so back-from-there lands on My Tournaments (the
+                // one place an in-progress tournament is managed from now on), not back into
+                // this creation flow. Two navigate() calls on purpose: the first swaps out
+                // organizer/setup for viewer/history, the second then pushes hosting on top of
+                // that, same shape as reaching hosting via My Tournaments' "Hosting · ..." row.
                 navController.navigate("viewer/history") {
                     popUpTo("organizer/setup") { inclusive = true }
                 }
+                navController.navigate("organizer/hosting")
             }
         }
         composable("organizer/hosting") {
@@ -174,8 +180,16 @@ private fun NfLunkyBallApp() {
                 viewModel = organizerViewModel,
                 onBack = { navController.popBackStack() },
                 onAbandoned = { navController.popBackStack(route = "home", inclusive = false) },
-                onLinkAccount = { navController.navigate("organizer/link_account") }
+                onLinkAccount = { navController.navigate("organizer/link_account") },
+                onManagePlayers = { navController.navigate("organizer/manage_players") },
+                onManageGroups = { navController.navigate("organizer/manage_groups") }
             )
+        }
+        composable("organizer/manage_players") {
+            ManagePlayersScreen(viewModel = organizerViewModel, onBack = { navController.popBackStack() })
+        }
+        composable("organizer/manage_groups") {
+            ManageGroupsScreen(viewModel = organizerViewModel, onBack = { navController.popBackStack() })
         }
         composable("viewer/join") {
             JoinScreen(viewModel = viewerViewModel, onJoined = { navController.navigate("viewer/scoreboard") })

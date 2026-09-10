@@ -256,6 +256,61 @@ class OrganizerViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
+    fun renamePlayer(teamId: String, newName: String) {
+        val name = newName.trim()
+        if (name.isBlank()) return
+        repository.update { t ->
+            t.copy(teams = t.teams.map { if (it.id == teamId) it.copy(name = name) else it })
+        }
+    }
+
+    /** True if [teamId] can be safely removed — only ever false once a match involving them
+     *  actually has a recorded result, since dropping them past that point would corrupt
+     *  standings/history rather than just tidying up an unplayed pairing. Checked both here (for
+     *  the UI to grey the action out) and again inside [removePlayer] itself. */
+    fun canRemovePlayer(teamId: String): Boolean {
+        val current = tournament.value ?: return false
+        return (current.groups.flatMap { it.matches } + current.bracketMatches)
+            .none { (it.teamAId == teamId || it.teamBId == teamId) && it.result != null }
+    }
+
+    /** No-ops instead of removing once [canRemovePlayer] would say no — defense in depth, not
+     *  just relying on the UI having disabled the action. Drops the team, its group membership,
+     *  and any of its still-unplayed matches (group-stage or bracket). */
+    fun removePlayer(teamId: String) {
+        if (!canRemovePlayer(teamId)) return
+        repository.update { t ->
+            t.copy(
+                teams = t.teams.filterNot { it.id == teamId },
+                groups = t.groups.map { g ->
+                    g.copy(
+                        teamIds = g.teamIds - teamId,
+                        matches = g.matches.filterNot { it.teamAId == teamId || it.teamBId == teamId }
+                    )
+                },
+                bracketMatches = t.bracketMatches.filterNot { it.teamAId == teamId || it.teamBId == teamId }
+            )
+        }
+    }
+
+    fun renameGroup(groupId: String, newName: String) {
+        val name = newName.trim()
+        if (name.isBlank()) return
+        repository.update { t ->
+            t.copy(groups = t.groups.map { if (it.id == groupId) it.copy(name = name) else it })
+        }
+    }
+
+    /** Only an empty group (no teams) can be removed — one with teams in it would silently
+     *  strand their matches/results, so removing those first (see [removePlayer]) is required. */
+    fun canRemoveGroup(groupId: String): Boolean =
+        tournament.value?.groups?.find { it.id == groupId }?.teamIds?.isEmpty() == true
+
+    fun removeGroup(groupId: String) {
+        if (!canRemoveGroup(groupId)) return
+        repository.update { t -> t.copy(groups = t.groups.filterNot { it.id == groupId }) }
+    }
+
     fun addBracketMatch(teamAId: String, teamBId: String, roundLabel: String) {
         repository.update { t ->
             t.copy(
