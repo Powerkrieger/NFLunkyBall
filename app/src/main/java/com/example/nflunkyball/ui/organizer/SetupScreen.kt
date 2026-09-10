@@ -32,6 +32,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.unit.dp
 import com.example.nflunkyball.model.Team
+import com.example.nflunkyball.ui.theme.Spacing
 import java.util.UUID
 
 @Composable
@@ -70,7 +71,7 @@ fun SetupScreen(
     Column(
         Modifier
             .fillMaxSize()
-            .padding(16.dp)
+            .padding(Spacing.md)
             .verticalScroll(rememberScrollState())
     ) {
         Text("New tournament", style = MaterialTheme.typography.headlineSmall)
@@ -78,12 +79,12 @@ fun SetupScreen(
             value = tournamentName,
             onValueChange = { tournamentName = it },
             label = { Text("Tournament name") },
-            modifier = Modifier.fillMaxWidth().padding(top = 12.dp)
+            modifier = Modifier.fillMaxWidth().padding(top = Spacing.sm)
         )
 
         // Groups first — teams get assigned to a group as they're added below, so having the
         // groups already exist here means that dropdown is never empty.
-        Text("Groups", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 24.dp))
+        Text("Groups", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = Spacing.lg))
         Row(verticalAlignment = Alignment.CenterVertically) {
             OutlinedTextField(
                 value = groupNameInput,
@@ -99,12 +100,12 @@ fun SetupScreen(
                         groupNameInput = ""
                     }
                 },
-                modifier = Modifier.padding(start = 8.dp)
+                modifier = Modifier.padding(start = Spacing.sm)
             ) { Text("Add") }
         }
         groupNames.forEach { name -> Text("• $name", Modifier.padding(vertical = 2.dp)) }
 
-        Text("Teams", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 24.dp))
+        Text("Teams", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = Spacing.lg))
         Row(verticalAlignment = Alignment.CenterVertically) {
             OutlinedTextField(
                 value = teamNameInput,
@@ -114,7 +115,7 @@ fun SetupScreen(
             )
             Button(
                 onClick = { addTeam(teamNameInput); teamNameInput = "" },
-                modifier = Modifier.padding(start = 8.dp)
+                modifier = Modifier.padding(start = Spacing.sm)
             ) { Text("Add") }
         }
 
@@ -124,14 +125,14 @@ fun SetupScreen(
             Text(
                 "Known players",
                 style = MaterialTheme.typography.labelMedium,
-                modifier = Modifier.padding(top = 8.dp)
+                modifier = Modifier.padding(top = Spacing.sm)
             )
-            LazyRow(Modifier.padding(top = 4.dp)) {
+            LazyRow(Modifier.padding(top = Spacing.xs)) {
                 items(suggestions) { name ->
                     SuggestionChip(
                         onClick = { addTeam(name) },
                         label = { Text(name) },
-                        modifier = Modifier.padding(end = 8.dp)
+                        modifier = Modifier.padding(end = Spacing.sm)
                     )
                 }
             }
@@ -139,7 +140,7 @@ fun SetupScreen(
 
         teams.forEach { team ->
             Row(
-                Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                Modifier.fillMaxWidth().padding(vertical = Spacing.xs),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -181,7 +182,7 @@ fun SetupScreen(
                 onStart(tournamentName.ifBlank { "Flunkyball Tournament" }, teams.toList(), grouped)
             },
             enabled = tournamentName.isNotBlank() && allAssigned,
-            modifier = Modifier.fillMaxWidth().padding(top = 24.dp, bottom = 24.dp)
+            modifier = Modifier.fillMaxWidth().padding(top = Spacing.lg, bottom = Spacing.lg)
         ) { Text("Start Group Stage") }
     }
 }
@@ -189,7 +190,7 @@ fun SetupScreen(
 @Composable
 private fun ActiveTournamentGuard(name: String, onNavigateToMyTournaments: () -> Unit) {
     Column(
-        Modifier.fillMaxSize().padding(24.dp),
+        Modifier.fillMaxSize().padding(Spacing.lg),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text("You already have an active tournament", style = MaterialTheme.typography.headlineSmall)
@@ -197,11 +198,11 @@ private fun ActiveTournamentGuard(name: String, onNavigateToMyTournaments: () ->
             "\"$name\" is still in progress on this device. Finish or abandon it before " +
                 "starting another one.",
             style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.padding(top = 8.dp)
+            modifier = Modifier.padding(top = Spacing.sm)
         )
         Button(
             onClick = onNavigateToMyTournaments,
-            modifier = Modifier.fillMaxWidth().padding(top = 24.dp)
+            modifier = Modifier.fillMaxWidth().padding(top = Spacing.lg)
         ) { Text("Go to My tournaments") }
     }
 }

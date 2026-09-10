@@ -18,12 +18,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import com.example.nflunkyball.model.Tournament
 import com.example.nflunkyball.model.standings
 import com.example.nflunkyball.server.ServerResult
 import com.example.nflunkyball.ui.shared.MatchList
 import com.example.nflunkyball.ui.shared.StandingsTable
+import com.example.nflunkyball.ui.theme.Spacing
 
 @Composable
 fun HistoryTournamentDetailScreen(viewModel: ViewerViewModel, savedId: String) {
@@ -57,38 +57,42 @@ fun HistoryTournamentDetailScreen(viewModel: ViewerViewModel, savedId: String) {
         else -> {
             val teamNames = current.teams.associate { it.id to it.name }
             Column(
-                Modifier.fillMaxSize().padding(16.dp).verticalScroll(rememberScrollState())
+                Modifier.fillMaxSize().padding(Spacing.md).verticalScroll(rememberScrollState())
             ) {
-                Text(current.name, style = MaterialTheme.typography.headlineSmall)
+                Text(
+                    current.name,
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
                 current.groups.forEach { group ->
                     Text(
                         group.name,
                         style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.padding(top = 20.dp)
+                        modifier = Modifier.padding(top = Spacing.lg)
                     )
                     StandingsTable(
                         standings = group.standings(),
                         teamNames = teamNames,
-                        modifier = Modifier.padding(top = 8.dp)
+                        modifier = Modifier.padding(top = Spacing.sm)
                     )
                     MatchList(
                         matches = group.matches,
                         teamNames = teamNames,
                         onRecordResult = null,
-                        modifier = Modifier.padding(top = 8.dp)
+                        modifier = Modifier.padding(top = Spacing.sm)
                     )
                 }
                 if (current.bracketMatches.isNotEmpty()) {
                     Text(
                         "Bracket",
                         style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.padding(top = 20.dp)
+                        modifier = Modifier.padding(top = Spacing.lg)
                     )
                     MatchList(
                         matches = current.bracketMatches,
                         teamNames = teamNames,
                         onRecordResult = null,
-                        modifier = Modifier.padding(top = 8.dp)
+                        modifier = Modifier.padding(top = Spacing.sm)
                     )
                 }
             }

@@ -15,9 +15,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import com.example.nflunkyball.qr.JoinPayloadCodec
 import com.example.nflunkyball.ui.shared.BluetoothGate
+import com.example.nflunkyball.ui.theme.Spacing
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
 
@@ -39,17 +39,17 @@ fun JoinScreen(viewModel: ViewerViewModel, onJoined: () -> Unit) {
 
     val content: @Composable () -> Unit = {
         Column(
-            Modifier.fillMaxWidth().padding(24.dp),
+            Modifier.fillMaxWidth().padding(Spacing.lg),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text("Join a tournament", style = MaterialTheme.typography.headlineSmall)
 
             Button(
                 onClick = { scanLauncher.launch(ScanOptions().setOrientationLocked(false).setBeepEnabled(false)) },
-                modifier = Modifier.fillMaxWidth().padding(top = 24.dp)
+                modifier = Modifier.fillMaxWidth().padding(top = Spacing.lg)
             ) { Text("Scan QR code") }
 
-            Text("or", modifier = Modifier.padding(vertical = 16.dp))
+            Text("or", modifier = Modifier.padding(vertical = Spacing.md))
 
             OutlinedTextField(
                 value = manualCode,
@@ -58,7 +58,7 @@ fun JoinScreen(viewModel: ViewerViewModel, onJoined: () -> Unit) {
                 modifier = Modifier.fillMaxWidth()
             )
             error?.let {
-                Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 8.dp))
+                Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = Spacing.sm))
             }
             Button(
                 onClick = {
@@ -71,7 +71,7 @@ fun JoinScreen(viewModel: ViewerViewModel, onJoined: () -> Unit) {
                     }
                 },
                 enabled = manualCode.isNotBlank(),
-                modifier = Modifier.fillMaxWidth().padding(top = 16.dp)
+                modifier = Modifier.fillMaxWidth().padding(top = Spacing.md)
             ) { Text("Join") }
         }
     }

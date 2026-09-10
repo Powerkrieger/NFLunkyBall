@@ -11,7 +11,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.example.nflunkyball.ble.ChunkProgress
 
@@ -30,7 +29,7 @@ fun ChunkProgressBar(progress: ChunkProgress, modifier: Modifier = Modifier) {
                     .weight(1f)
                     .fillMaxHeight()
                     .background(
-                        color = if (received) Color(0xFF4CAF50) else MaterialTheme.colorScheme.surfaceVariant,
+                        color = if (received) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
                         shape = RoundedCornerShape(2.dp)
                     )
             )

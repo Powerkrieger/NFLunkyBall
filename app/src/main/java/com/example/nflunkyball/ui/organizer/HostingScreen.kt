@@ -16,11 +16,11 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import com.example.nflunkyball.ble.RoomCode
 import com.example.nflunkyball.qr.JoinPayload
 import com.example.nflunkyball.ui.shared.BluetoothGate
 import com.example.nflunkyball.ui.shared.RoomCodeDisplay
+import com.example.nflunkyball.ui.theme.Spacing
 
 /** An account is optional, not a prerequisite for hosting (see SettingsScreen's "Organizer
  *  account" section) — [account] can legitimately be null here, in which case this just shows
@@ -64,7 +64,7 @@ private fun HostingScreenContent(
     val serverSyncStatus by viewModel.serverSyncStatus.collectAsState()
 
     Column(
-        Modifier.fillMaxSize().padding(24.dp),
+        Modifier.fillMaxSize().padding(Spacing.lg),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text("Share this to let people watch", style = MaterialTheme.typography.titleMedium)
@@ -72,12 +72,12 @@ private fun HostingScreenContent(
         if (roomId != null && tournament != null) {
             val code = RoomCode.encode(roomId)
             val payload = JoinPayload(room = code, server = account?.serverUrl, pw = readPassword, tid = tournament?.id)
-            RoomCodeDisplay(payload)
+            RoomCodeDisplay(payload, modifier = Modifier.padding(top = Spacing.md))
         } else {
-            CircularProgressIndicator(Modifier.padding(24.dp))
+            CircularProgressIndicator(Modifier.padding(Spacing.lg))
         }
 
-        Spacer(Modifier.height(24.dp))
+        Spacer(Modifier.height(Spacing.lg))
 
         if (useBleSync) {
             val versionText = broadcastVersion?.let { "Broadcasting version $it" } ?: "Starting broadcast…"
@@ -89,12 +89,12 @@ private fun HostingScreenContent(
         if (account != null) {
             Text("Hosting as ${account.displayName}", style = MaterialTheme.typography.bodyMedium)
         } else {
-            Button(onClick = onLinkAccount, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
+            Button(onClick = onLinkAccount, modifier = Modifier.fillMaxWidth().padding(top = Spacing.sm)) {
                 Text("Link organizer account")
             }
         }
 
-        Button(onClick = onContinue, modifier = Modifier.fillMaxWidth().padding(top = 24.dp)) {
+        Button(onClick = onContinue, modifier = Modifier.fillMaxWidth().padding(top = Spacing.lg)) {
             Text("Continue to scoring")
         }
     }

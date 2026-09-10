@@ -8,10 +8,10 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -23,11 +23,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import com.example.nflunkyball.model.Match
 import com.example.nflunkyball.model.Team
 import com.example.nflunkyball.ui.shared.MatchList
 import com.example.nflunkyball.ui.shared.MatchResultDialog
+import com.example.nflunkyball.ui.theme.Spacing
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -51,16 +51,16 @@ fun BracketScreen(
         Modifier
             .fillMaxSize()
             .padding(padding)
-            .padding(16.dp)
+            .padding(Spacing.md)
             .verticalScroll(rememberScrollState())
     ) {
         MatchList(
             matches = current.bracketMatches,
             teamNames = teamNames,
             onRecordResult = { match -> pendingMatch = match },
-            modifier = Modifier.padding(top = 8.dp)
+            modifier = Modifier.padding(top = Spacing.sm)
         )
-        Button(onClick = { showAddMatch = true }, modifier = Modifier.padding(top = 16.dp)) {
+        Button(onClick = { showAddMatch = true }, modifier = Modifier.padding(top = Spacing.md)) {
             Text("Add bracket match")
         }
         Button(
@@ -70,7 +70,7 @@ fun BracketScreen(
                 // lose the whole tournament unless the organizer explicitly says that's fine.
                 if (viewModel.organizerAccount == null) showUnlinkedWarning = true else onFinish()
             },
-            modifier = Modifier.fillMaxWidth().padding(top = 24.dp, bottom = 24.dp)
+            modifier = Modifier.fillMaxWidth().padding(top = Spacing.lg, bottom = Spacing.lg)
         ) { Text("Finish Tournament") }
     }
     }
@@ -139,19 +139,18 @@ private fun AddBracketMatchDialog(
         title = { Text("Add bracket match") },
         text = {
             Column {
-                Text("Team A", style = MaterialTheme.typography.labelMedium)
-                TeamPicker(teams, teamAId) { teamAId = it }
-                Text(
-                    "Team B",
-                    style = MaterialTheme.typography.labelMedium,
-                    modifier = Modifier.padding(top = 8.dp)
-                )
-                TeamPicker(teams, teamBId) { teamBId = it }
+                TeamPicker(teams, teamAId, label = "Team A") { teamAId = it }
+                TeamPicker(
+                    teams,
+                    teamBId,
+                    label = "Team B",
+                    modifier = Modifier.padding(top = Spacing.sm)
+                ) { teamBId = it }
                 OutlinedTextField(
                     value = roundLabel,
                     onValueChange = { roundLabel = it },
                     label = { Text("Round (e.g. Semifinal)") },
-                    modifier = Modifier.padding(top = 8.dp)
+                    modifier = Modifier.padding(top = Spacing.sm)
                 )
             }
         },
@@ -165,14 +164,34 @@ private fun AddBracketMatchDialog(
     )
 }
 
+/** Exposed dropdown (real trailing-arrow field, not a plain unstyled button) — see
+ *  [ManagePlayersScreen]'s equivalent group picker for why the previous TextButton-triggered
+ *  menu here gave no visual hint it was tappable at all. */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun TeamPicker(teams: List<Team>, selectedId: String, onSelect: (String) -> Unit) {
+private fun TeamPicker(
+    teams: List<Team>,
+    selectedId: String,
+    label: String,
+    modifier: Modifier = Modifier,
+    onSelect: (String) -> Unit
+) {
     var expanded by remember { mutableStateOf(false) }
-    val selectedName = teams.firstOrNull { it.id == selectedId }?.name ?: "Select team"
-    TextButton(onClick = { expanded = true }) { Text(selectedName) }
-    DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-        teams.forEach { team ->
-            DropdownMenuItem(text = { Text(team.name) }, onClick = { onSelect(team.id); expanded = false })
+    val selectedName = teams.firstOrNull { it.id == selectedId }?.name ?: ""
+
+    ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }, modifier = modifier) {
+        OutlinedTextField(
+            value = selectedName,
+            onValueChange = {},
+            readOnly = true,
+            label = { Text(label) },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+            modifier = Modifier.menuAnchor().fillMaxWidth()
+        )
+        ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            teams.forEach { team ->
+                DropdownMenuItem(text = { Text(team.name) }, onClick = { onSelect(team.id); expanded = false })
+            }
         }
     }
 }

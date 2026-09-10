@@ -27,7 +27,7 @@ fun StandingsTable(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
     ) {
         Column(Modifier.padding(horizontal = Spacing.md, vertical = Spacing.sm)) {
-            Row(Modifier.padding(vertical = 4.dp)) {
+            Row(Modifier.padding(vertical = Spacing.xs)) {
                 Text("Team", Modifier.weight(2f), style = MaterialTheme.typography.labelMedium)
                 Text("W", Modifier.width(32.dp), style = MaterialTheme.typography.labelMedium)
                 Text("L", Modifier.width(32.dp), style = MaterialTheme.typography.labelMedium)

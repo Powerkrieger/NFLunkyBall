@@ -18,12 +18,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import com.example.nflunkyball.model.Match
 import com.example.nflunkyball.model.standings
 import com.example.nflunkyball.ui.shared.MatchList
 import com.example.nflunkyball.ui.shared.MatchResultDialog
 import com.example.nflunkyball.ui.shared.StandingsTable
+import com.example.nflunkyball.ui.theme.Spacing
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -44,30 +44,30 @@ fun GroupStageScreen(
         Modifier
             .fillMaxSize()
             .padding(padding)
-            .padding(16.dp)
+            .padding(Spacing.md)
             .verticalScroll(rememberScrollState())
     ) {
         current.groups.forEach { group ->
             Text(
                 group.name,
                 style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(top = 20.dp)
+                modifier = Modifier.padding(top = Spacing.lg)
             )
             StandingsTable(
                 standings = group.standings(),
                 teamNames = teamNames,
-                modifier = Modifier.padding(top = 8.dp)
+                modifier = Modifier.padding(top = Spacing.sm)
             )
             MatchList(
                 matches = group.matches,
                 teamNames = teamNames,
                 onRecordResult = { match -> pendingMatch = group.id to match },
-                modifier = Modifier.padding(top = 8.dp)
+                modifier = Modifier.padding(top = Spacing.sm)
             )
         }
         Button(
             onClick = onAdvanceToBracket,
-            modifier = Modifier.fillMaxWidth().padding(top = 24.dp, bottom = 24.dp)
+            modifier = Modifier.fillMaxWidth().padding(top = Spacing.lg, bottom = Spacing.lg)
         ) { Text("Advance to Bracket") }
     }
     }

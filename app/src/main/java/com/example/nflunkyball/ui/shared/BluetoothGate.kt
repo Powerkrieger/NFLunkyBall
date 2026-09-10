@@ -19,8 +19,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.dp
 import com.example.nflunkyball.ble.BleCapability
+import com.example.nflunkyball.ui.theme.Spacing
 
 /**
  * Blocks [content] behind a clear "Bluetooth is off" message until it's turned on, instead of
@@ -44,7 +44,7 @@ fun BluetoothGate(content: @Composable () -> Unit) {
         content()
     } else {
         Column(
-            modifier = Modifier.fillMaxSize().padding(24.dp),
+            modifier = Modifier.fillMaxSize().padding(Spacing.lg),
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
@@ -55,7 +55,7 @@ fun BluetoothGate(content: @Composable () -> Unit) {
                 )
                 Button(
                     onClick = { launcher.launch(Intent(Settings.ACTION_BLUETOOTH_SETTINGS)) },
-                    modifier = Modifier.padding(top = 16.dp)
+                    modifier = Modifier.padding(top = Spacing.md)
                 ) {
                     Text("Open Bluetooth settings")
                 }

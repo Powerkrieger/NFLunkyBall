@@ -11,6 +11,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -30,6 +31,7 @@ import com.example.nflunkyball.ui.shared.ChunkProgressBar
 import com.example.nflunkyball.ui.shared.MatchList
 import com.example.nflunkyball.ui.shared.RoomCodeDisplay
 import com.example.nflunkyball.ui.shared.StandingsTable
+import com.example.nflunkyball.ui.theme.Spacing
 
 @Composable
 fun ViewerScoreboardScreen(viewModel: ViewerViewModel, onOpenHistory: () -> Unit) {
@@ -57,7 +59,7 @@ fun ViewerScoreboardScreen(viewModel: ViewerViewModel, onOpenHistory: () -> Unit
         Column(
             Modifier
                 .fillMaxSize()
-                .padding(16.dp)
+                .padding(Spacing.md)
                 .verticalScroll(rememberScrollState())
                 .padding(bottom = 72.dp)
         ) {
@@ -66,14 +68,14 @@ fun ViewerScoreboardScreen(viewModel: ViewerViewModel, onOpenHistory: () -> Unit
             // this shows nothing extra there; "Waiting for the organizer's scores…" below covers
             // the empty case for both modes.
             if (viewModel.useBleSync()) {
-                BluetoothStatusRow(modifier = Modifier.padding(bottom = 8.dp))
+                BluetoothStatusRow(modifier = Modifier.padding(bottom = Spacing.sm))
                 val progress = receiveProgress
                 if (progress != null) {
                     Text(
                         "Reading state of version ${progress.version}",
                         style = MaterialTheme.typography.bodySmall
                     )
-                    ChunkProgressBar(progress, modifier = Modifier.padding(top = 4.dp, bottom = 12.dp))
+                    ChunkProgressBar(progress, modifier = Modifier.padding(top = Spacing.xs, bottom = Spacing.sm))
                 }
             }
 
@@ -85,6 +87,7 @@ fun ViewerScoreboardScreen(viewModel: ViewerViewModel, onOpenHistory: () -> Unit
                     Text(
                         current.name,
                         style = MaterialTheme.typography.headlineSmall,
+                        color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.weight(1f)
                     )
                     TextButton(onClick = { showInvite = true }) { Text("Invite") }
@@ -97,31 +100,31 @@ fun ViewerScoreboardScreen(viewModel: ViewerViewModel, onOpenHistory: () -> Unit
                     Text(
                         group.name,
                         style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.padding(top = 20.dp)
+                        modifier = Modifier.padding(top = Spacing.lg)
                     )
                     StandingsTable(
                         standings = group.standings(),
                         teamNames = teamNames,
-                        modifier = Modifier.padding(top = 8.dp)
+                        modifier = Modifier.padding(top = Spacing.sm)
                     )
                     MatchList(
                         matches = group.matches,
                         teamNames = teamNames,
                         onRecordResult = null,
-                        modifier = Modifier.padding(top = 8.dp)
+                        modifier = Modifier.padding(top = Spacing.sm)
                     )
                 }
                 if (current.bracketMatches.isNotEmpty()) {
                     Text(
                         "Bracket",
                         style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.padding(top = 20.dp)
+                        modifier = Modifier.padding(top = Spacing.lg)
                     )
                     MatchList(
                         matches = current.bracketMatches,
                         teamNames = teamNames,
                         onRecordResult = null,
-                        modifier = Modifier.padding(top = 8.dp)
+                        modifier = Modifier.padding(top = Spacing.sm)
                     )
                 }
             }
@@ -129,16 +132,19 @@ fun ViewerScoreboardScreen(viewModel: ViewerViewModel, onOpenHistory: () -> Unit
 
         EmojiBar(
             onEmoji = { viewModel.sendEmoji(it) },
-            modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(12.dp)
+            modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(Spacing.sm)
         )
     }
 }
 
 @Composable
 private fun EmojiBar(onEmoji: (String) -> Unit, modifier: Modifier = Modifier) {
-    Card(modifier) {
+    Card(
+        modifier,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
+    ) {
         Row(
-            Modifier.fillMaxWidth().padding(8.dp),
+            Modifier.fillMaxWidth().padding(Spacing.sm),
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
             EmojiPalette.emojis.forEach { emoji ->

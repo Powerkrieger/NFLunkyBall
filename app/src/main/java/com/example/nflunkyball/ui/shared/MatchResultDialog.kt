@@ -21,9 +21,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import com.example.nflunkyball.model.Match
 import com.example.nflunkyball.model.MatchResult
+import com.example.nflunkyball.ui.theme.Spacing
 
 @Composable
 fun MatchResultDialog(
@@ -50,14 +50,14 @@ fun MatchResultDialog(
                         Text(teamNames[teamId] ?: teamId)
                     }
                 }
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(Spacing.sm))
                 OutlinedTextField(
                     value = scoreText,
                     onValueChange = { scoreText = it.filter(Char::isDigit) },
                     label = { Text("Winner's score (seconds, 300 = forfeit)") },
                     singleLine = true
                 )
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(Spacing.sm))
                 OutlinedTextField(
                     value = drink,
                     onValueChange = { drink = it },
@@ -67,12 +67,12 @@ fun MatchResultDialog(
                     singleLine = true
                 )
                 if (knownDrinks.isNotEmpty()) {
-                    LazyRow(Modifier.padding(top = 4.dp)) {
+                    LazyRow(Modifier.padding(top = Spacing.xs)) {
                         items(knownDrinks) { name ->
                             SuggestionChip(
                                 onClick = { drink = name },
                                 label = { Text(name) },
-                                modifier = Modifier.padding(end = 8.dp)
+                                modifier = Modifier.padding(end = Spacing.sm)
                             )
                         }
                     }
