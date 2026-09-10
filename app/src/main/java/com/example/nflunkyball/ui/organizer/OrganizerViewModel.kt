@@ -132,6 +132,10 @@ class OrganizerViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun stopHosting() {
         broadcaster?.stop()
+        stopServerSync()
+    }
+
+    private fun stopServerSync() {
         serverSyncJob?.cancel()
         serverSyncJob = null
         _serverSyncStatus.value = null
@@ -141,14 +145,14 @@ class OrganizerViewModel(application: Application) : AndroidViewModel(applicatio
      *  the live-sync endpoint every time it changes, instead of advertising it over BLE. Needs
      *  a linked account to sign with — unlike hosting over BLE, a tournament can exist locally
      *  with none linked yet (e.g. credentials got lost, or the organizer skipped linking and
-     *  wants to add it later — see [OrganizerTopBar]'s "Link organizer account" menu item and
-     *  [BracketScreen]'s finish-without-linking warning), so this surfaces that state instead of
-     *  silently doing nothing. Called again once linking completes to actually start syncing. */
+     *  wants to add it later — see [SettingsScreen]'s account section, [TournamentSettingsScreen]'s
+     *  "Add invite token" row, and [BracketScreen]'s finish-without-linking warning), so this
+     *  surfaces that state instead of silently doing nothing. Called again once linking
+     *  completes to actually start syncing. */
     private fun startServerSync() {
         val account = organizerAccount
         if (account == null) {
-            serverSyncJob?.cancel()
-            serverSyncJob = null
+            stopServerSync()
             _serverSyncStatus.value = "Not linked — link an organizer account to sync"
             return
         }
@@ -287,6 +291,20 @@ class OrganizerViewModel(application: Application) : AndroidViewModel(applicatio
                 is ServerResult.Failure -> onResult(false, result.message)
             }
         }
+    }
+
+    /** Forgets this device's organizer identity — local credentials only, nothing server-side
+     *  (an admin revoking/deleting the account is a separate, deliberate action). Only touches
+     *  the account, never [repository]/[tournament]: an in-progress tournament keeps hosting
+     *  over BLE untouched, and simply loses server sync (see [startServerSync]) until relinked.
+     *  [readPassword] deliberately isn't cleared here — it unlocks history/leaderboard viewing
+     *  (see [ServerCredentialsStore.clearAccount]'s doc), which isn't specific to being an
+     *  organizer, so it stays usable even while unlinked. */
+    fun unlinkAccount() {
+        stopServerSync()
+        credentialsStore.clearAccount()
+        organizerAccount = null
+        knownCompetitorNames = emptyList()
     }
 
     fun uploadToHistory() {

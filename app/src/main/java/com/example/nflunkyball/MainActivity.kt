@@ -81,14 +81,14 @@ private fun NfLunkyBallApp() {
                 onHost = {
                     // Resume an in-progress tournament (e.g. the app got killed mid-event)
                     // instead of dropping the organizer into a blank "New tournament" form and
-                    // silently orphaning what's already on disk — checked before the account-link
-                    // gate below so an existing-but-unlinked tournament resumes normally instead
-                    // of detouring into linking and then landing back on a blank setup form
-                    // (which would silently overwrite it the moment "Start Group Stage" is hit).
-                    val destination = when {
-                        organizerViewModel.tournament.value != null -> "organizer/hosting"
-                        organizerViewModel.organizerAccount == null -> "organizer/link_account"
-                        else -> "organizer/setup"
+                    // silently orphaning what's already on disk. An account is no longer a
+                    // prerequisite for hosting at all — see SettingsScreen's "Organizer account"
+                    // section for linking independent of any tournament; unlinked hosting just
+                    // means no server sync/history/known-players until one's linked.
+                    val destination = if (organizerViewModel.tournament.value != null) {
+                        "organizer/hosting"
+                    } else {
+                        "organizer/setup"
                     }
                     navController.navigate(destination)
                 },
@@ -98,23 +98,23 @@ private fun NfLunkyBallApp() {
             )
         }
         composable("settings") {
-            SettingsScreen(onBack = { navController.popBackStack() })
+            SettingsScreen(
+                organizerViewModel = organizerViewModel,
+                onBack = { navController.popBackStack() },
+                onLinkAccount = { navController.navigate("organizer/link_account") }
+            )
         }
         composable("organizer/link_account") {
             LinkAccountScreen(
                 viewModel = organizerViewModel,
                 onDone = {
-                    // Linking can now happen either before a tournament exists (fresh setup) or
-                    // after (added credentials back to an already-started one) — resume rather
-                    // than dropping into a blank setup form in the latter case.
-                    val destination = if (organizerViewModel.tournament.value != null) {
-                        "organizer/hosting"
-                    } else {
-                        "organizer/setup"
-                    }
-                    navController.navigate(destination) {
-                        popUpTo("organizer/link_account") { inclusive = true }
-                    }
+                    // Reached from several places now (Settings, HostingScreen, tournament
+                    // settings, the finish-without-linking warning) — popping back returns to
+                    // whichever one it was, rather than assuming a specific next screen. If a
+                    // tournament is active, (re)kick off sync now that credentials exist; a
+                    // fresh link from Settings with nothing hosted yet is a no-op here.
+                    if (organizerViewModel.tournament.value != null) organizerViewModel.startHosting()
+                    navController.popBackStack()
                 }
             )
         }

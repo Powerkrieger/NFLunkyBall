@@ -6,13 +6,18 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -24,13 +29,20 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.example.nflunkyball.persistence.AppSettingsStore
+import com.example.nflunkyball.ui.organizer.OrganizerViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(onBack: () -> Unit) {
+fun SettingsScreen(
+    organizerViewModel: OrganizerViewModel,
+    onBack: () -> Unit,
+    onLinkAccount: () -> Unit
+) {
     val context = LocalContext.current
     val settingsStore = remember { AppSettingsStore(context) }
     var useBleSync by remember { mutableStateOf(settingsStore.useBleSync()) }
+    var showUnlinkConfirm by remember { mutableStateOf(false) }
+    val account = organizerViewModel.organizerAccount
 
     Scaffold(
         topBar = {
@@ -45,6 +57,33 @@ fun SettingsScreen(onBack: () -> Unit) {
         }
     ) { padding ->
         Column(Modifier.padding(padding).padding(16.dp)) {
+            Text("Organizer account", style = MaterialTheme.typography.titleMedium)
+            Text(
+                // Deliberately independent of any tournament: an account only controls whether
+                // this device can sync/save to a server and pull known-player suggestions —
+                // hosting and scoring a tournament (over Bluetooth at least) works without one.
+                if (account != null) {
+                    "Linked as ${account.displayName} (${account.serverUrl})"
+                } else {
+                    "Not linked. Without an account, tournaments can still be hosted and scored " +
+                        "over Bluetooth, but can't be synced to a server, saved to history, or " +
+                        "use known-player suggestions."
+                },
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(top = 4.dp)
+            )
+            if (account != null) {
+                OutlinedButton(onClick = { showUnlinkConfirm = true }, modifier = Modifier.padding(top = 12.dp)) {
+                    Text("Unlink account")
+                }
+            } else {
+                Button(onClick = onLinkAccount, modifier = Modifier.padding(top = 12.dp)) {
+                    Text("Link organizer account")
+                }
+            }
+
+            HorizontalDivider(Modifier.padding(vertical = 24.dp))
+
             Row(
                 Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
@@ -68,5 +107,25 @@ fun SettingsScreen(onBack: () -> Unit) {
                 )
             }
         }
+    }
+
+    if (showUnlinkConfirm) {
+        AlertDialog(
+            onDismissRequest = { showUnlinkConfirm = false },
+            title = { Text("Unlink organizer account?") },
+            text = {
+                Text(
+                    "This only forgets the account on this device — it doesn't delete anything " +
+                        "on the server, and doesn't touch any tournament you're currently hosting " +
+                        "(it just loses server sync until you link again)."
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { showUnlinkConfirm = false; organizerViewModel.unlinkAccount() }) {
+                    Text("Unlink")
+                }
+            },
+            dismissButton = { TextButton(onClick = { showUnlinkConfirm = false }) { Text("Cancel") } }
+        )
     }
 }

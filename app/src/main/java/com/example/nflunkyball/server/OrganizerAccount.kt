@@ -65,6 +65,20 @@ class ServerCredentialsStore(context: Context) {
         prefs.edit().putString(KEY_VIEWER_SERVER_URL, serverUrl).apply()
     }
 
+    /** Clears only the organizer identity (which account, and its keypair) — not the shared
+     *  read password or last-known viewer server URL, since neither is specific to *being* an
+     *  organizer (the read password unlocks history for viewers too; see [OrganizerViewModel.unlinkAccount]
+     *  for why unlinking shouldn't reach further than the account itself). */
+    fun clearAccount() {
+        prefs.edit()
+            .remove(KEY_ACCOUNT_ID)
+            .remove(KEY_DISPLAY_NAME)
+            .remove(KEY_SERVER_URL)
+            .remove(KEY_PRIVATE_KEY)
+            .remove(KEY_PUBLIC_KEY)
+            .apply()
+    }
+
     fun clear() {
         prefs.edit().clear().apply()
     }

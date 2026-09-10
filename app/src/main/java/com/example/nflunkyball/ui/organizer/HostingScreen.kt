@@ -22,10 +22,10 @@ import com.example.nflunkyball.qr.JoinPayload
 import com.example.nflunkyball.ui.shared.BluetoothGate
 import com.example.nflunkyball.ui.shared.RoomCodeDisplay
 
-/** Normally reached only once the organizer has a linked account (see MainActivity's routing
- *  for creating a *new* tournament) — but resuming an already-in-progress one skips that gate,
- *  so [account] can legitimately be null here too (e.g. credentials got lost, or linking was
- *  deferred — see the "Link organizer account" affordance below and in [OrganizerTopBar]). */
+/** An account is optional, not a prerequisite for hosting (see SettingsScreen's "Organizer
+ *  account" section) — [account] can legitimately be null here, in which case this just shows
+ *  a "Link organizer account" affordance instead of a sync status, and BLE mode (unaffected
+ *  either way) keeps working normally. */
 @Composable
 fun HostingScreen(
     viewModel: OrganizerViewModel,
