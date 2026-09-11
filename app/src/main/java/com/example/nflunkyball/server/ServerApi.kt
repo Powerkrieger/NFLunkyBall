@@ -50,6 +50,31 @@ data class TournamentSummary(val id: Int, val name: String, val date: String, va
 data class CompetitorStats(val id: Int, val name: String, val wins: Int, val losses: Int, val elo: Double)
 
 @Serializable
+data class OpponentSummary(val id: Int, val name: String, val matches: Int, val winRate: Double)
+
+@Serializable
+data class EloHistoryEntry(
+    @SerialName("tournament_id") val tournamentId: Int,
+    @SerialName("tournament_name") val tournamentName: String,
+    val date: String,
+    val rating: Double
+)
+
+@Serializable
+data class CompetitorDetailStats(
+    val id: Int,
+    val name: String,
+    val wins: Int,
+    val losses: Int,
+    val elo: Double,
+    val avgSecondsWhenLost: Double?,
+    val avgSecondsOpponentsWhenWon: Double?,
+    val bestOpponent: OpponentSummary?,
+    val worstOpponent: OpponentSummary?,
+    val eloHistory: List<EloHistoryEntry>
+)
+
+@Serializable
 data class AccountStatus(
     val id: Int,
     @SerialName("display_name") val displayName: String,
@@ -137,6 +162,12 @@ class ServerApi(private val baseUrl: String) {
 
     suspend fun listCompetitors(readPassword: String): ServerResult<List<CompetitorStats>> = serverCall {
         client.get("$baseUrl/competitors") {
+            header("X-Read-Password", readPassword)
+        }.body()
+    }
+
+    suspend fun getCompetitorStats(id: Int, readPassword: String): ServerResult<CompetitorDetailStats> = serverCall {
+        client.get("$baseUrl/competitors/$id") {
             header("X-Read-Password", readPassword)
         }.body()
     }

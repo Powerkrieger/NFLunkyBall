@@ -18,6 +18,7 @@ import com.example.nflunkyball.persistence.AppSettingsStore
 import com.example.nflunkyball.persistence.SavedTournament
 import com.example.nflunkyball.persistence.ViewerTournamentsStore
 import com.example.nflunkyball.qr.JoinPayload
+import com.example.nflunkyball.server.CompetitorDetailStats
 import com.example.nflunkyball.server.CompetitorStats
 import com.example.nflunkyball.server.ServerApi
 import com.example.nflunkyball.server.ServerCredentialsStore
@@ -72,6 +73,10 @@ class ViewerViewModel(application: Application) : AndroidViewModel(application) 
     var competitors by mutableStateOf<List<CompetitorStats>>(emptyList())
         private set
     var historyStatus by mutableStateOf<String?>(null)
+        private set
+    var playerStats by mutableStateOf<CompetitorDetailStats?>(null)
+        private set
+    var playerStatsStatus by mutableStateOf<String?>(null)
         private set
 
     init {
@@ -207,6 +212,21 @@ class ViewerViewModel(application: Application) : AndroidViewModel(application) 
             when (val result = api.listCompetitors(password)) {
                 is ServerResult.Success -> competitors = result.value
                 is ServerResult.Failure -> Unit
+            }
+        }
+    }
+
+    fun loadPlayerStats(competitorId: Int) {
+        val server = resolveServerUrl() ?: return
+        val password = joinPayload?.pw ?: credentialsStore.loadReadPassword() ?: return
+        viewModelScope.launch {
+            playerStatsStatus = "Loading…"
+            when (val result = ServerApi(server).getCompetitorStats(competitorId, password)) {
+                is ServerResult.Success -> {
+                    playerStats = result.value
+                    playerStatsStatus = null
+                }
+                is ServerResult.Failure -> playerStatsStatus = result.message
             }
         }
     }

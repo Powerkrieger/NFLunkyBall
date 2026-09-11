@@ -1,5 +1,6 @@
 package com.example.nflunkyball.ui.viewer
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -52,7 +53,8 @@ fun HistoryScreen(
     organizerViewModel: OrganizerViewModel,
     onOpenTournament: (String) -> Unit,
     onReconnected: () -> Unit,
-    onResumeHosting: () -> Unit
+    onResumeHosting: () -> Unit,
+    onOpenPlayer: (Int) -> Unit
 ) {
     LaunchedEffect(Unit) { viewModel.loadHistory() }
     val saved by viewModel.savedTournaments.collectAsState()
@@ -180,7 +182,9 @@ fun HistoryScreen(
                     verticalArrangement = Arrangement.spacedBy(Spacing.xs)
                 ) {
                     items(leaderboard) { c ->
-                        CompetitorRow(c)
+                        // c.id is -1 for a live-only team not yet in the backend's Competitor
+                        // table (see mergeLiveStandings) — nothing to open a stats page for yet.
+                        CompetitorRow(c, onClick = { if (c.id >= 0) onOpenPlayer(c.id) })
                     }
                 }
             }
@@ -282,9 +286,9 @@ private fun TournamentStandingRow(teamName: String, standing: ProvisionalStandin
 }
 
 @Composable
-private fun CompetitorRow(c: CompetitorStats) {
+private fun CompetitorRow(c: CompetitorStats, onClick: () -> Unit) {
     Row(
-        Modifier.fillMaxWidth().padding(vertical = Spacing.xs),
+        Modifier.fillMaxWidth().clickable(enabled = c.id >= 0, onClick = onClick).padding(vertical = Spacing.xs),
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
         Text(c.name)

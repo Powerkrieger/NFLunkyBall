@@ -40,6 +40,7 @@ import com.example.nflunkyball.ui.theme.NFLunkyBallTheme
 import com.example.nflunkyball.ui.viewer.HistoryScreen
 import com.example.nflunkyball.ui.viewer.HistoryTournamentDetailScreen
 import com.example.nflunkyball.ui.viewer.JoinScreen
+import com.example.nflunkyball.ui.viewer.PlayerStatsScreen
 import com.example.nflunkyball.ui.viewer.ViewerScoreboardScreen
 import com.example.nflunkyball.ui.viewer.ViewerViewModel
 
@@ -226,13 +227,20 @@ private fun NfLunkyBallApp() {
                         popUpTo("viewer/history") { inclusive = true }
                     }
                 },
-                onResumeHosting = { navController.navigate("organizer/hosting") }
+                onResumeHosting = { navController.navigate("organizer/hosting") },
+                onOpenPlayer = { id -> navController.navigate("viewer/player/$id") }
             )
         }
         composable("viewer/history/{id}") { backStackEntry ->
             val id = backStackEntry.arguments?.getString("id")
             if (id != null) {
                 HistoryTournamentDetailScreen(viewModel = viewerViewModel, savedId = id)
+            }
+        }
+        composable("viewer/player/{id}") { backStackEntry ->
+            val id = backStackEntry.arguments?.getString("id")?.toIntOrNull()
+            if (id != null) {
+                PlayerStatsScreen(viewModel = viewerViewModel, competitorId = id, onBack = { navController.popBackStack() })
             }
         }
     }
