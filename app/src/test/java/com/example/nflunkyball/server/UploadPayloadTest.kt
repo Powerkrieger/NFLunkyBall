@@ -6,6 +6,7 @@ import com.example.nflunkyball.model.MatchResult
 import com.example.nflunkyball.model.Team
 import com.example.nflunkyball.model.Tournament
 import com.example.nflunkyball.model.TournamentPhase
+import com.example.nflunkyball.persistence.MatchDrinks
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -35,31 +36,35 @@ class UploadPayloadTest {
     )
 
     @Test
-    fun `merges a drink into the matching match's result only`() {
-        val payload = tournament.toUploadPayload(mapOf("m1" to "IPA"))
+    fun `merges per-team drinks into the matching match's result only`() {
+        val payload = tournament.toUploadPayload(mapOf("m1" to MatchDrinks(teamA = "IPA", teamB = "Cider")))
 
-        assertEquals("IPA", payload.groups[0].matches[0].result?.drink)
-        assertNull(payload.bracketMatches[0].result?.drink)
+        assertEquals("IPA", payload.groups[0].matches[0].result?.drinkA)
+        assertEquals("Cider", payload.groups[0].matches[0].result?.drinkB)
+        assertNull(payload.bracketMatches[0].result?.drinkA)
+        assertNull(payload.bracketMatches[0].result?.drinkB)
     }
 
     @Test
-    fun `a match with no result gets no drink even if one is recorded for its id`() {
-        val payload = tournament.toUploadPayload(mapOf("m2" to "Cola"))
+    fun `a match with no result gets no drinks even if some are recorded for its id`() {
+        val payload = tournament.toUploadPayload(mapOf("m2" to MatchDrinks(teamA = "Cola")))
 
         assertNull(payload.groups[0].matches[1].result)
     }
 
     @Test
-    fun `no drinks recorded leaves every result's drink null`() {
+    fun `no drinks recorded leaves every result's drinks null`() {
         val payload = tournament.toUploadPayload(emptyMap())
 
-        assertNull(payload.groups[0].matches[0].result?.drink)
-        assertNull(payload.bracketMatches[0].result?.drink)
+        assertNull(payload.groups[0].matches[0].result?.drinkA)
+        assertNull(payload.groups[0].matches[0].result?.drinkB)
+        assertNull(payload.bracketMatches[0].result?.drinkA)
+        assertNull(payload.bracketMatches[0].result?.drinkB)
     }
 
     @Test
     fun `preserves every other field unchanged`() {
-        val payload = tournament.toUploadPayload(mapOf("m3" to "Water"))
+        val payload = tournament.toUploadPayload(mapOf("m3" to MatchDrinks(teamA = "Water")))
 
         assertEquals(tournament.id, payload.id)
         assertEquals(tournament.name, payload.name)
@@ -71,9 +76,10 @@ class UploadPayloadTest {
 
     @Test
     fun `serializes to JSON shaped like the backend's TournamentIn schema`() {
-        val payload = tournament.toUploadPayload(mapOf("m1" to "IPA"))
+        val payload = tournament.toUploadPayload(mapOf("m1" to MatchDrinks(teamA = "IPA", teamB = "Cider")))
         val json = Json.encodeToString(UploadTournament.serializer(), payload)
 
-        assertEquals(true, json.contains("\"drink\":\"IPA\""))
+        assertEquals(true, json.contains("\"drinkA\":\"IPA\""))
+        assertEquals(true, json.contains("\"drinkB\":\"Cider\""))
     }
 }

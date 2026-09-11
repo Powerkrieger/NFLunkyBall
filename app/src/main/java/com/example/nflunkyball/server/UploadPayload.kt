@@ -5,14 +5,15 @@ import com.example.nflunkyball.model.Match
 import com.example.nflunkyball.model.Team
 import com.example.nflunkyball.model.Tournament
 import com.example.nflunkyball.model.TournamentPhase
+import com.example.nflunkyball.persistence.MatchDrinks
 import kotlinx.serialization.Serializable
 
 /**
- * Mirrors [Tournament] field-for-field, plus one addition: [UploadMatchResult.drink]. Kept as a
- * genuinely separate type (not just an extra nullable field bolted onto the shared model) so
- * that BLE broadcasting and server-backed live sync — which both serialize the real [Tournament]
- * object directly — can never end up carrying drink choices, by construction rather than by
- * convention. Only [toUploadPayload] ever builds one of these, from the local-only
+ * Mirrors [Tournament] field-for-field, plus two additions: [UploadMatchResult.drinkA]/[UploadMatchResult.drinkB].
+ * Kept as a genuinely separate type (not just extra nullable fields bolted onto the shared model)
+ * so that BLE broadcasting and server-backed live sync — which both serialize the real
+ * [Tournament] object directly — can never end up carrying drink choices, by construction rather
+ * than by convention. Only [toUploadPayload] ever builds one of these, from the local-only
  * [com.example.nflunkyball.persistence.MatchDrinkStore], and only for the final "upload to
  * history" call.
  */
@@ -47,15 +48,19 @@ data class UploadMatch(
 data class UploadMatchResult(
     val winnerId: String,
     val winnerScore: Int,
-    val drink: String? = null
+    val drinkA: String? = null,
+    val drinkB: String? = null
 )
 
-fun Tournament.toUploadPayload(drinksByMatchId: Map<String, String>): UploadTournament {
+fun Tournament.toUploadPayload(drinksByMatchId: Map<String, MatchDrinks>): UploadTournament {
     fun Match.toUpload() = UploadMatch(
         id = id,
         teamAId = teamAId,
         teamBId = teamBId,
-        result = result?.let { UploadMatchResult(it.winnerId, it.winnerScore, drinksByMatchId[id]) },
+        result = result?.let {
+            val drinks = drinksByMatchId[id]
+            UploadMatchResult(it.winnerId, it.winnerScore, drinks?.teamA, drinks?.teamB)
+        },
         roundLabel = roundLabel
     )
     return UploadTournament(

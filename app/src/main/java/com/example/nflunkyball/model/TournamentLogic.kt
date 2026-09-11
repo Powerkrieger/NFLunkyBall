@@ -99,3 +99,14 @@ fun Tournament.provisionalStandings(): Map<String, ProvisionalStanding> {
         )
     }
 }
+
+/**
+ * [provisionalStandings] sorted the way a "how's this tournament going" leaderboard should read:
+ * most wins first, ties broken by Elo gained/lost this tournament (not the persisted, global
+ * Elo — see HistoryScreen's "This tournament" vs "Global" leaderboard tabs).
+ */
+fun Tournament.provisionalLeaderboard(): List<Pair<String, ProvisionalStanding>> =
+    provisionalStandings().toList().sortedWith(
+        compareByDescending<Pair<String, ProvisionalStanding>> { it.second.winDelta }
+            .thenByDescending { it.second.eloDelta }
+    )

@@ -35,8 +35,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import com.example.nflunkyball.ble.BleCapability
 import com.example.nflunkyball.model.ELO_STARTING_RATING
+import com.example.nflunkyball.model.ProvisionalStanding
 import com.example.nflunkyball.model.Tournament
 import com.example.nflunkyball.model.TournamentPhase
+import com.example.nflunkyball.model.provisionalLeaderboard
 import com.example.nflunkyball.model.provisionalStandings
 import com.example.nflunkyball.persistence.SavedTournament
 import com.example.nflunkyball.server.CompetitorStats
@@ -137,16 +139,49 @@ fun HistoryScreen(
                 }
             }
         } else {
-            val leaderboard = remember(viewModel.competitors, hostedTournament, watchedTournament) {
-                mergeLiveStandings(viewModel.competitors, listOf(hostedTournament, watchedTournament))
-                    .sortedByDescending { it.elo }
+            // Hosted preferred over watched if somehow both are active — this device's own
+            // tournament is more clearly "the one" than one it merely happens to be viewing.
+            val currentTournament = (hostedTournament ?: watchedTournament)
+                ?.takeIf { it.phase != TournamentPhase.FINISHED }
+            var leaderboardTab by remember { mutableIntStateOf(if (currentTournament != null) 0 else 1) }
+
+            TabRow(selectedTabIndex = leaderboardTab) {
+                Tab(
+                    selected = leaderboardTab == 0,
+                    onClick = { leaderboardTab = 0 },
+                    text = { Text("This tournament") }
+                )
+                Tab(selected = leaderboardTab == 1, onClick = { leaderboardTab = 1 }, text = { Text("Global") })
             }
-            LazyColumn(
-                Modifier.fillMaxSize().padding(Spacing.md),
-                verticalArrangement = Arrangement.spacedBy(Spacing.xs)
-            ) {
-                items(leaderboard) { c ->
-                    CompetitorRow(c)
+            if (leaderboardTab == 0) {
+                if (currentTournament == null) {
+                    Box(Modifier.fillMaxSize().padding(Spacing.md), contentAlignment = Alignment.TopCenter) {
+                        Text("No tournament in progress right now.", style = MaterialTheme.typography.bodyMedium)
+                    }
+                } else {
+                    val teamNames = currentTournament.teams.associate { it.id to it.name }
+                    val rows = remember(currentTournament) { currentTournament.provisionalLeaderboard() }
+                    LazyColumn(
+                        Modifier.fillMaxSize().padding(Spacing.md),
+                        verticalArrangement = Arrangement.spacedBy(Spacing.xs)
+                    ) {
+                        items(rows) { (teamId, standing) ->
+                            TournamentStandingRow(teamNames[teamId] ?: teamId, standing)
+                        }
+                    }
+                }
+            } else {
+                val leaderboard = remember(viewModel.competitors, hostedTournament, watchedTournament) {
+                    mergeLiveStandings(viewModel.competitors, listOf(hostedTournament, watchedTournament))
+                        .sortedByDescending { it.elo }
+                }
+                LazyColumn(
+                    Modifier.fillMaxSize().padding(Spacing.md),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.xs)
+                ) {
+                    items(leaderboard) { c ->
+                        CompetitorRow(c)
+                    }
                 }
             }
         }
@@ -231,6 +266,19 @@ private fun mergeLiveStandings(
             }
         }
     return byNameLower.values.toList()
+}
+
+@Composable
+private fun TournamentStandingRow(teamName: String, standing: ProvisionalStanding) {
+    Row(
+        Modifier.fillMaxWidth().padding(vertical = Spacing.xs),
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(teamName)
+        val sign = if (standing.eloDelta >= 0) "+" else ""
+        Text("${standing.winDelta}W ${standing.lossDelta}L · $sign${String.format(Locale.US, "%.1f", standing.eloDelta)} elo")
+    }
+    HorizontalDivider()
 }
 
 @Composable

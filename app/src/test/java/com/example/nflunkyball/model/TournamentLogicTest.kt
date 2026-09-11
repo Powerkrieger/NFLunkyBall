@@ -107,6 +107,39 @@ class TournamentLogicTest {
     }
 
     @Test
+    fun `provisional leaderboard sorts by wins desc, ties broken by elo delta desc`() {
+        // B beats C first (raising B's rating), then A beats B while B is elevated — so A and B
+        // both end up with 1 win, but A's win (over a now-higher-rated opponent) is worth more
+        // Elo than B's win over C, even though B also has a loss dragging its Elo down further.
+        val tournament = Tournament(
+            id = "t1",
+            name = "Test Cup",
+            teams = listOf(team("A"), team("B"), team("C")),
+            groups = listOf(
+                Group(
+                    id = "g1",
+                    name = "Group A",
+                    teamIds = listOf("A", "B", "C"),
+                    matches = listOf(
+                        Match("m1", "B", "C", MatchResult(winnerId = "B", winnerScore = 5)),
+                        Match("m2", "A", "B", MatchResult(winnerId = "A", winnerScore = 5))
+                    )
+                )
+            )
+        )
+
+        val leaderboard = tournament.provisionalLeaderboard()
+
+        assertEquals(listOf("A", "B", "C"), leaderboard.map { it.first })
+        assertEquals(1, leaderboard[0].second.winDelta) // A
+        assertEquals(1, leaderboard[1].second.winDelta) // B, tied on wins with A
+        assert(leaderboard[0].second.eloDelta > leaderboard[1].second.eloDelta) {
+            "A's win over a boosted opponent should be worth more Elo than B's win over C"
+        }
+        assertEquals(0, leaderboard[2].second.winDelta) // C, fewer wins, ranks last regardless of Elo
+    }
+
+    @Test
     fun `provisional standings are zero when no matches have a result yet`() {
         val tournament = Tournament(
             id = "t1",

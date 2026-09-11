@@ -353,15 +353,17 @@ class OrganizerViewModel(application: Application) : AndroidViewModel(applicatio
 
     /** Recorded locally only (see [MatchDrinkStore]) — never touches [repository], so it's never
      *  part of what BLE broadcasting or live sync serialize. Only reaches the server via
-     *  [uploadToHistory]. */
-    fun recordDrink(matchId: String, drink: String) {
-        val trimmed = drink.trim()
-        if (trimmed.isBlank()) return
-        drinkStore.set(matchId, trimmed)
+     *  [uploadToHistory]. Each team can be drinking something different, so both are recorded
+     *  independently; a match with neither entered isn't stored at all. */
+    fun recordDrinks(matchId: String, teamADrink: String, teamBDrink: String) {
+        if (teamADrink.isBlank() && teamBDrink.isBlank()) return
+        drinkStore.set(matchId, teamADrink, teamBDrink)
     }
 
-    /** Distinct previously-entered drinks, for autocomplete suggestions when recording a new one. */
-    fun knownDrinks(): List<String> = drinkStore.all().values.distinct().sorted()
+    /** Distinct previously-entered drinks (either team), for autocomplete suggestions when
+     *  recording a new one. */
+    fun knownDrinks(): List<String> =
+        drinkStore.all().values.flatMap { listOfNotNull(it.teamA, it.teamB) }.distinct().sorted()
 
     /** [inviteCode] is the whole code an admin generated (bundles the server URL + token) —
      *  see InvitePayload for why the app never hardcodes a server address itself. */
