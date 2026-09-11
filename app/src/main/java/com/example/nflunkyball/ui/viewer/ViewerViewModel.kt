@@ -185,7 +185,12 @@ class ViewerViewModel(application: Application) : AndroidViewModel(application) 
     fun decodeCachedTournament(cachedJson: String): Tournament? =
         runCatching { fetchJson.decodeFromString(Tournament.serializer(), cachedJson) }.getOrNull()
 
-    private fun resolveServerUrl(): String? = joinPayload?.server ?: credentialsStore.loadViewerServerUrl()
+    // Falls back to the organizer account's own server, if this device has one linked — an
+    // organizer who's never separately joined a tournament as a viewer (e.g. just wants to check
+    // the Leaderboard) otherwise had no server URL on record at all, silently breaking history/
+    // leaderboard loading for them despite already being fully linked to the group.
+    private fun resolveServerUrl(): String? =
+        joinPayload?.server ?: credentialsStore.loadViewerServerUrl() ?: credentialsStore.loadAccount()?.serverUrl
 
     fun sendEmoji(emoji: String) {
         val roomId = joinPayload?.let { RoomCode.decode(it.room) } ?: return
