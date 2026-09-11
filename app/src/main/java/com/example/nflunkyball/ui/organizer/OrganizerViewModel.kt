@@ -382,18 +382,29 @@ class OrganizerViewModel(application: Application) : AndroidViewModel(applicatio
             val publicKeyB64 = Base64.encodeToString(keyPair.publicKeyBytes, Base64.NO_WRAP)
             when (val result = ServerApi(invite.server).register(invite.token, publicKeyB64)) {
                 is ServerResult.Success -> {
-                    val account = OrganizerAccount(
-                        accountId = result.value.accountId,
-                        displayName = result.value.displayName,
-                        serverUrl = invite.server,
-                        privateKeySeed = keyPair.privateKeySeed,
-                        publicKeyBytes = keyPair.publicKeyBytes
-                    )
-                    credentialsStore.saveAccount(account)
-                    credentialsStore.saveReadPassword(result.value.readPassword)
-                    organizerAccount = account
-                    readPassword = result.value.readPassword
-                    onResult(true, "Linked as ${result.value.displayName}")
+                    val accountId = result.value.accountId
+                    val displayName = result.value.displayName
+                    if (accountId != null && displayName != null) {
+                        val account = OrganizerAccount(
+                            accountId = accountId,
+                            displayName = displayName,
+                            serverUrl = invite.server,
+                            privateKeySeed = keyPair.privateKeySeed,
+                            publicKeyBytes = keyPair.publicKeyBytes
+                        )
+                        credentialsStore.saveAccount(account)
+                        credentialsStore.saveReadPassword(result.value.readPassword)
+                        organizerAccount = account
+                        readPassword = result.value.readPassword
+                        onResult(true, "Linked as $displayName")
+                    } else {
+                        // A viewer invite: no Account/keypair, just standing read access — same
+                        // two calls ViewerViewModel.join makes when a tournament's QR embeds them.
+                        credentialsStore.saveReadPassword(result.value.readPassword)
+                        credentialsStore.saveViewerServerUrl(invite.server)
+                        readPassword = result.value.readPassword
+                        onResult(true, "Logged in as viewer")
+                    }
                 }
                 is ServerResult.Failure -> onResult(false, result.message)
             }

@@ -27,8 +27,9 @@ data class RegisterRequest(
 
 @Serializable
 data class RegisterResponse(
-    @SerialName("account_id") val accountId: Int,
-    @SerialName("display_name") val displayName: String,
+    // Both null for a viewer invite — no Account is created for those.
+    @SerialName("account_id") val accountId: Int?,
+    @SerialName("display_name") val displayName: String?,
     @SerialName("read_password") val readPassword: String
 )
 

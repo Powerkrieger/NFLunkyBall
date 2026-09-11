@@ -10,6 +10,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -21,10 +22,20 @@ import com.example.nflunkyball.ui.theme.Spacing
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
 
+/**
+ * One code redemption flow for both roles — the server decides whether a code grants an
+ * organizer identity or just standing viewer read access (see OrganizerViewModel.linkAccount),
+ * so this screen never needs to know which kind of code it's handling ahead of time. Reused both
+ * as the app's required first screen (no group access on this device yet) and from Settings for
+ * an explicit re-link/switch-role later.
+ */
 @Composable
-fun LinkAccountScreen(
+fun LoginScreen(
     viewModel: OrganizerViewModel,
-    onDone: () -> Unit
+    onDone: () -> Unit,
+    // Null when reached mid-flow (e.g. "you need to link to save this tournament") — the escape
+    // hatch to just watch a different tournament doesn't make sense there, only on first run.
+    onJoinTournament: (() -> Unit)? = null
 ) {
     var inviteCode by remember { mutableStateOf("") }
     var status by remember { mutableStateOf<String?>(null) }
@@ -42,11 +53,11 @@ fun LinkAccountScreen(
     }
 
     Column(Modifier.fillMaxSize().padding(Spacing.lg)) {
-        Text("Link organizer account", style = MaterialTheme.typography.headlineSmall)
+        Text("Log in", style = MaterialTheme.typography.headlineSmall)
         Text(
             "Ask whoever runs the group's history server for an invite code — it's a one-time " +
-                "code that also tells the app where the server lives and already has your name " +
-                "assigned, so there's nothing else to enter.",
+                "code that also tells the app where the server lives. Whether it logs you in as " +
+                "an organizer or just a viewer depends on which kind of code it is.",
             style = MaterialTheme.typography.bodyMedium,
             modifier = Modifier.padding(top = Spacing.sm, bottom = Spacing.md)
         )
@@ -70,6 +81,12 @@ fun LinkAccountScreen(
             },
             enabled = inviteCode.isNotBlank(),
             modifier = Modifier.fillMaxWidth().padding(top = Spacing.md)
-        ) { Text("Link account") }
+        ) { Text("Log in") }
+        onJoinTournament?.let {
+            TextButton(
+                onClick = it,
+                modifier = Modifier.fillMaxWidth().padding(top = Spacing.sm)
+            ) { Text("Just watching one tournament? Scan its code instead") }
+        }
     }
 }

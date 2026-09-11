@@ -116,7 +116,7 @@ fun SettingsScreen(
                         ) { Text("Unlink account") }
                     } else {
                         Button(onClick = onLinkAccount, modifier = Modifier.padding(top = Spacing.sm)) {
-                            Text("Link organizer account")
+                            Text("Log in")
                         }
                     }
                 }

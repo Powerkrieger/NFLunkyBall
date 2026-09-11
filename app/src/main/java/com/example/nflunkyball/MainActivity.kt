@@ -17,19 +17,22 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.nflunkyball.model.TournamentPhase
+import com.example.nflunkyball.server.ServerCredentialsStore
 import com.example.nflunkyball.ui.HomeScreen
 import com.example.nflunkyball.ui.RulebookScreen
 import com.example.nflunkyball.ui.SettingsScreen
 import com.example.nflunkyball.ui.organizer.BracketScreen
 import com.example.nflunkyball.ui.organizer.GroupStageScreen
 import com.example.nflunkyball.ui.organizer.HostingScreen
-import com.example.nflunkyball.ui.organizer.LinkAccountScreen
+import com.example.nflunkyball.ui.organizer.LoginScreen
 import com.example.nflunkyball.ui.organizer.ManageGroupsScreen
 import com.example.nflunkyball.ui.organizer.ManagePlayersScreen
 import com.example.nflunkyball.ui.organizer.OrganizerViewModel
@@ -81,7 +84,35 @@ private fun NfLunkyBallApp() {
     val organizerViewModel: OrganizerViewModel = viewModel()
     val viewerViewModel: ViewerViewModel = viewModel()
 
-    NavHost(navController = navController, startDestination = "home") {
+    // Evaluated once at composition (a device's link state doesn't change without an explicit
+    // navigation afterward), so an already-linked device — organizer or viewer, however that was
+    // obtained — never sees a redirect flash through the login screen.
+    val context = LocalContext.current
+    val isAlreadyLinked = remember {
+        val credentialsStore = ServerCredentialsStore(context)
+        credentialsStore.loadAccount() != null || credentialsStore.loadReadPassword() != null
+    }
+
+    NavHost(navController = navController, startDestination = if (isAlreadyLinked) "home" else "login") {
+        composable("login") {
+            LoginScreen(
+                viewModel = organizerViewModel,
+                onDone = {
+                    navController.navigate("home") {
+                        popUpTo("login") { inclusive = true }
+                    }
+                },
+                onJoinTournament = {
+                    // Rewrite the back stack to Home first (same two-call shape used elsewhere in
+                    // this graph, e.g. SetupScreen's onStart) so backing out of Join/Scoreboard
+                    // lands on Home instead of exiting the app or bouncing back to Login.
+                    navController.navigate("home") {
+                        popUpTo("login") { inclusive = true }
+                    }
+                    navController.navigate("viewer/join")
+                }
+            )
+        }
         composable("home") {
             val hostedTournament by organizerViewModel.tournament.collectAsState()
             val watchedTournament by viewerViewModel.tournament.collectAsState()
@@ -118,7 +149,7 @@ private fun NfLunkyBallApp() {
             )
         }
         composable("organizer/link_account") {
-            LinkAccountScreen(
+            LoginScreen(
                 viewModel = organizerViewModel,
                 onDone = {
                     // Reached from several places now (Settings, HostingScreen, tournament
