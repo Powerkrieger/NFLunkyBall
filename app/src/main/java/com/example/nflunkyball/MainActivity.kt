@@ -181,9 +181,9 @@ private fun NfLunkyBallApp() {
         composable("organizer/bracket") {
             BracketScreen(
                 viewModel = organizerViewModel,
-                onFinish = {
+                onFinish = { finishInfo ->
                     organizerViewModel.finishTournament()
-                    organizerViewModel.uploadToHistory()
+                    organizerViewModel.uploadToHistory(finishInfo)
                     organizerViewModel.clearTournament()
                     navController.popBackStack(route = "home", inclusive = false)
                 },

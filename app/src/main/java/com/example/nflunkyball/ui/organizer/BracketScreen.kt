@@ -25,6 +25,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.example.nflunkyball.model.Match
 import com.example.nflunkyball.model.Team
+import com.example.nflunkyball.model.TournamentFinishInfo
 import com.example.nflunkyball.ui.shared.MatchList
 import com.example.nflunkyball.ui.shared.MatchResultDialog
 import com.example.nflunkyball.ui.theme.Spacing
@@ -33,7 +34,7 @@ import com.example.nflunkyball.ui.theme.Spacing
 @Composable
 fun BracketScreen(
     viewModel: OrganizerViewModel,
-    onFinish: () -> Unit,
+    onFinish: (TournamentFinishInfo) -> Unit,
     onOpenSettings: () -> Unit,
     onLinkAccount: () -> Unit
 ) {
@@ -43,6 +44,7 @@ fun BracketScreen(
     var pendingMatch by remember { mutableStateOf<Match?>(null) }
     var showAddMatch by remember { mutableStateOf(false) }
     var showUnlinkedWarning by remember { mutableStateOf(false) }
+    var showFinishDialog by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = { OrganizerTopBar("${current.name} — Bracket", viewModel, onOpenSettings) }
@@ -68,7 +70,7 @@ fun BracketScreen(
                 // Finishing clears the local copy right after (see MainActivity's onFinish) —
                 // without a linked account nothing was ever uploaded, so that would silently
                 // lose the whole tournament unless the organizer explicitly says that's fine.
-                if (viewModel.organizerAccount == null) showUnlinkedWarning = true else onFinish()
+                if (viewModel.organizerAccount == null) showUnlinkedWarning = true else showFinishDialog = true
             },
             modifier = Modifier.fillMaxWidth().padding(top = Spacing.lg, bottom = Spacing.lg)
         ) { Text("Finish Tournament") }
@@ -91,10 +93,22 @@ fun BracketScreen(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showUnlinkedWarning = false; onFinish() }) {
+                TextButton(onClick = {
+                    showUnlinkedWarning = false
+                    // Nothing will actually be uploaded (no linked account), so there's no point
+                    // asking for referees/location/comment first — they'd just be discarded.
+                    onFinish(TournamentFinishInfo(System.currentTimeMillis(), "", "", ""))
+                }) {
                     Text("Finish without saving")
                 }
             }
+        )
+    }
+
+    if (showFinishDialog) {
+        FinishTournamentDialog(
+            onDismiss = { showFinishDialog = false },
+            onConfirm = { info -> showFinishDialog = false; onFinish(info) }
         )
     }
 

@@ -5,6 +5,7 @@ import com.example.nflunkyball.model.Match
 import com.example.nflunkyball.model.MatchResult
 import com.example.nflunkyball.model.Team
 import com.example.nflunkyball.model.Tournament
+import com.example.nflunkyball.model.TournamentFinishInfo
 import com.example.nflunkyball.model.TournamentPhase
 import com.example.nflunkyball.persistence.MatchDrinks
 import kotlinx.serialization.json.Json
@@ -81,5 +82,32 @@ class UploadPayloadTest {
 
         assertEquals(true, json.contains("\"drinkA\":\"IPA\""))
         assertEquals(true, json.contains("\"drinkB\":\"Cider\""))
+    }
+
+    @Test
+    fun `no finish info leaves date, location, referees and comment null`() {
+        val payload = tournament.toUploadPayload(emptyMap())
+
+        assertNull(payload.date)
+        assertNull(payload.location)
+        assertNull(payload.referees)
+        assertNull(payload.comment)
+    }
+
+    @Test
+    fun `finish info is converted to an ISO-8601 date and blank fields become null`() {
+        val finishInfo = TournamentFinishInfo(
+            dateMillis = 1684281600000L, // 2023-05-17T00:00:00Z
+            location = "  Joost's garage  ",
+            referees = "",
+            comment = "  "
+        )
+
+        val payload = tournament.toUploadPayload(emptyMap(), finishInfo)
+
+        assertEquals("2023-05-17T00:00:00Z", payload.date)
+        assertEquals("Joost's garage", payload.location)
+        assertNull(payload.referees)
+        assertNull(payload.comment)
     }
 }

@@ -4,9 +4,11 @@ import com.example.nflunkyball.model.Group
 import com.example.nflunkyball.model.Match
 import com.example.nflunkyball.model.Team
 import com.example.nflunkyball.model.Tournament
+import com.example.nflunkyball.model.TournamentFinishInfo
 import com.example.nflunkyball.model.TournamentPhase
 import com.example.nflunkyball.persistence.MatchDrinks
 import kotlinx.serialization.Serializable
+import java.time.Instant
 
 /**
  * Mirrors [Tournament] field-for-field, plus two additions: [UploadMatchResult.drinkA]/[UploadMatchResult.drinkB].
@@ -24,7 +26,14 @@ data class UploadTournament(
     val teams: List<Team> = emptyList(),
     val groups: List<UploadGroup> = emptyList(),
     val bracketMatches: List<UploadMatch> = emptyList(),
-    val phase: TournamentPhase = TournamentPhase.SETUP
+    val phase: TournamentPhase = TournamentPhase.SETUP,
+    // Organizer-entered at finish time (see TournamentFinishInfo) — date is ISO-8601 (UTC), all
+    // null if the tournament was finished without ever going through that dialog (e.g. finished
+    // unlinked, with nothing to save anyway).
+    val date: String? = null,
+    val location: String? = null,
+    val referees: String? = null,
+    val comment: String? = null
 )
 
 @Serializable
@@ -52,7 +61,10 @@ data class UploadMatchResult(
     val drinkB: String? = null
 )
 
-fun Tournament.toUploadPayload(drinksByMatchId: Map<String, MatchDrinks>): UploadTournament {
+fun Tournament.toUploadPayload(
+    drinksByMatchId: Map<String, MatchDrinks>,
+    finishInfo: TournamentFinishInfo? = null
+): UploadTournament {
     fun Match.toUpload() = UploadMatch(
         id = id,
         teamAId = teamAId,
@@ -69,6 +81,10 @@ fun Tournament.toUploadPayload(drinksByMatchId: Map<String, MatchDrinks>): Uploa
         teams = teams,
         groups = groups.map { UploadGroup(it.id, it.name, it.teamIds, it.matches.map { m -> m.toUpload() }) },
         bracketMatches = bracketMatches.map { it.toUpload() },
-        phase = phase
+        phase = phase,
+        date = finishInfo?.let { Instant.ofEpochMilli(it.dateMillis).toString() },
+        location = finishInfo?.location?.trim()?.ifBlank { null },
+        referees = finishInfo?.referees?.trim()?.ifBlank { null },
+        comment = finishInfo?.comment?.trim()?.ifBlank { null }
     )
 }

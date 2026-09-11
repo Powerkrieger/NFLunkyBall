@@ -18,6 +18,7 @@ import com.example.nflunkyball.model.Match
 import com.example.nflunkyball.model.MatchResult
 import com.example.nflunkyball.model.Team
 import com.example.nflunkyball.model.Tournament
+import com.example.nflunkyball.model.TournamentFinishInfo
 import com.example.nflunkyball.model.TournamentPhase
 import com.example.nflunkyball.model.generateRoundRobinMatches
 import com.example.nflunkyball.persistence.AppSettingsStore
@@ -414,13 +415,14 @@ class OrganizerViewModel(application: Application) : AndroidViewModel(applicatio
         _accountSyncStatus.value = null
     }
 
-    fun uploadToHistory() {
+    fun uploadToHistory(finishInfo: TournamentFinishInfo) {
         val account = organizerAccount ?: return
         val current = tournament.value ?: return
         viewModelScope.launch {
             uploadStatus = "Uploading…"
-            // The one and only place drink choices ever leave this device — see MatchDrinkStore.
-            val payload = current.toUploadPayload(drinkStore.all())
+            // The one and only place drink choices/finish metadata ever leave this device — see
+            // MatchDrinkStore and FinishTournamentDialog.
+            val payload = current.toUploadPayload(drinkStore.all(), finishInfo)
             val bodyJson = uploadJson.encodeToString(UploadTournament.serializer(), payload)
             val timestamp = System.currentTimeMillis() / 1000
             val message = "${current.id}|$timestamp|${sha256Hex(bodyJson)}"
