@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
@@ -30,9 +31,24 @@ fun HomeScreen(
     onHost: () -> Unit,
     onJoin: () -> Unit,
     onMyTournaments: () -> Unit,
+    onRulebook: () -> Unit,
     onSettings: () -> Unit
 ) {
     Box(Modifier.fillMaxSize()) {
+        IconButton(
+            onClick = onRulebook,
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(Spacing.sm)
+                .size(44.dp)
+                .background(MaterialTheme.colorScheme.secondaryContainer, CircleShape)
+        ) {
+            Icon(
+                Icons.Default.Info,
+                contentDescription = "Rulebook",
+                tint = MaterialTheme.colorScheme.onSecondaryContainer
+            )
+        }
         IconButton(
             onClick = onSettings,
             modifier = Modifier

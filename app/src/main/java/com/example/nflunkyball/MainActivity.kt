@@ -24,6 +24,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.nflunkyball.model.TournamentPhase
 import com.example.nflunkyball.ui.HomeScreen
+import com.example.nflunkyball.ui.RulebookScreen
 import com.example.nflunkyball.ui.SettingsScreen
 import com.example.nflunkyball.ui.organizer.BracketScreen
 import com.example.nflunkyball.ui.organizer.GroupStageScreen
@@ -101,8 +102,12 @@ private fun NfLunkyBallApp() {
                 onHost = { navController.navigate("organizer/setup") },
                 onJoin = { navController.navigate("viewer/join") },
                 onMyTournaments = { navController.navigate("viewer/history") },
+                onRulebook = { navController.navigate("rulebook") },
                 onSettings = { navController.navigate("settings") }
             )
+        }
+        composable("rulebook") {
+            RulebookScreen(onBack = { navController.popBackStack() })
         }
         composable("settings") {
             SettingsScreen(
