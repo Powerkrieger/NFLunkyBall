@@ -217,7 +217,7 @@ class OrganizerViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    fun recordGroupMatchResult(groupId: String, matchId: String, result: MatchResult) {
+    fun recordGroupMatchResult(groupId: String, matchId: String, result: MatchResult?) {
         repository.update { t ->
             t.copy(
                 groups = t.groups.map { g ->
@@ -332,7 +332,7 @@ class OrganizerViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    fun recordBracketMatchResult(matchId: String, result: MatchResult) {
+    fun recordBracketMatchResult(matchId: String, result: MatchResult?) {
         repository.update { t ->
             t.copy(bracketMatches = t.bracketMatches.map { m -> if (m.id == matchId) m.copy(result = result) else m })
         }

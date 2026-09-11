@@ -82,6 +82,10 @@ fun GroupStageScreen(
                 viewModel.recordGroupMatchResult(groupId, match.id, result)
                 viewModel.recordDrink(match.id, drink)
                 pendingMatch = null
+            },
+            onClear = {
+                viewModel.recordGroupMatchResult(groupId, match.id, null)
+                pendingMatch = null
             }
         )
     }

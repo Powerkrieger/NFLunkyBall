@@ -108,6 +108,10 @@ fun BracketScreen(
                 viewModel.recordBracketMatchResult(match.id, result)
                 viewModel.recordDrink(match.id, drink)
                 pendingMatch = null
+            },
+            onClear = {
+                viewModel.recordBracketMatchResult(match.id, null)
+                pendingMatch = null
             }
         )
     }

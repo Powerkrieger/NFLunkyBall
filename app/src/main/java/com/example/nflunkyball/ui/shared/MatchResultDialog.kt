@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
@@ -31,7 +32,8 @@ fun MatchResultDialog(
     teamNames: Map<String, String>,
     knownDrinks: List<String> = emptyList(),
     onDismiss: () -> Unit,
-    onConfirm: (MatchResult, drink: String) -> Unit
+    onConfirm: (MatchResult, drink: String) -> Unit,
+    onClear: (() -> Unit)? = null
 ) {
     var winnerId by remember { mutableStateOf(match.result?.winnerId ?: match.teamAId) }
     var scoreText by remember { mutableStateOf(match.result?.winnerScore?.toString() ?: "") }
@@ -76,6 +78,15 @@ fun MatchResultDialog(
                             )
                         }
                     }
+                }
+                // A third dialog action doesn't fit AlertDialog's confirm/dismiss slots, so it
+                // lives in the body instead — only offered once there's actually a result to undo.
+                if (match.result != null && onClear != null) {
+                    TextButton(
+                        onClick = onClear,
+                        modifier = Modifier.padding(top = Spacing.sm),
+                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                    ) { Text("Clear result (undo)") }
                 }
             }
         },
