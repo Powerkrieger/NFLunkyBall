@@ -24,7 +24,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
@@ -43,8 +42,6 @@ import com.example.nflunkyball.ui.theme.Spacing
 import java.util.Locale
 import java.util.UUID
 
-/** Squad sizes the organizer can pick from; 1 is the classic singles format. */
-private val SQUAD_SIZES = listOf(1, 2, 3, 4)
 
 @Composable
 fun SetupScreen(
@@ -69,29 +66,30 @@ fun SetupScreen(
     var tournamentName by remember { mutableStateOf("") }
     var playerNameInput by remember { mutableStateOf("") }
     var groupNameInput by remember { mutableStateOf("") }
-    var squadSize by remember { mutableIntStateOf(1) }
+    // Singles (one player is one team) or teams — squads of any size, uneven sides allowed
+    // (the rating rule uses each side's mean, so 2 v 3 is fine).
+    var teamMode by remember { mutableStateOf(false) }
     val teams = remember { mutableStateListOf<Team>() }
-    // Players picked for the squad currently being assembled (squad tournaments only).
+    // Players picked for the squad currently being assembled (team mode only).
     val pendingMembers = remember { mutableStateListOf<String>() }
     val groupNames = remember { mutableStateListOf<String>() }
     val assignments = remember { mutableStateMapOf<String, String>() } // teamId -> groupName
 
     val takenNames = (teams.flatMap { it.memberNames } + pendingMembers).map { it.lowercase() }.toSet()
 
-    /** Singles: one player is one team. Squads: collect into [pendingMembers] until full. */
+    /** Singles: one player is one team. Teams: collect into [pendingMembers] until the
+     *  organizer confirms the squad with [addPendingTeam]. */
     fun addPlayer(rawName: String) {
         val name = rawName.trim()
         if (name.isBlank() || name.lowercase() in takenNames) return
-        if (squadSize == 1) {
-            teams.add(Team(id = UUID.randomUUID().toString(), name = name))
-        } else {
-            pendingMembers.add(name)
-            if (pendingMembers.size == squadSize) {
-                val members = pendingMembers.toList()
-                teams.add(Team(id = UUID.randomUUID().toString(), name = Team.autoName(members), members = members))
-                pendingMembers.clear()
-            }
-        }
+        if (teamMode) pendingMembers.add(name) else teams.add(Team(id = UUID.randomUUID().toString(), name = name))
+    }
+
+    fun addPendingTeam() {
+        if (pendingMembers.isEmpty()) return
+        val members = pendingMembers.toList()
+        teams.add(Team(id = UUID.randomUUID().toString(), name = Team.autoName(members), members = members))
+        pendingMembers.clear()
     }
 
     Column(
@@ -108,18 +106,24 @@ fun SetupScreen(
             modifier = Modifier.fillMaxWidth().padding(top = Spacing.sm)
         )
 
-        Text("Players per team", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = Spacing.lg))
+        Text("Format", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = Spacing.lg))
         Row(Modifier.padding(top = Spacing.xs), horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-            SQUAD_SIZES.forEach { size ->
+            listOf(false to "Singles", true to "Teams").forEach { (isTeams, label) ->
                 FilterChip(
-                    selected = squadSize == size,
+                    selected = teamMode == isTeams,
                     // Changing the format mid-setup would leave half-built squads behind, so it's
                     // locked once the first team exists.
                     enabled = teams.isEmpty() && pendingMembers.isEmpty(),
-                    onClick = { squadSize = size },
-                    label = { Text(if (size == 1) "Singles" else "$size") }
+                    onClick = { teamMode = isTeams },
+                    label = { Text(label) }
                 )
             }
+        }
+        if (teamMode) {
+            Text(
+                "Teams can be any size, and sides don't have to match — 2 v 3 is fine.",
+                style = MaterialTheme.typography.bodySmall
+            )
         }
 
         // Groups first — teams get assigned to a group as they're added below, so having the
@@ -146,14 +150,14 @@ fun SetupScreen(
         groupNames.forEach { name -> Text("• $name", Modifier.padding(vertical = 2.dp)) }
 
         Text(
-            if (squadSize == 1) "Players" else "Teams",
+            if (teamMode) "Teams" else "Players",
             style = MaterialTheme.typography.titleMedium,
             modifier = Modifier.padding(top = Spacing.lg)
         )
-        if (squadSize > 1) {
+        if (teamMode) {
             Text(
-                if (pendingMembers.isEmpty()) "Pick $squadSize players to form a team"
-                else "${pendingMembers.size} of $squadSize picked — ${squadSize - pendingMembers.size} more",
+                if (pendingMembers.isEmpty()) "Pick the players for the next team, then add it"
+                else "Next team: ${Team.autoName(pendingMembers)}",
                 style = MaterialTheme.typography.bodySmall
             )
             if (pendingMembers.isNotEmpty()) {
@@ -167,6 +171,9 @@ fun SetupScreen(
                             modifier = Modifier.padding(end = Spacing.sm)
                         )
                     }
+                }
+                Button(onClick = { addPendingTeam() }, modifier = Modifier.padding(top = Spacing.xs)) {
+                    Text("Add team (${pendingMembers.size})")
                 }
             }
         }
@@ -273,7 +280,12 @@ fun SetupScreen(
                 val grouped = groupNames.associateWith { groupName ->
                     teams.filter { assignments[it.id] == groupName }.map { it.id }
                 }
-                onStart(tournamentName.ifBlank { "Flunkyball Tournament" }, teams.toList(), grouped, squadSize)
+                onStart(
+                    tournamentName.ifBlank { "Flunkyball Tournament" },
+                    teams.toList(),
+                    grouped,
+                    if (teamMode) teams.maxOf { it.memberNames.size } else 1
+                )
             },
             enabled = tournamentName.isNotBlank() && allAssigned && pendingMembers.isEmpty(),
             modifier = Modifier.fillMaxWidth().padding(top = Spacing.lg, bottom = Spacing.lg)

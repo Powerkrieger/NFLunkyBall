@@ -76,7 +76,7 @@ fun ManagePlayersScreen(viewModel: OrganizerViewModel, onBack: () -> Unit) {
                     onValueChange = { newPlayerName = it },
                     label = {
                         Text(
-                            if (current.squadSize > 1) "Team members (${current.squadSize}, comma-separated)"
+                            if (current.squadSize > 1) "Team members (comma-separated, any number)"
                             else "Player name"
                         )
                     },
