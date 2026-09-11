@@ -19,7 +19,8 @@ import kotlinx.serialization.json.Json
 
 @Serializable
 data class RegisterRequest(
-    @SerialName("display_name") val displayName: String,
+    // No display name here — it's assigned by whoever mints the invite, not chosen by whoever
+    // redeems it (see the backend's admin panel).
     @SerialName("invite_token") val inviteToken: String,
     @SerialName("public_key") val publicKey: String
 )
@@ -27,6 +28,7 @@ data class RegisterRequest(
 @Serializable
 data class RegisterResponse(
     @SerialName("account_id") val accountId: Int,
+    @SerialName("display_name") val displayName: String,
     @SerialName("read_password") val readPassword: String
 )
 
@@ -74,13 +76,12 @@ class ServerApi(private val baseUrl: String) {
     }
 
     suspend fun register(
-        displayName: String,
         inviteToken: String,
         publicKeyBase64: String
     ): ServerResult<RegisterResponse> = serverCall {
         client.post("$baseUrl/accounts/register") {
             contentType(ContentType.Application.Json)
-            setBody(RegisterRequest(displayName, inviteToken, publicKeyBase64))
+            setBody(RegisterRequest(inviteToken, publicKeyBase64))
         }.body()
     }
 

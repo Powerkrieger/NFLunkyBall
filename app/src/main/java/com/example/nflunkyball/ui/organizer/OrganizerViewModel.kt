@@ -366,7 +366,6 @@ class OrganizerViewModel(application: Application) : AndroidViewModel(applicatio
     /** [inviteCode] is the whole code an admin generated (bundles the server URL + token) —
      *  see InvitePayload for why the app never hardcodes a server address itself. */
     fun linkAccount(
-        displayName: String,
         inviteCode: String,
         onResult: (Boolean, String) -> Unit
     ) {
@@ -378,11 +377,11 @@ class OrganizerViewModel(application: Application) : AndroidViewModel(applicatio
         viewModelScope.launch {
             val keyPair = Ed25519.generateKeyPair()
             val publicKeyB64 = Base64.encodeToString(keyPair.publicKeyBytes, Base64.NO_WRAP)
-            when (val result = ServerApi(invite.server).register(displayName, invite.token, publicKeyB64)) {
+            when (val result = ServerApi(invite.server).register(invite.token, publicKeyB64)) {
                 is ServerResult.Success -> {
                     val account = OrganizerAccount(
                         accountId = result.value.accountId,
-                        displayName = displayName,
+                        displayName = result.value.displayName,
                         serverUrl = invite.server,
                         privateKeySeed = keyPair.privateKeySeed,
                         publicKeyBytes = keyPair.publicKeyBytes
@@ -391,7 +390,7 @@ class OrganizerViewModel(application: Application) : AndroidViewModel(applicatio
                     credentialsStore.saveReadPassword(result.value.readPassword)
                     organizerAccount = account
                     readPassword = result.value.readPassword
-                    onResult(true, "Linked as $displayName")
+                    onResult(true, "Linked as ${result.value.displayName}")
                 }
                 is ServerResult.Failure -> onResult(false, result.message)
             }

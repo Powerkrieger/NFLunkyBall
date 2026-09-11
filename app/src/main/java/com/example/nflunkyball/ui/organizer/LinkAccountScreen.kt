@@ -26,7 +26,6 @@ fun LinkAccountScreen(
     viewModel: OrganizerViewModel,
     onDone: () -> Unit
 ) {
-    var displayName by remember { mutableStateOf("") }
     var inviteCode by remember { mutableStateOf("") }
     var status by remember { mutableStateOf<String?>(null) }
 
@@ -46,21 +45,16 @@ fun LinkAccountScreen(
         Text("Link organizer account", style = MaterialTheme.typography.headlineSmall)
         Text(
             "Ask whoever runs the group's history server for an invite code — it's a one-time " +
-                "code that also tells the app where the server lives, so there's nothing else to enter.",
+                "code that also tells the app where the server lives and already has your name " +
+                "assigned, so there's nothing else to enter.",
             style = MaterialTheme.typography.bodyMedium,
             modifier = Modifier.padding(top = Spacing.sm, bottom = Spacing.md)
-        )
-        OutlinedTextField(
-            value = displayName,
-            onValueChange = { displayName = it },
-            label = { Text("Your name") },
-            modifier = Modifier.fillMaxWidth()
         )
         OutlinedTextField(
             value = inviteCode,
             onValueChange = { inviteCode = it },
             label = { Text("Invite code") },
-            modifier = Modifier.fillMaxWidth().padding(top = Spacing.sm)
+            modifier = Modifier.fillMaxWidth()
         )
         OutlinedButton(
             onClick = { scanLauncher.launch(ScanOptions().setOrientationLocked(false).setBeepEnabled(false)) },
@@ -69,12 +63,12 @@ fun LinkAccountScreen(
         status?.let { Text(it, modifier = Modifier.padding(top = Spacing.sm)) }
         Button(
             onClick = {
-                viewModel.linkAccount(displayName, inviteCode) { success, message ->
+                viewModel.linkAccount(inviteCode) { success, message ->
                     status = message
                     if (success) onDone()
                 }
             },
-            enabled = displayName.isNotBlank() && inviteCode.isNotBlank(),
+            enabled = inviteCode.isNotBlank(),
             modifier = Modifier.fillMaxWidth().padding(top = Spacing.md)
         ) { Text("Link account") }
     }
