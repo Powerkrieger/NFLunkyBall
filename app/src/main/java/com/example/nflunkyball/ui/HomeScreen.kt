@@ -21,6 +21,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.example.nflunkyball.BuildConfig
 import com.example.nflunkyball.ui.theme.Spacing
 
 @Composable
@@ -62,5 +63,11 @@ fun HomeScreen(onHost: () -> Unit, onJoin: () -> Unit, onMyTournaments: () -> Un
                 Text("My tournaments")
             }
         }
+        Text(
+            "v${BuildConfig.VERSION_NAME}",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.align(Alignment.BottomEnd).padding(Spacing.sm)
+        )
     }
 }
