@@ -64,38 +64,65 @@ const val ELO_K_FACTOR = 32.0
 data class ProvisionalStanding(val winDelta: Int, val lossDelta: Int, val eloDelta: Double)
 
 /**
- * A client-side-only preview of how this tournament's own matches would move each team's Elo,
- * starting everyone fresh at [ELO_STARTING_RATING] — never touches the server's persisted rating,
- * just produces a delta the caller can add on top of it (see HistoryScreen's Leaderboard tab).
- * Recomputed from this tournament's current match state, so it naturally goes stale/refreshes as
- * the organizer edits results.
+ * A client-side-only preview of how this tournament's own matches would move each *player's*
+ * Elo, keyed by player name, starting everyone fresh at [ELO_STARTING_RATING] — never touches
+ * the server's persisted rating, just produces a delta the caller can add on top of it (see
+ * HistoryScreen's Leaderboard tab). Recomputed from this tournament's current match state, so it
+ * naturally goes stale/refreshes as the organizer edits results.
+ *
+ * Squads use the backend's rule (`_elo_steps` in `app/stats.py`): a side's rating is the mean
+ * of its members', the expected score comes from the two means, and every member receives the
+ * full delta. For singles that is exactly the classic two-player formula.
  */
-fun Tournament.provisionalStandings(): Map<String, ProvisionalStanding> {
-    val ratings = teams.associate { it.id to ELO_STARTING_RATING }.toMutableMap()
-    val wins = teams.associate { it.id to 0 }.toMutableMap()
-    val losses = teams.associate { it.id to 0 }.toMutableMap()
+fun Tournament.provisionalPlayerStandings(): Map<String, ProvisionalStanding> {
+    val players = teams.flatMap { it.memberNames }.distinct()
+    val ratings = players.associateWith { ELO_STARTING_RATING }.toMutableMap()
+    val wins = players.associateWith { 0 }.toMutableMap()
+    val losses = players.associateWith { 0 }.toMutableMap()
+    val membersByTeamId = teams.associate { it.id to it.memberNames }
 
     val allMatches = groups.flatMap { it.matches } + bracketMatches
     for (match in allMatches) {
         val result = match.result ?: continue
-        val ratingA = ratings[match.teamAId] ?: ELO_STARTING_RATING
-        val ratingB = ratings[match.teamBId] ?: ELO_STARTING_RATING
+        val sideA = membersByTeamId[match.teamAId] ?: continue
+        val sideB = membersByTeamId[match.teamBId] ?: continue
+        val ratingA = sideA.map { ratings[it] ?: ELO_STARTING_RATING }.average()
+        val ratingB = sideB.map { ratings[it] ?: ELO_STARTING_RATING }.average()
         val expectedA = 1.0 / (1.0 + Math.pow(10.0, (ratingB - ratingA) / 400.0))
-        val actualA = if (result.winnerId == match.teamAId) 1.0 else 0.0
-        val delta = ELO_K_FACTOR * (actualA - expectedA)
-        ratings[match.teamAId] = ratingA + delta
-        ratings[match.teamBId] = ratingB - delta
+        val winnerIsA = result.winnerId == match.teamAId
+        val delta = ELO_K_FACTOR * ((if (winnerIsA) 1.0 else 0.0) - expectedA)
+        sideA.forEach { ratings[it] = (ratings[it] ?: ELO_STARTING_RATING) + delta }
+        sideB.forEach { ratings[it] = (ratings[it] ?: ELO_STARTING_RATING) - delta }
 
-        val loserId = if (result.winnerId == match.teamAId) match.teamBId else match.teamAId
-        wins[result.winnerId] = (wins[result.winnerId] ?: 0) + 1
-        losses[loserId] = (losses[loserId] ?: 0) + 1
+        (if (winnerIsA) sideA else sideB).forEach { wins[it] = (wins[it] ?: 0) + 1 }
+        (if (winnerIsA) sideB else sideA).forEach { losses[it] = (losses[it] ?: 0) + 1 }
     }
 
+    return players.associateWith { player ->
+        ProvisionalStanding(
+            winDelta = wins[player] ?: 0,
+            lossDelta = losses[player] ?: 0,
+            eloDelta = (ratings[player] ?: ELO_STARTING_RATING) - ELO_STARTING_RATING
+        )
+    }
+}
+
+/**
+ * [provisionalPlayerStandings] rolled up per team (keyed by team id) for the "This tournament"
+ * leaderboard. Wins/losses are the squad's; its Elo delta is its members' mean delta — which,
+ * since every member receives the same delta per match, is each member's delta for a squad
+ * whose members only ever played together.
+ */
+fun Tournament.provisionalStandings(): Map<String, ProvisionalStanding> {
+    val byPlayer = provisionalPlayerStandings()
+    val allMatches = groups.flatMap { it.matches } + bracketMatches
     return teams.associate { team ->
+        val played = allMatches.filter { it.result != null && (it.teamAId == team.id || it.teamBId == team.id) }
+        val members = team.memberNames.mapNotNull { byPlayer[it] }
         team.id to ProvisionalStanding(
-            winDelta = wins[team.id] ?: 0,
-            lossDelta = losses[team.id] ?: 0,
-            eloDelta = (ratings[team.id] ?: ELO_STARTING_RATING) - ELO_STARTING_RATING
+            winDelta = played.count { it.result?.winnerId == team.id },
+            lossDelta = played.count { it.result?.winnerId != team.id },
+            eloDelta = if (members.isEmpty()) 0.0 else members.map { it.eloDelta }.average()
         )
     }
 }

@@ -55,6 +55,37 @@ class SquadModelTest {
     }
 
     @Test
+    fun `provisional squad Elo uses side means and gives every member the full delta`() {
+        // Mirrors the backend's test_squad_elo_uses_side_means_and_gives_every_member_the_full_delta.
+        val tournament = Tournament(
+            id = "t", name = "Squad Cup", squadSize = 2,
+            teams = listOf(Team("x", "Anna & Ben", listOf("Anna", "Ben")), Team("y", "Cid & Dee", listOf("Cid", "Dee"))),
+            groups = listOf(
+                Group(
+                    "g", "G", listOf("x", "y"),
+                    listOf(
+                        Match("m1", "x", "y", MatchResult.ofLosers("x", listOf(PlayerResult("Cid", 40), PlayerResult("Dee", 305, 1)))),
+                        Match("m2", "x", "y", MatchResult.ofLosers("y", listOf(PlayerResult("Anna", 20), PlayerResult("Ben", 30))))
+                    )
+                )
+            )
+        )
+
+        val byPlayer = tournament.provisionalPlayerStandings()
+        val byTeam = tournament.provisionalStandings()
+
+        val expectedX = 1.0 / (1.0 + Math.pow(10.0, (984.0 - 1016.0) / 400.0))
+        val delta2 = ELO_K_FACTOR * (0.0 - expectedX)
+        assertEquals(16.0 + delta2, byPlayer.getValue("Anna").eloDelta, 1e-9)
+        assertEquals(byPlayer.getValue("Anna").eloDelta, byPlayer.getValue("Ben").eloDelta, 1e-9)
+        assertEquals(-16.0 - delta2, byPlayer.getValue("Cid").eloDelta, 1e-9)
+        assertEquals(1, byPlayer.getValue("Dee").winDelta)
+        assertEquals(1, byPlayer.getValue("Dee").lossDelta)
+        assertEquals(byPlayer.getValue("Anna").eloDelta, byTeam.getValue("x").eloDelta, 1e-9)
+        assertEquals(1, byTeam.getValue("x").winDelta)
+    }
+
+    @Test
     fun `squad auto name joins members in order`() {
         assertEquals("Anna & Ben", Team.autoName(listOf("Anna", "Ben")))
         assertEquals(listOf("Anna", "Ben"), Team("x", "Anna & Ben", listOf("Anna", "Ben")).memberNames)

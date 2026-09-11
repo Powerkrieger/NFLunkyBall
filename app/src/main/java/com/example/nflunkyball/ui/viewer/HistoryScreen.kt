@@ -36,7 +36,7 @@ import com.example.nflunkyball.model.ProvisionalStanding
 import com.example.nflunkyball.model.Tournament
 import com.example.nflunkyball.model.TournamentPhase
 import com.example.nflunkyball.model.provisionalLeaderboard
-import com.example.nflunkyball.model.provisionalStandings
+import com.example.nflunkyball.model.provisionalPlayerStandings
 import com.example.nflunkyball.persistence.SavedTournament
 import com.example.nflunkyball.server.CompetitorStats
 import com.example.nflunkyball.ui.organizer.OrganizerViewModel
@@ -226,12 +226,12 @@ private fun mergeLiveStandings(
     liveTournaments.filterNotNull()
         .filter { it.phase != TournamentPhase.FINISHED }
         .forEach { tournament ->
-            val provisional = tournament.provisionalStandings()
-            tournament.teams.forEach { team ->
-                val delta = provisional[team.id] ?: return@forEach
-                val key = team.name.lowercase()
+            // Per player, not per team: a squad's members each carry the result on their own
+            // persisted rating, exactly as the backend will once the tournament is uploaded.
+            tournament.provisionalPlayerStandings().forEach { (player, delta) ->
+                val key = player.lowercase()
                 val current = byNameLower[key]
-                    ?: CompetitorStats(id = -1, name = team.name, wins = 0, losses = 0, elo = ELO_STARTING_RATING)
+                    ?: CompetitorStats(id = -1, name = player, wins = 0, losses = 0, elo = ELO_STARTING_RATING)
                 byNameLower[key] = current.copy(
                     wins = current.wins + delta.winDelta,
                     losses = current.losses + delta.lossDelta,
