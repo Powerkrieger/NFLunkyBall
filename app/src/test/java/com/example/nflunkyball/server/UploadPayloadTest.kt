@@ -3,6 +3,7 @@ package com.example.nflunkyball.server
 import com.example.nflunkyball.model.Group
 import com.example.nflunkyball.model.Match
 import com.example.nflunkyball.model.MatchResult
+import com.example.nflunkyball.model.PlayerResult
 import com.example.nflunkyball.model.Team
 import com.example.nflunkyball.model.Tournament
 import com.example.nflunkyball.model.TournamentFinishInfo
@@ -82,6 +83,44 @@ class UploadPayloadTest {
 
         assertEquals(true, json.contains("\"drinkA\":\"IPA\""))
         assertEquals(true, json.contains("\"drinkB\":\"Cider\""))
+    }
+
+    @Test
+    fun `a singles result is uploaded with one loser entry derived from winnerScore`() {
+        val payload = tournament.toUploadPayload(mapOf("m3" to MatchDrinks(teamA = "IPA", teamB = "Cider")))
+
+        // m3: Beta ("b") beat Alpha ("a") with a 300 — Alpha is the lone loser, one refused drink.
+        val result = payload.bracketMatches[0].result!!
+        assertEquals(listOf(UploadPlayerResult("Alpha", 300, forfeitedDrinks = 1, drink = "IPA")), result.losers)
+        assertEquals(mapOf("Beta" to "Cider"), result.winnerDrinks)
+        assertEquals(1, payload.squadSize)
+    }
+
+    @Test
+    fun `a squad result uploads every losing player's own counter and per-player drinks`() {
+        val squads = Tournament(
+            id = "t2",
+            name = "Team Cup",
+            squadSize = 2,
+            teams = listOf(Team("x", "Anna & Ben", listOf("Anna", "Ben")), Team("y", "Cid & Dee", listOf("Cid", "Dee"))),
+            bracketMatches = listOf(
+                Match(
+                    id = "f", teamAId = "x", teamBId = "y",
+                    result = MatchResult.ofLosers("x", listOf(PlayerResult("Cid", 40), PlayerResult("Dee", 305, 1)))
+                )
+            ),
+            phase = TournamentPhase.FINISHED
+        )
+        val drinks = MatchDrinks(byPlayer = mapOf("Anna" to "Helles", "Cid" to "Radler"))
+
+        val result = squads.toUploadPayload(mapOf("f" to drinks)).bracketMatches[0].result!!
+
+        assertEquals(345, result.winnerScore)
+        assertEquals(
+            listOf(UploadPlayerResult("Cid", 40, 0, "Radler"), UploadPlayerResult("Dee", 305, 1, null)),
+            result.losers
+        )
+        assertEquals(mapOf("Anna" to "Helles"), result.winnerDrinks)  // Ben recorded nothing
     }
 
     @Test

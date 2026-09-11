@@ -27,6 +27,7 @@ data class UploadTournament(
     val groups: List<UploadGroup> = emptyList(),
     val bracketMatches: List<UploadMatch> = emptyList(),
     val phase: TournamentPhase = TournamentPhase.SETUP,
+    val squadSize: Int = 1,
     // Organizer-entered at finish time (see TournamentFinishInfo) — date is ISO-8601 (UTC), all
     // null if the tournament was finished without ever going through that dialog (e.g. finished
     // unlinked, with nothing to save anyway).
@@ -53,25 +54,50 @@ data class UploadMatch(
     val roundLabel: String? = null
 )
 
+/** One losing player's counter plus what they drank — the upload-only shape of [PlayerResult]. */
+@Serializable
+data class UploadPlayerResult(
+    val player: String,
+    val seconds: Int,
+    val forfeitedDrinks: Int = 0,
+    val drink: String? = null
+)
+
 @Serializable
 data class UploadMatchResult(
     val winnerId: String,
     val winnerScore: Int,
+    // Per-team drinks, the singles-era fields. Still sent (as the first member's drink on each
+    // side) so an older backend keeps working; [losers]/[winnerDrinks] are the per-player record.
     val drinkA: String? = null,
-    val drinkB: String? = null
+    val drinkB: String? = null,
+    val losers: List<UploadPlayerResult> = emptyList(),
+    val winnerDrinks: Map<String, String> = emptyMap()
 )
 
 fun Tournament.toUploadPayload(
     drinksByMatchId: Map<String, MatchDrinks>,
     finishInfo: TournamentFinishInfo? = null
 ): UploadTournament {
+    val teamsById = teams.associateBy { it.id }
     fun Match.toUpload() = UploadMatch(
         id = id,
         teamAId = teamAId,
         teamBId = teamBId,
-        result = result?.let {
+        result = result?.let { result ->
             val drinks = drinksByMatchId[id]
-            UploadMatchResult(it.winnerId, it.winnerScore, drinks?.teamA, drinks?.teamB)
+            val winnerIsA = result.winnerId == teamAId
+            val losingTeam = teamsById[if (winnerIsA) teamBId else teamAId]
+            val winningTeam = teamsById[if (winnerIsA) teamAId else teamBId]
+            val losingDrink = if (winnerIsA) drinks?.teamB else drinks?.teamA
+            val winningDrink = if (winnerIsA) drinks?.teamA else drinks?.teamB
+            val losers = result.loserResults(losingTeam?.name ?: "").map { entry ->
+                UploadPlayerResult(entry.player, entry.seconds, entry.forfeitedDrinks, drinks?.byPlayer?.get(entry.player) ?: losingDrink)
+            }
+            val winnerDrinks = winningTeam?.memberNames.orEmpty()
+                .mapNotNull { player -> (drinks?.byPlayer?.get(player) ?: winningDrink)?.let { player to it } }
+                .toMap()
+            UploadMatchResult(result.winnerId, result.winnerScore, drinks?.teamA, drinks?.teamB, losers, winnerDrinks)
         },
         roundLabel = roundLabel
     )
@@ -82,6 +108,7 @@ fun Tournament.toUploadPayload(
         groups = groups.map { UploadGroup(it.id, it.name, it.teamIds, it.matches.map { m -> m.toUpload() }) },
         bracketMatches = bracketMatches.map { it.toUpload() },
         phase = phase,
+        squadSize = squadSize,
         date = finishInfo?.let { Instant.ofEpochMilli(it.dateMillis).toString() },
         location = finishInfo?.location?.trim()?.ifBlank { null },
         referees = finishInfo?.referees?.trim()?.ifBlank { null },

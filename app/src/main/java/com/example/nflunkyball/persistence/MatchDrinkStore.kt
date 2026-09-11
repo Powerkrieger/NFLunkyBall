@@ -7,9 +7,16 @@ import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
-/** Each team can be drinking something different, so this is per-team, not tied to who won. */
+/** Each player can be drinking something different, so this is never tied to who won.
+ *  [teamA]/[teamB] are the singles-era per-side fields (still what the current result dialog
+ *  records); [byPlayer] is the per-player record squads need and takes precedence per player
+ *  when present. */
 @Serializable
-data class MatchDrinks(val teamA: String? = null, val teamB: String? = null)
+data class MatchDrinks(
+    val teamA: String? = null,
+    val teamB: String? = null,
+    val byPlayer: Map<String, String> = emptyMap()
+)
 
 /**
  * What each match's teams drank, recorded by the organizer — deliberately kept out of the

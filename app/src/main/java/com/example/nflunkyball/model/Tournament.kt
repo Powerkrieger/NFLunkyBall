@@ -12,5 +12,7 @@ data class Tournament(
     val teams: List<Team> = emptyList(),
     val groups: List<Group> = emptyList(),
     val bracketMatches: List<Match> = emptyList(),
-    val phase: TournamentPhase = TournamentPhase.SETUP
+    val phase: TournamentPhase = TournamentPhase.SETUP,
+    /** Players per [Team], chosen by the organizer at setup. 1 is the classic singles format. */
+    val squadSize: Int = 1
 )
