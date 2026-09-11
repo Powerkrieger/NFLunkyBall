@@ -15,6 +15,8 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
@@ -79,7 +81,16 @@ private fun NfLunkyBallApp() {
 
     NavHost(navController = navController, startDestination = "home") {
         composable("home") {
+            val hostedTournament by organizerViewModel.tournament.collectAsState()
+            val watchedTournament by viewerViewModel.tournament.collectAsState()
             HomeScreen(
+                // Highlights "My tournaments" once there's actually something there — a
+                // tournament in progress (either role) or a previously linked/joined account
+                // (history/leaderboard viewing) — and Host/Join otherwise, on an empty home
+                // screen where starting something new is the more useful default.
+                hasActiveOrLinkedSession = hostedTournament != null ||
+                    watchedTournament != null ||
+                    viewerViewModel.historyAvailable(),
                 // Always starts a fresh tournament — never resumes one. An in-progress
                 // tournament is no longer reachable through this button at all; it's managed
                 // exclusively via "My tournaments" from here on (SetupScreen itself guards

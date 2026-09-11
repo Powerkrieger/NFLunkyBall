@@ -25,7 +25,13 @@ import com.example.nflunkyball.BuildConfig
 import com.example.nflunkyball.ui.theme.Spacing
 
 @Composable
-fun HomeScreen(onHost: () -> Unit, onJoin: () -> Unit, onMyTournaments: () -> Unit, onSettings: () -> Unit) {
+fun HomeScreen(
+    hasActiveOrLinkedSession: Boolean,
+    onHost: () -> Unit,
+    onJoin: () -> Unit,
+    onMyTournaments: () -> Unit,
+    onSettings: () -> Unit
+) {
     Box(Modifier.fillMaxSize()) {
         IconButton(
             onClick = onSettings,
@@ -51,17 +57,28 @@ fun HomeScreen(onHost: () -> Unit, onJoin: () -> Unit, onMyTournaments: () -> Un
                 style = MaterialTheme.typography.displaySmall,
                 color = MaterialTheme.colorScheme.primary
             )
-            // Filled for the primary action, outlined for the rest — one clear default choice
-            // ("start something new") instead of three visually equal buttons.
-            Button(onClick = onHost, modifier = Modifier.fillMaxWidth().padding(top = Spacing.xl)) {
-                Text("Host a tournament")
-            }
-            OutlinedButton(onClick = onJoin, modifier = Modifier.fillMaxWidth().padding(top = Spacing.md)) {
-                Text("Join a tournament")
-            }
-            OutlinedButton(onClick = onMyTournaments, modifier = Modifier.fillMaxWidth().padding(top = Spacing.md)) {
-                Text("My tournaments")
-            }
+            // "My tournaments" is the one worth highlighting once there's something there to go
+            // back to (a tournament in progress, or a linked/joined account); otherwise Host/Join
+            // are the more useful default actions on an otherwise-empty home screen. Filled =
+            // the highlighted action, outlined = the rest, same visual language either way.
+            HomeActionButton(
+                text = "My tournaments",
+                highlighted = hasActiveOrLinkedSession,
+                onClick = onMyTournaments,
+                modifier = Modifier.fillMaxWidth().padding(top = Spacing.xl)
+            )
+            HomeActionButton(
+                text = "Host a tournament",
+                highlighted = !hasActiveOrLinkedSession,
+                onClick = onHost,
+                modifier = Modifier.fillMaxWidth().padding(top = Spacing.md)
+            )
+            HomeActionButton(
+                text = "Join a tournament",
+                highlighted = !hasActiveOrLinkedSession,
+                onClick = onJoin,
+                modifier = Modifier.fillMaxWidth().padding(top = Spacing.md)
+            )
         }
         Text(
             "v${BuildConfig.VERSION_NAME}",
@@ -69,5 +86,14 @@ fun HomeScreen(onHost: () -> Unit, onJoin: () -> Unit, onMyTournaments: () -> Un
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.align(Alignment.BottomEnd).padding(Spacing.sm)
         )
+    }
+}
+
+@Composable
+private fun HomeActionButton(text: String, highlighted: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    if (highlighted) {
+        Button(onClick = onClick, modifier = modifier) { Text(text) }
+    } else {
+        OutlinedButton(onClick = onClick, modifier = modifier) { Text(text) }
     }
 }
