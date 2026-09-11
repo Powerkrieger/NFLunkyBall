@@ -45,7 +45,7 @@ data class UploadResponse(val id: Int)
 data class TournamentSummary(val id: Int, val name: String, val date: String, val phase: String)
 
 @Serializable
-data class CompetitorStats(val id: Int, val name: String, val wins: Int, val losses: Int)
+data class CompetitorStats(val id: Int, val name: String, val wins: Int, val losses: Int, val elo: Double)
 
 @Serializable
 data class AccountStatus(

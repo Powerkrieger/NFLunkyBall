@@ -78,4 +78,49 @@ class TournamentLogicTest {
             assertEquals(0, it.losses)
         }
     }
+
+    @Test
+    fun `provisional standings give the winner a positive elo delta and the loser a negative one`() {
+        val tournament = Tournament(
+            id = "t1",
+            name = "Test Cup",
+            teams = listOf(team("A"), team("B")),
+            groups = listOf(
+                Group(
+                    id = "g1",
+                    name = "Group A",
+                    teamIds = listOf("A", "B"),
+                    matches = listOf(Match("m1", "A", "B", MatchResult(winnerId = "A", winnerScore = 12)))
+                )
+            )
+        )
+
+        val standings = tournament.provisionalStandings()
+
+        assertEquals(1, standings.getValue("A").winDelta)
+        assertEquals(0, standings.getValue("A").lossDelta)
+        assertEquals(1, standings.getValue("B").lossDelta)
+        assert(standings.getValue("A").eloDelta > 0) { "Winner's elo delta should be positive" }
+        assert(standings.getValue("B").eloDelta < 0) { "Loser's elo delta should be negative" }
+        // Zero-sum for a two-player match.
+        assertEquals(standings.getValue("A").eloDelta, -standings.getValue("B").eloDelta, 0.0001)
+    }
+
+    @Test
+    fun `provisional standings are zero when no matches have a result yet`() {
+        val tournament = Tournament(
+            id = "t1",
+            name = "Test Cup",
+            teams = listOf(team("A"), team("B")),
+            groups = listOf(Group(id = "g1", name = "Group A", teamIds = listOf("A", "B")))
+        )
+
+        val standings = tournament.provisionalStandings()
+
+        standings.values.forEach {
+            assertEquals(0, it.winDelta)
+            assertEquals(0, it.lossDelta)
+            assertEquals(0.0, it.eloDelta, 0.0001)
+        }
+    }
 }

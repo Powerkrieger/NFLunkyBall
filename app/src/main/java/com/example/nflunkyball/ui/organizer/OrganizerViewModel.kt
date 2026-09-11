@@ -23,6 +23,7 @@ import com.example.nflunkyball.model.generateRoundRobinMatches
 import com.example.nflunkyball.persistence.AppSettingsStore
 import com.example.nflunkyball.persistence.MatchDrinkStore
 import com.example.nflunkyball.persistence.TournamentRepository
+import com.example.nflunkyball.server.CompetitorStats
 import com.example.nflunkyball.server.Ed25519
 import com.example.nflunkyball.server.InvitePayloadCodec
 import com.example.nflunkyball.server.OrganizerAccount
@@ -86,7 +87,9 @@ class OrganizerViewModel(application: Application) : AndroidViewModel(applicatio
     var uploadStatus by mutableStateOf<String?>(null)
         private set
 
-    var knownCompetitorNames by mutableStateOf<List<String>>(emptyList())
+    /** Sorted by Elo desc (ties broken by name) so the SetupScreen suggestion chips read as a
+     *  rough skill ranking rather than an alphabetical list. */
+    var knownCompetitors by mutableStateOf<List<CompetitorStats>>(emptyList())
         private set
 
     private val _emojiEvents = MutableSharedFlow<String>(extraBufferCapacity = 32)
@@ -126,7 +129,8 @@ class OrganizerViewModel(application: Application) : AndroidViewModel(applicatio
         val password = readPassword ?: return
         viewModelScope.launch {
             when (val result = ServerApi(account.serverUrl).listCompetitors(password)) {
-                is ServerResult.Success -> knownCompetitorNames = result.value.map { it.name }.sorted()
+                is ServerResult.Success ->
+                    knownCompetitors = result.value.sortedWith(compareByDescending<CompetitorStats> { it.elo }.thenBy { it.name })
                 is ServerResult.Failure -> Unit
             }
         }
@@ -405,7 +409,7 @@ class OrganizerViewModel(application: Application) : AndroidViewModel(applicatio
         stopServerSync()
         credentialsStore.clearAccount()
         organizerAccount = null
-        knownCompetitorNames = emptyList()
+        knownCompetitors = emptyList()
         _accountSyncStatus.value = null
     }
 

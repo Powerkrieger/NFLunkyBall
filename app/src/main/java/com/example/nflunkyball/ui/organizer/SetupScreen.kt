@@ -31,8 +31,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.unit.dp
+import com.example.nflunkyball.model.ELO_STARTING_RATING
+import com.example.nflunkyball.model.PlayerSeed
 import com.example.nflunkyball.model.Team
+import com.example.nflunkyball.model.assignGroupsBySeeding
+import com.example.nflunkyball.model.assignGroupsRandomly
 import com.example.nflunkyball.ui.theme.Spacing
+import java.util.Locale
 import java.util.UUID
 
 @Composable
@@ -120,7 +125,8 @@ fun SetupScreen(
         }
 
         val addedNames = teams.map { it.name.lowercase() }.toSet()
-        val suggestions = viewModel.knownCompetitorNames.filter { it.lowercase() !in addedNames }
+        // Already sorted by Elo desc (see OrganizerViewModel.loadKnownCompetitors).
+        val suggestions = viewModel.knownCompetitors.filter { it.name.lowercase() !in addedNames }
         if (suggestions.isNotEmpty()) {
             Text(
                 "Known players",
@@ -128,13 +134,38 @@ fun SetupScreen(
                 modifier = Modifier.padding(top = Spacing.sm)
             )
             LazyRow(Modifier.padding(top = Spacing.xs)) {
-                items(suggestions) { name ->
+                items(suggestions) { competitor ->
                     SuggestionChip(
-                        onClick = { addTeam(name) },
-                        label = { Text(name) },
+                        onClick = { addTeam(competitor.name) },
+                        label = { Text("${competitor.name} (${String.format(Locale.US, "%.1f", competitor.elo)})") },
                         modifier = Modifier.padding(end = Spacing.sm)
                     )
                 }
+            }
+        }
+
+        if (groupNames.size >= 2 && teams.isNotEmpty()) {
+            Row(Modifier.padding(top = Spacing.sm)) {
+                TextButton(
+                    onClick = {
+                        val eloByName = viewModel.knownCompetitors.associateBy { it.name.lowercase() }
+                        val seeds = teams.map { team ->
+                            PlayerSeed(team.id, eloByName[team.name.lowercase()]?.elo ?: ELO_STARTING_RATING)
+                        }
+                        val assigned = assignGroupsBySeeding(seeds, groupNames)
+                        assigned.forEach { (groupName, teamIds) ->
+                            teamIds.forEach { teamId -> assignments[teamId] = groupName }
+                        }
+                    }
+                ) { Text("Auto-assign to groups") }
+                TextButton(
+                    onClick = {
+                        val assigned = assignGroupsRandomly(teams.map { it.id }, groupNames)
+                        assigned.forEach { (groupName, teamIds) ->
+                            teamIds.forEach { teamId -> assignments[teamId] = groupName }
+                        }
+                    }
+                ) { Text("Random groups") }
             }
         }
 

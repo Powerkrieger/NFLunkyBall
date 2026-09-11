@@ -34,11 +34,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import com.example.nflunkyball.ble.BleCapability
+import com.example.nflunkyball.model.ELO_STARTING_RATING
+import com.example.nflunkyball.model.Tournament
 import com.example.nflunkyball.model.TournamentPhase
+import com.example.nflunkyball.model.provisionalStandings
 import com.example.nflunkyball.persistence.SavedTournament
 import com.example.nflunkyball.server.CompetitorStats
 import com.example.nflunkyball.ui.organizer.OrganizerViewModel
 import com.example.nflunkyball.ui.theme.Spacing
+import java.util.Locale
 
 @Composable
 fun HistoryScreen(
@@ -54,6 +58,9 @@ fun HistoryScreen(
     // viewer's saved-tournaments list above, so a tournament this device is hosting wouldn't
     // otherwise show up here at all — surfaced explicitly instead.
     val hostedTournament by organizerViewModel.tournament.collectAsState()
+    // The viewer's currently-watched live tournament (BLE or server sync) — folded into the
+    // Leaderboard tab below so it reflects games in progress, not just archived results.
+    val watchedTournament by viewModel.tournament.collectAsState()
     var tabIndex by remember { mutableIntStateOf(0) }
     var showBluetoothOff by remember { mutableStateOf(false) }
     var pendingRemoval by remember { mutableStateOf<SavedTournament?>(null) }
@@ -130,11 +137,15 @@ fun HistoryScreen(
                 }
             }
         } else {
+            val leaderboard = remember(viewModel.competitors, hostedTournament, watchedTournament) {
+                mergeLiveStandings(viewModel.competitors, listOf(hostedTournament, watchedTournament))
+                    .sortedByDescending { it.elo }
+            }
             LazyColumn(
                 Modifier.fillMaxSize().padding(Spacing.md),
                 verticalArrangement = Arrangement.spacedBy(Spacing.xs)
             ) {
-                items(viewModel.competitors.sortedByDescending { it.wins }) { c ->
+                items(leaderboard) { c ->
                     CompetitorRow(c)
                 }
             }
@@ -191,6 +202,37 @@ private fun SavedTournamentRow(entry: SavedTournament, onClick: () -> Unit, onRe
     }
 }
 
+/**
+ * Overlays each still-in-progress (non-FINISHED) tournament's own provisional standings on top
+ * of the backend's persisted, archived-only stats, matched by team/competitor name — so a
+ * currently-watched or currently-hosted tournament's results show up immediately instead of only
+ * after the organizer uploads it to history. Purely a display-time approximation: it's fine for
+ * this to shift as the organizer edits live results (see TournamentLogic.provisionalStandings).
+ */
+private fun mergeLiveStandings(
+    serverStats: List<CompetitorStats>,
+    liveTournaments: List<Tournament?>
+): List<CompetitorStats> {
+    val byNameLower = serverStats.associateBy { it.name.lowercase() }.toMutableMap()
+    liveTournaments.filterNotNull()
+        .filter { it.phase != TournamentPhase.FINISHED }
+        .forEach { tournament ->
+            val provisional = tournament.provisionalStandings()
+            tournament.teams.forEach { team ->
+                val delta = provisional[team.id] ?: return@forEach
+                val key = team.name.lowercase()
+                val current = byNameLower[key]
+                    ?: CompetitorStats(id = -1, name = team.name, wins = 0, losses = 0, elo = ELO_STARTING_RATING)
+                byNameLower[key] = current.copy(
+                    wins = current.wins + delta.winDelta,
+                    losses = current.losses + delta.lossDelta,
+                    elo = current.elo + delta.eloDelta
+                )
+            }
+        }
+    return byNameLower.values.toList()
+}
+
 @Composable
 private fun CompetitorRow(c: CompetitorStats) {
     Row(
@@ -198,7 +240,7 @@ private fun CompetitorRow(c: CompetitorStats) {
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
         Text(c.name)
-        Text("${c.wins}W ${c.losses}L")
+        Text("${String.format(Locale.US, "%.1f", c.elo)} · ${c.wins}W ${c.losses}L")
     }
     HorizontalDivider()
 }
