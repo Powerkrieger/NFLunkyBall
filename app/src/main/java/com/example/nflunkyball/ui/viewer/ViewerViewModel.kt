@@ -20,7 +20,9 @@ import com.example.nflunkyball.persistence.ViewerTournamentsStore
 import com.example.nflunkyball.qr.JoinPayload
 import com.example.nflunkyball.server.CompetitorDetailStats
 import com.example.nflunkyball.server.CompetitorStats
+import com.example.nflunkyball.server.MatchDetail
 import com.example.nflunkyball.server.ServerApi
+import com.example.nflunkyball.server.TournamentDetail
 import com.example.nflunkyball.server.ServerCredentialsStore
 import com.example.nflunkyball.server.ServerResult
 import com.example.nflunkyball.server.TournamentSummary
@@ -268,19 +270,20 @@ class ViewerViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    suspend fun fetchTournamentDetail(id: Int): ServerResult<Tournament> {
+    /** The archived tournament plus its metadata and link maps (see [TournamentDetail]). */
+    suspend fun fetchTournamentDetail(id: Int): ServerResult<TournamentDetail> =
+        withReadAccess { api, password -> api.getTournamentDetail(id, password) }
+
+    suspend fun fetchMatchDetail(id: Int): ServerResult<MatchDetail> =
+        withReadAccess { api, password -> api.getMatchDetail(id, password) }
+
+    private suspend fun <T> withReadAccess(
+        call: suspend (ServerApi, String) -> ServerResult<T>
+    ): ServerResult<T> {
         val server = resolveServerUrl() ?: return ServerResult.Failure("No server address available")
         val password = joinPayload?.pw ?: credentialsStore.loadReadPassword()
             ?: return ServerResult.Failure("No read password available")
-        return when (val result = ServerApi(server).getTournamentJson(id, password)) {
-            is ServerResult.Success -> runCatching {
-                fetchJson.decodeFromString(Tournament.serializer(), result.value)
-            }.fold(
-                onSuccess = { ServerResult.Success(it) },
-                onFailure = { ServerResult.Failure(it.message ?: "Failed to parse tournament") }
-            )
-            is ServerResult.Failure -> result
-        }
+        return call(ServerApi(server), password)
     }
 
     override fun onCleared() {

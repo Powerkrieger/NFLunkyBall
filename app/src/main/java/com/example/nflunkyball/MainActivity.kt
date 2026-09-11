@@ -42,6 +42,7 @@ import com.example.nflunkyball.ui.shared.PermissionsGate
 import com.example.nflunkyball.ui.theme.NFLunkyBallTheme
 import com.example.nflunkyball.ui.viewer.HistoryScreen
 import com.example.nflunkyball.ui.viewer.HistoryTournamentDetailScreen
+import com.example.nflunkyball.ui.viewer.MatchDetailScreen
 import com.example.nflunkyball.ui.viewer.JoinScreen
 import com.example.nflunkyball.ui.viewer.PlayerStatsScreen
 import com.example.nflunkyball.ui.viewer.ViewerScoreboardScreen
@@ -265,13 +266,52 @@ private fun NfLunkyBallApp() {
         composable("viewer/history/{id}") { backStackEntry ->
             val id = backStackEntry.arguments?.getString("id")
             if (id != null) {
-                HistoryTournamentDetailScreen(viewModel = viewerViewModel, savedId = id)
+                HistoryTournamentDetailScreen(
+                    viewModel = viewerViewModel,
+                    savedId = id,
+                    serverId = null,
+                    onOpenMatch = { matchId -> navController.navigate("viewer/match/$matchId") },
+                    onOpenPlayer = { playerId -> navController.navigate("viewer/player/$playerId") }
+                )
+            }
+        }
+        // Same screen as above, addressed by backend id — how a player's Elo history or a match
+        // page links to a tournament the viewer never saved locally.
+        composable("viewer/tournament/{id}") { backStackEntry ->
+            val id = backStackEntry.arguments?.getString("id")?.toIntOrNull()
+            if (id != null) {
+                HistoryTournamentDetailScreen(
+                    viewModel = viewerViewModel,
+                    savedId = null,
+                    serverId = id,
+                    onOpenMatch = { matchId -> navController.navigate("viewer/match/$matchId") },
+                    onOpenPlayer = { playerId -> navController.navigate("viewer/player/$playerId") }
+                )
             }
         }
         composable("viewer/player/{id}") { backStackEntry ->
             val id = backStackEntry.arguments?.getString("id")?.toIntOrNull()
             if (id != null) {
-                PlayerStatsScreen(viewModel = viewerViewModel, competitorId = id, onBack = { navController.popBackStack() })
+                PlayerStatsScreen(
+                    viewModel = viewerViewModel,
+                    competitorId = id,
+                    onBack = { navController.popBackStack() },
+                    onOpenPlayer = { playerId -> navController.navigate("viewer/player/$playerId") },
+                    onOpenMatch = { matchId -> navController.navigate("viewer/match/$matchId") },
+                    onOpenTournament = { tournamentId -> navController.navigate("viewer/tournament/$tournamentId") }
+                )
+            }
+        }
+        composable("viewer/match/{id}") { backStackEntry ->
+            val id = backStackEntry.arguments?.getString("id")?.toIntOrNull()
+            if (id != null) {
+                MatchDetailScreen(
+                    viewModel = viewerViewModel,
+                    matchId = id,
+                    onBack = { navController.popBackStack() },
+                    onOpenPlayer = { playerId -> navController.navigate("viewer/player/$playerId") },
+                    onOpenTournament = { tournamentId -> navController.navigate("viewer/tournament/$tournamentId") }
+                )
             }
         }
     }

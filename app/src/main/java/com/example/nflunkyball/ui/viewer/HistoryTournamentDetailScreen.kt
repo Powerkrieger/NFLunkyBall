@@ -1,12 +1,15 @@
 package com.example.nflunkyball.ui.viewer
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -18,84 +21,141 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import com.example.nflunkyball.model.Match
 import com.example.nflunkyball.model.Tournament
 import com.example.nflunkyball.model.standings
 import com.example.nflunkyball.server.ServerResult
+import com.example.nflunkyball.server.TournamentDetail
 import com.example.nflunkyball.ui.shared.MatchList
 import com.example.nflunkyball.ui.shared.StandingsTable
 import com.example.nflunkyball.ui.theme.Spacing
 
+/**
+ * One archived tournament, reached either from the viewer's saved list ([savedId]) or by its
+ * backend id ([serverId], e.g. from a player's Elo history). With a server id on hand the
+ * backend's detail endpoint is preferred — it carries the finish metadata and the id maps that
+ * make match rows and player names tappable; the locally cached body is the offline fallback
+ * and renders read-only.
+ */
 @Composable
-fun HistoryTournamentDetailScreen(viewModel: ViewerViewModel, savedId: String) {
+fun HistoryTournamentDetailScreen(
+    viewModel: ViewerViewModel,
+    savedId: String?,
+    serverId: Int?,
+    onOpenMatch: (Int) -> Unit,
+    onOpenPlayer: (Int) -> Unit
+) {
     val saved by viewModel.savedTournaments.collectAsState()
-    val entry = saved.find { it.id == savedId }
-    var tournament by remember { mutableStateOf<Tournament?>(null) }
+    val entry = saved.find { savedId != null && it.id == savedId } ?: saved.find { serverId != null && it.serverId == serverId }
+    val resolvedServerId = serverId ?: entry?.serverId
+    var detail by remember { mutableStateOf<TournamentDetail?>(null) }
+    var cached by remember { mutableStateOf<Tournament?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
 
-    LaunchedEffect(savedId, entry?.cachedTournamentJson) {
-        val cachedJson = entry?.cachedTournamentJson
-        val serverId = entry?.serverId
-        when {
-            cachedJson != null -> {
-                tournament = viewModel.decodeCachedTournament(cachedJson)
-                if (tournament == null) error = "Couldn't read this tournament's saved data"
-            }
-            serverId != null -> when (val result = viewModel.fetchTournamentDetail(serverId)) {
-                is ServerResult.Success -> tournament = result.value
+    LaunchedEffect(savedId, resolvedServerId, entry?.cachedTournamentJson) {
+        detail = null
+        cached = null
+        error = null
+        if (resolvedServerId != null) {
+            when (val result = viewModel.fetchTournamentDetail(resolvedServerId)) {
+                is ServerResult.Success -> { detail = result.value; return@LaunchedEffect }
                 is ServerResult.Failure -> error = result.message
             }
-            else -> error = "This tournament isn't available yet"
+        }
+        val cachedJson = entry?.cachedTournamentJson
+        when {
+            cachedJson != null -> {
+                cached = viewModel.decodeCachedTournament(cachedJson)
+                if (cached != null) error = null else error = "Couldn't read this tournament's saved data"
+            }
+            error == null -> error = "This tournament isn't available yet"
         }
     }
 
-    val current = tournament
+    val current = detail?.tournament ?: cached
     when {
-        error != null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text(error!!) }
+        current == null && error != null ->
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text(error!!) }
         current == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             CircularProgressIndicator()
         }
-        else -> {
-            val teamNames = current.teams.associate { it.id to it.name }
-            Column(
-                Modifier.fillMaxSize().padding(Spacing.md).verticalScroll(rememberScrollState())
-            ) {
-                Text(
-                    current.name,
-                    style = MaterialTheme.typography.headlineSmall,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                current.groups.forEach { group ->
-                    Text(
-                        group.name,
-                        style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.padding(top = Spacing.lg)
-                    )
-                    StandingsTable(
-                        standings = group.standings(),
-                        teamNames = teamNames,
-                        modifier = Modifier.padding(top = Spacing.sm)
-                    )
-                    MatchList(
-                        matches = group.matches,
-                        teamNames = teamNames,
-                        onRecordResult = null,
-                        modifier = Modifier.padding(top = Spacing.sm)
-                    )
-                }
-                if (current.bracketMatches.isNotEmpty()) {
-                    Text(
-                        "Bracket",
-                        style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.padding(top = Spacing.lg)
-                    )
-                    MatchList(
-                        matches = current.bracketMatches,
-                        teamNames = teamNames,
-                        onRecordResult = null,
-                        modifier = Modifier.padding(top = Spacing.sm)
-                    )
-                }
+        else -> TournamentBody(current, detail, onOpenMatch, onOpenPlayer)
+    }
+}
+
+@Composable
+private fun TournamentBody(
+    tournament: Tournament,
+    detail: TournamentDetail?,
+    onOpenMatch: (Int) -> Unit,
+    onOpenPlayer: (Int) -> Unit
+) {
+    val teamNames = tournament.teams.associate { it.id to it.name }
+    val openMatch: ((Match) -> (() -> Unit)?)? = detail?.let { d ->
+        { match -> d.matchIds[match.id]?.let { id -> { onOpenMatch(id) } } }
+    }
+
+    Column(Modifier.fillMaxSize().padding(Spacing.md).verticalScroll(rememberScrollState())) {
+        Text(
+            tournament.name,
+            style = MaterialTheme.typography.headlineSmall,
+            color = MaterialTheme.colorScheme.primary
+        )
+        detail?.let { d ->
+            Text(d.date.take(10), style = MaterialTheme.typography.bodyMedium)
+            d.location?.takeIf { it.isNotBlank() }?.let { Text("Location: $it", style = MaterialTheme.typography.bodyMedium) }
+            d.referees?.takeIf { it.isNotBlank() }?.let { Text("Referees: $it", style = MaterialTheme.typography.bodyMedium) }
+            d.comment?.takeIf { it.isNotBlank() }?.let {
+                Text(it, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = Spacing.xs))
             }
+        }
+
+        Text("Players", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = Spacing.lg))
+        tournament.teams.forEach { team ->
+            val competitorId = detail?.competitorIds?.get(team.id)
+            Text(
+                team.name,
+                color = if (competitorId != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(enabled = competitorId != null) { competitorId?.let(onOpenPlayer) }
+                    .padding(vertical = Spacing.xs)
+            )
+            HorizontalDivider()
+        }
+
+        tournament.groups.forEach { group ->
+            Text(
+                group.name,
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(top = Spacing.lg)
+            )
+            StandingsTable(
+                standings = group.standings(),
+                teamNames = teamNames,
+                modifier = Modifier.padding(top = Spacing.sm)
+            )
+            MatchList(
+                matches = group.matches,
+                teamNames = teamNames,
+                onRecordResult = null,
+                modifier = Modifier.padding(top = Spacing.sm),
+                onOpenMatch = openMatch
+            )
+        }
+        if (tournament.bracketMatches.isNotEmpty()) {
+            Text(
+                "Bracket",
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(top = Spacing.lg)
+            )
+            MatchList(
+                matches = tournament.bracketMatches,
+                teamNames = teamNames,
+                onRecordResult = null,
+                modifier = Modifier.padding(top = Spacing.sm),
+                onOpenMatch = openMatch
+            )
         }
     }
 }

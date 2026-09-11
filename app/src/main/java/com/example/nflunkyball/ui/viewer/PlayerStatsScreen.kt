@@ -1,5 +1,6 @@
 package com.example.nflunkyball.ui.viewer
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -46,12 +47,20 @@ import com.patrykandpatrick.vico.core.cartesian.data.CartesianChartModelProducer
 import com.patrykandpatrick.vico.core.cartesian.data.LineCartesianLayerModel
 import java.util.Locale
 
-/** One point on the Elo chart, whichever granularity it came from. */
-private data class EloPoint(val label: String, val rating: Double)
+/** One point on the Elo chart, whichever granularity it came from. [onOpen] navigates to the
+ *  match or tournament the point came from. */
+private data class EloPoint(val label: String, val rating: Double, val onOpen: () -> Unit)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PlayerStatsScreen(viewModel: ViewerViewModel, competitorId: Int, onBack: () -> Unit) {
+fun PlayerStatsScreen(
+    viewModel: ViewerViewModel,
+    competitorId: Int,
+    onBack: () -> Unit,
+    onOpenPlayer: (Int) -> Unit,
+    onOpenMatch: (Int) -> Unit,
+    onOpenTournament: (Int) -> Unit
+) {
     LaunchedEffect(competitorId) { viewModel.loadPlayerStats(competitorId) }
     val stats = viewModel.playerStats
     val status = viewModel.playerStatsStatus
@@ -108,17 +117,21 @@ fun PlayerStatsScreen(viewModel: ViewerViewModel, competitorId: Int, onBack: () 
                 Text("Favorite drink: $it")
             }
             Spacer2()
-            OpponentLine("Best matchup", stats.bestOpponent)
-            OpponentLine("Toughest matchup", stats.worstOpponent)
-            OpponentLine("Nemesis (most played)", stats.nemesis)
-            SimilarPlayerLine(stats.mostSimilarPlayer)
+            OpponentLine("Best matchup", stats.bestOpponent, onOpenPlayer)
+            OpponentLine("Toughest matchup", stats.worstOpponent, onOpenPlayer)
+            OpponentLine("Nemesis (most played)", stats.nemesis, onOpenPlayer)
+            SimilarPlayerLine(stats.mostSimilarPlayer, onOpenPlayer)
 
             val byTournament = remember(stats) {
-                stats.eloHistory.map { EloPoint("${it.tournamentName} (${it.date.take(10)})", it.rating) }
+                stats.eloHistory.map {
+                    EloPoint("${it.tournamentName} (${it.date.take(10)})", it.rating) { onOpenTournament(it.tournamentId) }
+                }
             }
             val byMatch = remember(stats) {
                 stats.eloMatchHistory.map {
-                    EloPoint("${if (it.won) "W" else "L"} · vs ${it.opponentName} (${it.date.take(10)})", it.rating)
+                    EloPoint("${if (it.won) "W" else "L"} · vs ${it.opponentName} (${it.date.take(10)})", it.rating) {
+                        onOpenMatch(it.matchId)
+                    }
                 }
             }
             if (byTournament.isNotEmpty() || byMatch.isNotEmpty()) {
@@ -134,10 +147,10 @@ fun PlayerStatsScreen(viewModel: ViewerViewModel, competitorId: Int, onBack: () 
                 Column(Modifier.padding(top = Spacing.sm)) {
                     points.forEach { point ->
                         Row(
-                            Modifier.fillMaxWidth().padding(vertical = Spacing.xs),
+                            Modifier.fillMaxWidth().clickable(onClick = point.onOpen).padding(vertical = Spacing.xs),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Text(point.label)
+                            Text(point.label, color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f))
                             Text("%.1f".format(Locale.US, point.rating))
                         }
                         HorizontalDivider()
@@ -154,19 +167,32 @@ private fun Spacer2() {
 }
 
 @Composable
-private fun OpponentLine(label: String, opponent: OpponentSummary?) {
-    Text(
-        if (opponent != null) {
+private fun OpponentLine(label: String, opponent: OpponentSummary?, onOpenPlayer: (Int) -> Unit) {
+    if (opponent != null) {
+        LinkLine(
             "$label: ${opponent.name} (${(opponent.winRate * 100).toInt()}% over ${opponent.matches} matches)"
-        } else {
-            "$label: not enough data yet"
-        }
-    )
+        ) { onOpenPlayer(opponent.id) }
+    } else {
+        Text("$label: not enough data yet")
+    }
 }
 
 @Composable
-private fun SimilarPlayerLine(similar: SimilarPlayer?) {
-    Text(if (similar != null) "Most similar player: ${similar.name}" else "Most similar player: not enough data yet")
+private fun SimilarPlayerLine(similar: SimilarPlayer?, onOpenPlayer: (Int) -> Unit) {
+    if (similar != null) {
+        LinkLine("Most similar player: ${similar.name}") { onOpenPlayer(similar.id) }
+    } else {
+        Text("Most similar player: not enough data yet")
+    }
+}
+
+@Composable
+private fun LinkLine(text: String, onClick: () -> Unit) {
+    Text(
+        text,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = Spacing.xs)
+    )
 }
 
 @Composable

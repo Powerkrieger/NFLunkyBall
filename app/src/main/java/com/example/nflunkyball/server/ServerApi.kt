@@ -13,6 +13,7 @@ import io.ktor.http.ContentType
 import io.ktor.http.contentType
 import io.ktor.http.isSuccess
 import io.ktor.serialization.kotlinx.json.json
+import com.example.nflunkyball.model.Tournament
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -98,6 +99,53 @@ data class CompetitorDetailStats(
 )
 
 @Serializable
+data class CompetitorRef(val id: Int, val name: String)
+
+@Serializable
+data class TournamentRef(val id: Int, val name: String, val date: String, val location: String?)
+
+@Serializable
+data class HeadToHead(val matches: Int, val winsA: Int, val winsB: Int)
+
+/** Everything the archive knows about one match — see the backend's `match_detail`. Elo
+ *  before/after is what the full replay assigned at this point in play order. */
+@Serializable
+data class MatchDetail(
+    val id: Int,
+    val tournament: TournamentRef,
+    val roundLabel: String?,
+    val competitorA: CompetitorRef,
+    val competitorB: CompetitorRef,
+    val winner: CompetitorRef?,
+    val winnerScore: Int?,
+    val forfeit: Boolean,
+    val drinkA: String?,
+    val drinkB: String?,
+    val eloBeforeA: Double?,
+    val eloAfterA: Double?,
+    val eloBeforeB: Double?,
+    val eloAfterB: Double?,
+    val headToHead: HeadToHead
+)
+
+/** The archived tournament body plus organizer-entered metadata and the client-id → server-id
+ *  maps that turn its match rows and team names into links ([matchIds] only covers matches
+ *  that have a result — those are the only ones the backend keeps as rows). */
+@Serializable
+data class TournamentDetail(
+    val id: Int,
+    val name: String,
+    val date: String,
+    val phase: String,
+    val location: String?,
+    val referees: String?,
+    val comment: String?,
+    val tournament: Tournament,
+    val matchIds: Map<String, Int>,
+    val competitorIds: Map<String, Int>
+)
+
+@Serializable
 data class AccountStatus(
     val id: Int,
     @SerialName("display_name") val displayName: String,
@@ -179,6 +227,18 @@ class ServerApi(private val baseUrl: String) {
     /** Returns the raw JSON text (the app's own Tournament serializer decodes it from here). */
     suspend fun getTournamentJson(id: Int, readPassword: String): ServerResult<String> = serverCall {
         client.get("$baseUrl/tournaments/$id") {
+            header("X-Read-Password", readPassword)
+        }.body()
+    }
+
+    suspend fun getTournamentDetail(id: Int, readPassword: String): ServerResult<TournamentDetail> = serverCall {
+        client.get("$baseUrl/tournaments/$id/detail") {
+            header("X-Read-Password", readPassword)
+        }.body()
+    }
+
+    suspend fun getMatchDetail(id: Int, readPassword: String): ServerResult<MatchDetail> = serverCall {
+        client.get("$baseUrl/matches/$id") {
             header("X-Read-Password", readPassword)
         }.body()
     }
