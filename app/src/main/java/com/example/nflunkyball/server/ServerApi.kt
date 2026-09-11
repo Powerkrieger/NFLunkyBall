@@ -6,6 +6,7 @@ import io.ktor.client.engine.cio.CIO
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.request.get
 import io.ktor.client.request.header
+import io.ktor.client.request.parameter
 import io.ktor.client.request.post
 import io.ktor.client.request.put
 import io.ktor.client.request.setBody
@@ -68,11 +69,21 @@ data class EloMatchHistoryEntry(
     @SerialName("tournament_id") val tournamentId: Int,
     @SerialName("tournament_name") val tournamentName: String,
     val date: String,
+    // Singles-era pair: the first opposing player, and the opposing side's names joined.
     @SerialName("opponent_id") val opponentId: Int,
     @SerialName("opponent_name") val opponentName: String,
+    val opponents: List<CompetitorRef> = emptyList(),
+    val teammates: List<CompetitorRef> = emptyList(),
     val won: Boolean,
     val rating: Double
 )
+
+/** Which matches a stats view counts — mirrors the backend's `mode` query parameter. */
+enum class StatsMode(val query: String, val label: String) {
+    ALL("all", "All"),
+    SINGLES("singles", "Singles"),
+    TEAMS("teams", "Teams")
+}
 
 @Serializable
 data class SimilarPlayer(val id: Int, val name: String, val distance: Double)
@@ -87,6 +98,7 @@ data class CompetitorDetailStats(
     val avgSecondsWhenLost: Double?,
     val avgSecondsOpponentsWhenWon: Double?,
     val forfeitRate: Double?,
+    val forfeitedDrinks: Int = 0,
     val currentStreak: Int,
     val longestWinStreak: Int,
     val favoriteDrink: String?,
@@ -107,13 +119,34 @@ data class TournamentRef(val id: Int, val name: String, val date: String, val lo
 @Serializable
 data class HeadToHead(val matches: Int, val winsA: Int, val winsB: Int)
 
+/** One player's part in a match. [seconds]/[forfeitedDrinks] are their own counter and only
+ *  meaningful on the losing side. */
+@Serializable
+data class MatchPlayer(
+    val id: Int,
+    val name: String,
+    val won: Boolean,
+    val seconds: Int?,
+    val forfeitedDrinks: Int,
+    val drink: String?,
+    val eloBefore: Double?,
+    val eloAfter: Double?
+)
+
 /** Everything the archive knows about one match — see the backend's `match_detail`. Elo
- *  before/after is what the full replay assigned at this point in play order. */
+ *  before/after is what the full replay assigned at this point in play order. [sideA]/[sideB]
+ *  are the squad-aware view; the remaining per-side fields are the singles-era shape (first
+ *  player per side, losers' summed counter). */
 @Serializable
 data class MatchDetail(
     val id: Int,
     val tournament: TournamentRef,
     val roundLabel: String?,
+    val teamAName: String = "",
+    val teamBName: String = "",
+    val sideA: List<MatchPlayer> = emptyList(),
+    val sideB: List<MatchPlayer> = emptyList(),
+    val winnerIsA: Boolean = true,
     val competitorA: CompetitorRef,
     val competitorB: CompetitorRef,
     val winner: CompetitorRef?,
@@ -137,11 +170,15 @@ data class TournamentDetail(
     val name: String,
     val date: String,
     val phase: String,
+    val squadSize: Int = 1,
     val location: String?,
     val referees: String?,
     val comment: String?,
     val tournament: Tournament,
     val matchIds: Map<String, Int>,
+    /** Client team id → every member's competitor id, in order. */
+    val memberIds: Map<String, List<Int>> = emptyMap(),
+    /** Client team id → first member — the singles-era shape. */
     val competitorIds: Map<String, Int>
 )
 
@@ -237,20 +274,29 @@ class ServerApi(private val baseUrl: String) {
         }.body()
     }
 
-    suspend fun getMatchDetail(id: Int, readPassword: String): ServerResult<MatchDetail> = serverCall {
-        client.get("$baseUrl/matches/$id") {
-            header("X-Read-Password", readPassword)
-        }.body()
-    }
+    suspend fun getMatchDetail(id: Int, readPassword: String, mode: StatsMode = StatsMode.ALL): ServerResult<MatchDetail> =
+        serverCall {
+            client.get("$baseUrl/matches/$id") {
+                parameter("mode", mode.query)
+                header("X-Read-Password", readPassword)
+            }.body()
+        }
 
-    suspend fun listCompetitors(readPassword: String): ServerResult<List<CompetitorStats>> = serverCall {
-        client.get("$baseUrl/competitors") {
-            header("X-Read-Password", readPassword)
-        }.body()
-    }
+    suspend fun listCompetitors(readPassword: String, mode: StatsMode = StatsMode.ALL): ServerResult<List<CompetitorStats>> =
+        serverCall {
+            client.get("$baseUrl/competitors") {
+                parameter("mode", mode.query)
+                header("X-Read-Password", readPassword)
+            }.body()
+        }
 
-    suspend fun getCompetitorStats(id: Int, readPassword: String): ServerResult<CompetitorDetailStats> = serverCall {
+    suspend fun getCompetitorStats(
+        id: Int,
+        readPassword: String,
+        mode: StatsMode = StatsMode.ALL
+    ): ServerResult<CompetitorDetailStats> = serverCall {
         client.get("$baseUrl/competitors/$id") {
+            parameter("mode", mode.query)
             header("X-Read-Password", readPassword)
         }.body()
     }

@@ -110,17 +110,30 @@ private fun TournamentBody(
             }
         }
 
-        Text("Players", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = Spacing.lg))
+        val squads = tournament.squadSize > 1 || tournament.teams.any { it.members.size > 1 }
+        Text(
+            if (squads) "Teams" else "Players",
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.padding(top = Spacing.lg)
+        )
         tournament.teams.forEach { team ->
-            val competitorId = detail?.competitorIds?.get(team.id)
-            Text(
-                team.name,
-                color = if (competitorId != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable(enabled = competitorId != null) { competitorId?.let(onOpenPlayer) }
-                    .padding(vertical = Spacing.xs)
-            )
+            val memberIds = detail?.memberIds?.get(team.id)
+                ?: detail?.competitorIds?.get(team.id)?.let { listOf(it) }
+                .orEmpty()
+            if (squads) {
+                Text(team.name, modifier = Modifier.padding(top = Spacing.xs))
+            }
+            team.memberNames.forEachIndexed { index, member ->
+                val competitorId = memberIds.getOrNull(index)
+                Text(
+                    if (squads) "    $member" else member,
+                    color = if (competitorId != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(enabled = competitorId != null) { competitorId?.let(onOpenPlayer) }
+                        .padding(vertical = Spacing.xs)
+                )
+            }
             HorizontalDivider()
         }
 

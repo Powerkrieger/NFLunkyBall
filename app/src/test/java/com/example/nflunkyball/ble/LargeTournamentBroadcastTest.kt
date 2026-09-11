@@ -1,6 +1,8 @@
 package com.example.nflunkyball.ble
 
 import com.example.nflunkyball.model.Group
+import com.example.nflunkyball.model.MatchResult
+import com.example.nflunkyball.model.PlayerResult
 import com.example.nflunkyball.model.Team
 import com.example.nflunkyball.model.Tournament
 import com.example.nflunkyball.model.TournamentPhase
@@ -37,6 +39,51 @@ class LargeTournamentBroadcastTest {
             teams = teams,
             groups = groups,
             phase = TournamentPhase.GROUP_STAGE
+        )
+    }
+
+    /** Same shape, but every team is a two-player squad and every match already has a result
+     *  with per-loser counters — the biggest payload a squad tournament realistically produces. */
+    private fun fourGroupSquadTournament(): Tournament {
+        var player = 0
+        val teams = (1..20).map {
+            val members = listOf("Player ${++player}", "Player ${++player}")
+            Team(id = UUID.randomUUID().toString(), name = Team.autoName(members), members = members)
+        }
+        val membersById = teams.associate { it.id to it.memberNames }
+        val groups = teams.chunked(5).mapIndexed { index, groupTeams ->
+            val bare = Group(
+                id = UUID.randomUUID().toString(),
+                name = "Group ${'A' + index}",
+                teamIds = groupTeams.map { it.id }
+            )
+            bare.copy(
+                matches = bare.generateRoundRobinMatches().map { match ->
+                    val losers = membersById.getValue(match.teamBId).map { PlayerResult(it, 45, forfeitedDrinks = 1) }
+                    match.copy(result = MatchResult.ofLosers(match.teamAId, losers))
+                }
+            )
+        }
+        return Tournament(
+            id = UUID.randomUUID().toString(),
+            name = "BLE Squad Cup",
+            teams = teams,
+            groups = groups,
+            phase = TournamentPhase.GROUP_STAGE,
+            squadSize = 2
+        )
+    }
+
+    @Test
+    fun `a fully-scored 4-group squad tournament still fits within the legacy chunk budget once compressed`() {
+        val rawBytes = json.encodeToString(Tournament.serializer(), fourGroupSquadTournament()).encodeToByteArray()
+        val compressed = GzipCodec.compress(rawBytes)
+
+        val chunks = ChunkedMessage.chunk(roomId = 1, version = 1, payload = compressed, maxChunkPayloadBytes = BleConstants.MAX_CHUNK_PAYLOAD_BYTES)
+
+        assertTrue(
+            "expected fewer than ${BleConstants.MAX_CHUNK_COUNT} chunks, got ${chunks.size} (${rawBytes.size} raw / ${compressed.size} gz bytes)",
+            chunks.size < BleConstants.MAX_CHUNK_COUNT
         )
     }
 

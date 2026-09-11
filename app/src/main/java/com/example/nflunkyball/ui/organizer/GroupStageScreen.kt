@@ -75,12 +75,13 @@ fun GroupStageScreen(
     pendingMatch?.let { (groupId, match) ->
         MatchResultDialog(
             match = match,
-            teamNames = teamNames,
+            teams = current.teams.associateBy { it.id },
             knownDrinks = viewModel.knownDrinks(),
+            existingDrinks = viewModel.drinksFor(match.id),
             onDismiss = { pendingMatch = null },
-            onConfirm = { result, drinkA, drinkB ->
+            onConfirm = { result, drinks ->
                 viewModel.recordGroupMatchResult(groupId, match.id, result)
-                viewModel.recordDrinks(match.id, drinkA, drinkB)
+                viewModel.recordDrinks(match.id, drinks)
                 pendingMatch = null
             },
             onClear = {

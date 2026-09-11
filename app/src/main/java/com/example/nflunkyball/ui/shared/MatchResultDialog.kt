@@ -4,10 +4,13 @@ import android.os.SystemClock
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
@@ -19,93 +22,128 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import com.example.nflunkyball.model.FORFEIT_FLAT_SECONDS
 import com.example.nflunkyball.model.Match
 import com.example.nflunkyball.model.MatchResult
+import com.example.nflunkyball.model.PlayerResult
+import com.example.nflunkyball.model.Team
+import com.example.nflunkyball.persistence.MatchDrinks
 import com.example.nflunkyball.ui.theme.Spacing
 import kotlinx.coroutines.delay
 
+/**
+ * Records a result: pick the winning side, then every player on the losing side gets their own
+ * independent timer and counter (drinking time plus a flat [FORFEIT_FLAT_SECONDS] per refused
+ * drink — see [PlayerResult]). For a singles match that's one loser, exactly the old flow.
+ * Drinks are per player and organizer-only (see [MatchDrinks]).
+ */
 @Composable
 fun MatchResultDialog(
     match: Match,
-    teamNames: Map<String, String>,
+    teams: Map<String, Team>,
     knownDrinks: List<String> = emptyList(),
+    existingDrinks: MatchDrinks? = null,
     onDismiss: () -> Unit,
-    onConfirm: (MatchResult, drinkA: String, drinkB: String) -> Unit,
+    onConfirm: (MatchResult, MatchDrinks) -> Unit,
     onClear: (() -> Unit)? = null
 ) {
-    var winnerId by remember { mutableStateOf(match.result?.winnerId ?: match.teamAId) }
-    var scoreText by remember { mutableStateOf(match.result?.winnerScore?.toString() ?: "") }
-    var drinkA by remember { mutableStateOf("") }
-    var drinkB by remember { mutableStateOf("") }
-    val score = scoreText.toIntOrNull()
+    val teamA = teams[match.teamAId]
+    val teamB = teams[match.teamBId]
+    val nameA = teamA?.name ?: match.teamAId
+    val nameB = teamB?.name ?: match.teamBId
+    val membersA = teamA?.memberNames ?: listOf(nameA)
+    val membersB = teamB?.memberNames ?: listOf(nameB)
 
-    // Simple start/stop stopwatch: winnerScore is already defined as elapsed seconds (see
-    // MatchResult's doc comment), so stopping it fills that field directly instead of the
-    // organizer eyeballing a separate clock. Never persisted — resets whenever the dialog reopens.
-    var timerStartMs by remember { mutableStateOf<Long?>(null) }
-    var elapsedSeconds by remember { mutableLongStateOf(0L) }
-    LaunchedEffect(timerStartMs) {
-        val startedAt = timerStartMs ?: return@LaunchedEffect
-        while (true) {
-            elapsedSeconds = (SystemClock.elapsedRealtime() - startedAt) / 1000
-            delay(200)
+    var winnerId by remember { mutableStateOf(match.result?.winnerId ?: match.teamAId) }
+    val losers = if (winnerId == match.teamAId) membersB else membersA
+    val winners = if (winnerId == match.teamAId) membersA else membersB
+
+    // Per losing player: their counter (seconds, text so it's hand-editable) and refusal count.
+    // Prefilled from an existing result when editing.
+    val secondsText = remember {
+        mutableStateMapOf<String, String>().also { map ->
+            match.result?.let { result ->
+                val losingName = if (result.winnerId == match.teamAId) nameB else nameA
+                result.loserResults(losingName).forEach { map[it.player] = it.seconds.toString() }
+            }
         }
     }
+    val forfeits = remember {
+        mutableStateMapOf<String, Int>().also { map ->
+            match.result?.let { result ->
+                val losingName = if (result.winnerId == match.teamAId) nameB else nameA
+                result.loserResults(losingName).forEach { map[it.player] = it.forfeitedDrinks }
+            }
+        }
+    }
+    val drinks = remember {
+        mutableStateMapOf<String, String>().also { map ->
+            existingDrinks?.let { existing ->
+                membersA.forEach { p -> (existing.byPlayer[p] ?: existing.teamA)?.let { map[p] = it } }
+                membersB.forEach { p -> (existing.byPlayer[p] ?: existing.teamB)?.let { map[p] = it } }
+            }
+        }
+    }
+
+    val allLosersTimed = losers.all { secondsText[it]?.toIntOrNull() != null }
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(if (match.result == null) "Record result" else "Edit result") },
         text = {
-            Column {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
                 Text("Winner", style = MaterialTheme.typography.labelMedium)
-                listOf(match.teamAId, match.teamBId).forEach { teamId ->
+                listOf(match.teamAId to nameA, match.teamBId to nameB).forEach { (teamId, name) ->
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         RadioButton(selected = winnerId == teamId, onClick = { winnerId = teamId })
-                        Text(teamNames[teamId] ?: teamId)
+                        Text(name)
                     }
                 }
                 Spacer(Modifier.height(Spacing.sm))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    TextButton(onClick = {
-                        val running = timerStartMs != null
-                        if (running) {
-                            scoreText = elapsedSeconds.toString()
-                            timerStartMs = null
-                        } else {
-                            elapsedSeconds = 0L
-                            timerStartMs = SystemClock.elapsedRealtime()
+
+                Text(
+                    if (losers.size == 1) "Loser's drink time" else "Losers' drink times (each on their own clock)",
+                    style = MaterialTheme.typography.labelMedium
+                )
+                losers.forEach { player ->
+                    LoserCounter(
+                        player = player,
+                        showName = losers.size > 1,
+                        secondsText = secondsText[player] ?: "",
+                        onSecondsChange = { secondsText[player] = it },
+                        forfeitedDrinks = forfeits[player] ?: 0,
+                        onRefusedDrink = {
+                            forfeits[player] = (forfeits[player] ?: 0) + 1
+                            secondsText[player] = ((secondsText[player]?.toIntOrNull() ?: 0) + FORFEIT_FLAT_SECONDS).toString()
+                        },
+                        onResetRefusals = {
+                            val count = forfeits[player] ?: 0
+                            forfeits[player] = 0
+                            secondsText[player] = ((secondsText[player]?.toIntOrNull() ?: 0) - count * FORFEIT_FLAT_SECONDS)
+                                .coerceAtLeast(0).toString()
                         }
-                    }) { Text(if (timerStartMs != null) "Stop timer" else "Start timer") }
-                    if (timerStartMs != null) {
-                        Text("${elapsedSeconds}s", style = MaterialTheme.typography.bodyMedium)
-                    }
+                    )
+                    Spacer(Modifier.height(Spacing.sm))
                 }
-                OutlinedTextField(
-                    value = scoreText,
-                    onValueChange = { scoreText = it.filter(Char::isDigit) },
-                    label = { Text("Winner's score (seconds, 300 = forfeit)") },
-                    singleLine = true
-                )
-                Spacer(Modifier.height(Spacing.sm))
-                DrinkField(
-                    label = "${teamNames[match.teamAId] ?: match.teamAId}'s drink",
-                    value = drinkA,
-                    onValueChange = { drinkA = it },
-                    knownDrinks = knownDrinks
-                )
-                Spacer(Modifier.height(Spacing.sm))
-                DrinkField(
-                    label = "${teamNames[match.teamBId] ?: match.teamBId}'s drink",
-                    value = drinkB,
-                    onValueChange = { drinkB = it },
-                    knownDrinks = knownDrinks
-                )
+
+                Text("Drinks", style = MaterialTheme.typography.labelMedium)
+                (membersA + membersB).forEach { player ->
+                    DrinkField(
+                        label = "$player's drink",
+                        value = drinks[player] ?: "",
+                        onValueChange = { drinks[player] = it },
+                        knownDrinks = knownDrinks
+                    )
+                    Spacer(Modifier.height(Spacing.xs))
+                }
                 // A third dialog action doesn't fit AlertDialog's confirm/dismiss slots, so it
                 // lives in the body instead — only offered once there's actually a result to undo.
                 if (match.result != null && onClear != null) {
@@ -119,12 +157,85 @@ fun MatchResultDialog(
         },
         confirmButton = {
             TextButton(
-                onClick = { onConfirm(MatchResult(winnerId = winnerId, winnerScore = score!!), drinkA, drinkB) },
-                enabled = score != null
+                onClick = {
+                    val loserResults = losers.map { player ->
+                        PlayerResult(player, secondsText[player]!!.toInt(), forfeits[player] ?: 0)
+                    }
+                    val result = MatchResult.ofLosers(winnerId, loserResults)
+                    val byPlayer = drinks.filterValues { it.isNotBlank() }
+                    val matchDrinks = MatchDrinks(
+                        teamA = byPlayer[membersA.first()],
+                        teamB = byPlayer[membersB.first()],
+                        byPlayer = byPlayer
+                    )
+                    onConfirm(result, matchDrinks)
+                },
+                enabled = allLosersTimed && winners.isNotEmpty()
             ) { Text("Save") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
     )
+}
+
+/** One losing player's counter: an independent start/stop stopwatch that fills the seconds
+ *  field, the hand-editable field itself, and a "refused a drink" action that adds the flat
+ *  forfeit amount and bumps the refusal count. Never persisted — resets when the dialog reopens. */
+@Composable
+private fun LoserCounter(
+    player: String,
+    showName: Boolean,
+    secondsText: String,
+    onSecondsChange: (String) -> Unit,
+    forfeitedDrinks: Int,
+    onRefusedDrink: () -> Unit,
+    onResetRefusals: () -> Unit
+) {
+    var timerStartMs by remember(player) { mutableStateOf<Long?>(null) }
+    var elapsedSeconds by remember(player) { mutableLongStateOf(0L) }
+    var baseSeconds by remember(player) { mutableIntStateOf(0) }
+    LaunchedEffect(timerStartMs) {
+        val startedAt = timerStartMs ?: return@LaunchedEffect
+        while (true) {
+            elapsedSeconds = (SystemClock.elapsedRealtime() - startedAt) / 1000
+            delay(200)
+        }
+    }
+
+    Column(Modifier.fillMaxWidth()) {
+        if (showName) Text(player, style = MaterialTheme.typography.bodyMedium)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            TextButton(onClick = {
+                if (timerStartMs != null) {
+                    // Stopping adds this run to whatever refusals already put on the counter.
+                    onSecondsChange((baseSeconds + elapsedSeconds.toInt()).toString())
+                    timerStartMs = null
+                } else {
+                    baseSeconds = forfeitedDrinks * FORFEIT_FLAT_SECONDS
+                    elapsedSeconds = 0L
+                    timerStartMs = SystemClock.elapsedRealtime()
+                }
+            }) { Text(if (timerStartMs != null) "Stop" else "Start timer") }
+            if (timerStartMs != null) {
+                Text("${elapsedSeconds}s", style = MaterialTheme.typography.bodyMedium)
+            }
+            TextButton(onClick = onRefusedDrink) { Text("Refused a drink") }
+        }
+        OutlinedTextField(
+            value = secondsText,
+            onValueChange = { onSecondsChange(it.filter(Char::isDigit)) },
+            label = { Text("Seconds (incl. $FORFEIT_FLAT_SECONDS per refused drink)") },
+            singleLine = true
+        )
+        if (forfeitedDrinks > 0) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "$forfeitedDrinks refused ${if (forfeitedDrinks == 1) "drink" else "drinks"}",
+                    style = MaterialTheme.typography.bodySmall
+                )
+                TextButton(onClick = onResetRefusals) { Text("Reset") }
+            }
+        }
+    }
 }
 
 @Composable

@@ -171,8 +171,8 @@ private fun NfLunkyBallApp() {
                         popUpTo("organizer/setup") { inclusive = true }
                     }
                 }
-            ) { name, teams, groups ->
-                organizerViewModel.startTournament(name, teams, groups)
+            ) { name, teams, groups, squadSize ->
+                organizerViewModel.startTournament(name, teams, groups, squadSize)
                 // Go straight to the QR/room-code screen so it's immediately shareable — but
                 // rewrite the back stack first so back-from-there lands on My Tournaments (the
                 // one place an in-progress tournament is managed from now on), not back into

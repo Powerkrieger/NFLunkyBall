@@ -74,7 +74,12 @@ fun ManagePlayersScreen(viewModel: OrganizerViewModel, onBack: () -> Unit) {
                 OutlinedTextField(
                     value = newPlayerName,
                     onValueChange = { newPlayerName = it },
-                    label = { Text("Player name") },
+                    label = {
+                        Text(
+                            if (current.squadSize > 1) "Team members (${current.squadSize}, comma-separated)"
+                            else "Player name"
+                        )
+                    },
                     modifier = Modifier.fillMaxWidth()
                 )
                 if (current.groups.size > 1) {

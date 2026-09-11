@@ -28,13 +28,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import com.example.nflunkyball.server.CompetitorRef
 import com.example.nflunkyball.server.MatchDetail
+import com.example.nflunkyball.server.MatchPlayer
 import com.example.nflunkyball.server.ServerResult
 import com.example.nflunkyball.ui.theme.Spacing
 import java.util.Locale
 
-/** One archived match, with both players and the tournament as links. */
+/** One archived match: both sides player by player, with every player and the tournament as links. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MatchDetailScreen(
@@ -47,7 +47,7 @@ fun MatchDetailScreen(
     var detail by remember { mutableStateOf<MatchDetail?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
 
-    LaunchedEffect(matchId) {
+    LaunchedEffect(matchId, viewModel.statsMode) {
         detail = null
         error = null
         when (val result = viewModel.fetchMatchDetail(matchId)) {
@@ -59,7 +59,7 @@ fun MatchDetailScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(detail?.let { "${it.competitorA.name} vs ${it.competitorB.name}" } ?: "Match") },
+                title = { Text(detail?.let { "${it.teamAName} vs ${it.teamBName}" } ?: "Match") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -93,38 +93,17 @@ fun MatchDetailScreen(
             )
             Spacer(Modifier.height(Spacing.md))
 
-            PlayerCard(
-                player = match.competitorA,
-                won = match.winner?.id == match.competitorA.id,
-                drink = match.drinkA,
-                eloBefore = match.eloBeforeA,
-                eloAfter = match.eloAfterA,
-                onOpen = { onOpenPlayer(match.competitorA.id) }
-            )
+            SideCard(name = match.teamAName, players = match.sideA, won = match.winnerIsA, onOpenPlayer = onOpenPlayer)
             Spacer(Modifier.height(Spacing.sm))
-            PlayerCard(
-                player = match.competitorB,
-                won = match.winner?.id == match.competitorB.id,
-                drink = match.drinkB,
-                eloBefore = match.eloBeforeB,
-                eloAfter = match.eloAfterB,
-                onOpen = { onOpenPlayer(match.competitorB.id) }
-            )
+            SideCard(name = match.teamBName, players = match.sideB, won = !match.winnerIsA, onOpenPlayer = onOpenPlayer)
             Spacer(Modifier.height(Spacing.md))
 
             Text("Result", style = MaterialTheme.typography.titleMedium)
-            val winner = match.winner
-            if (winner != null) {
-                val loser = if (winner.id == match.competitorA.id) match.competitorB else match.competitorA
-                Text("${winner.name} wins")
-                match.winnerScore?.let { score ->
-                    Text(
-                        if (match.forfeit) "$score · forfeit by ${loser.name}"
-                        else "$score seconds for ${loser.name} to finish their drink"
-                    )
-                }
-            } else {
-                Text("No result recorded")
+            val winningName = if (match.winnerIsA) match.teamAName else match.teamBName
+            val losers = if (match.winnerIsA) match.sideB else match.sideA
+            Text("$winningName wins")
+            losers.forEach { loser ->
+                Text(loserLine(loser, showName = losers.size > 1))
             }
             Spacer(Modifier.height(Spacing.md))
 
@@ -138,17 +117,22 @@ fun MatchDetailScreen(
     }
 }
 
+private fun loserLine(loser: MatchPlayer, showName: Boolean): String {
+    val seconds = loser.seconds ?: return if (showName) "${loser.name}: no time recorded" else "No time recorded"
+    val prefix = if (showName) "${loser.name}: " else ""
+    val refusals = when (loser.forfeitedDrinks) {
+        0 -> ""
+        1 -> " (incl. 1 refused drink)"
+        else -> " (incl. ${loser.forfeitedDrinks} refused drinks)"
+    }
+    return "$prefix$seconds seconds on the counter$refusals"
+}
+
+/** One side of the match: the squad name (or the player, for singles) and a tappable row per
+ *  member with their Elo movement and drink. */
 @Composable
-private fun PlayerCard(
-    player: CompetitorRef,
-    won: Boolean,
-    drink: String?,
-    eloBefore: Double?,
-    eloAfter: Double?,
-    onOpen: () -> Unit
-) {
+private fun SideCard(name: String, players: List<MatchPlayer>, won: Boolean, onOpenPlayer: (Int) -> Unit) {
     Card(
-        onClick = onOpen,
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
             containerColor = if (won) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
@@ -156,19 +140,32 @@ private fun PlayerCard(
     ) {
         Column(Modifier.fillMaxWidth().padding(horizontal = Spacing.md, vertical = Spacing.sm)) {
             Row(Modifier.fillMaxWidth()) {
-                Text(player.name, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                Text(name, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
                 Text(if (won) "Winner" else "Loser", style = MaterialTheme.typography.labelMedium)
             }
-            if (eloBefore != null && eloAfter != null) {
-                val delta = eloAfter - eloBefore
-                val sign = if (delta >= 0) "+" else ""
-                Text(
-                    "Elo ${"%.1f".format(Locale.US, eloBefore)} → ${"%.1f".format(Locale.US, eloAfter)} " +
-                        "($sign${"%.1f".format(Locale.US, delta)})",
-                    style = MaterialTheme.typography.bodySmall
-                )
+            players.forEach { player ->
+                Column(
+                    Modifier.fillMaxWidth().clickable { onOpenPlayer(player.id) }.padding(vertical = Spacing.xs)
+                ) {
+                    if (players.size > 1 || player.name != name) {
+                        Text(player.name, color = MaterialTheme.colorScheme.primary)
+                    }
+                    val before = player.eloBefore
+                    val after = player.eloAfter
+                    if (before != null && after != null) {
+                        val delta = after - before
+                        val sign = if (delta >= 0) "+" else ""
+                        Text(
+                            "Elo ${"%.1f".format(Locale.US, before)} → ${"%.1f".format(Locale.US, after)} " +
+                                "($sign${"%.1f".format(Locale.US, delta)})",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                    player.drink?.takeIf { it.isNotBlank() }?.let {
+                        Text("Drink: $it", style = MaterialTheme.typography.bodySmall)
+                    }
+                }
             }
-            drink?.takeIf { it.isNotBlank() }?.let { Text("Drink: $it", style = MaterialTheme.typography.bodySmall) }
         }
     }
 }

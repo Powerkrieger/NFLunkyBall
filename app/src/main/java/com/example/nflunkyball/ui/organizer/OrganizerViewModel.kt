@@ -23,6 +23,7 @@ import com.example.nflunkyball.model.TournamentPhase
 import com.example.nflunkyball.model.generateRoundRobinMatches
 import com.example.nflunkyball.persistence.AppSettingsStore
 import com.example.nflunkyball.persistence.MatchDrinkStore
+import com.example.nflunkyball.persistence.MatchDrinks
 import com.example.nflunkyball.persistence.TournamentRepository
 import com.example.nflunkyball.server.CompetitorStats
 import com.example.nflunkyball.server.Ed25519
@@ -137,7 +138,12 @@ class OrganizerViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    fun startTournament(name: String, teams: List<Team>, groupAssignments: Map<String, List<String>>) {
+    fun startTournament(
+        name: String,
+        teams: List<Team>,
+        groupAssignments: Map<String, List<String>>,
+        squadSize: Int = 1
+    ) {
         val groups = groupAssignments.map { (groupName, teamIds) ->
             val bareGroup = Group(id = UUID.randomUUID().toString(), name = groupName, teamIds = teamIds)
             bareGroup.copy(matches = bareGroup.generateRoundRobinMatches())
@@ -148,7 +154,8 @@ class OrganizerViewModel(application: Application) : AndroidViewModel(applicatio
                 name = name,
                 teams = teams,
                 groups = groups,
-                phase = TournamentPhase.GROUP_STAGE
+                phase = TournamentPhase.GROUP_STAGE,
+                squadSize = squadSize
             )
         )
     }
@@ -234,12 +241,18 @@ class OrganizerViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     /** Adds a new team to an in-progress group, generating matches against every team already
-     *  in it — existing results are untouched, only the new pairings are appended. */
+     *  in it — existing results are untouched, only the new pairings are appended. [playerName]
+     *  is one player for singles; for a squad tournament it's the members separated by commas
+     *  or "&" (the squad gets the "Anna & Ben" auto-name). */
     fun addPlayer(groupId: String, playerName: String) {
-        val name = playerName.trim()
-        if (name.isBlank()) return
+        val members = playerName.split(',', '&').map { it.trim() }.filter { it.isNotBlank() }
+        if (members.isEmpty()) return
         repository.update { t ->
-            val newTeam = Team(id = UUID.randomUUID().toString(), name = name)
+            val newTeam = if (t.squadSize > 1 || members.size > 1) {
+                Team(id = UUID.randomUUID().toString(), name = Team.autoName(members), members = members)
+            } else {
+                Team(id = UUID.randomUUID().toString(), name = members.single())
+            }
             t.copy(
                 teams = t.teams + newTeam,
                 groups = t.groups.map { g ->
@@ -356,15 +369,16 @@ class OrganizerViewModel(application: Application) : AndroidViewModel(applicatio
      *  part of what BLE broadcasting or live sync serialize. Only reaches the server via
      *  [uploadToHistory]. Each team can be drinking something different, so both are recorded
      *  independently; a match with neither entered isn't stored at all. */
-    fun recordDrinks(matchId: String, teamADrink: String, teamBDrink: String) {
-        if (teamADrink.isBlank() && teamBDrink.isBlank()) return
-        drinkStore.set(matchId, teamADrink, teamBDrink)
+    fun recordDrinks(matchId: String, drinks: MatchDrinks) {
+        drinkStore.set(matchId, drinks)
     }
 
-    /** Distinct previously-entered drinks (either team), for autocomplete suggestions when
+    fun drinksFor(matchId: String): MatchDrinks? = drinkStore.all()[matchId]
+
+    /** Distinct previously-entered drinks (any player), for autocomplete suggestions when
      *  recording a new one. */
     fun knownDrinks(): List<String> =
-        drinkStore.all().values.flatMap { listOfNotNull(it.teamA, it.teamB) }.distinct().sorted()
+        drinkStore.all().values.flatMap { listOfNotNull(it.teamA, it.teamB) + it.byPlayer.values }.distinct().sorted()
 
     /** [inviteCode] is the whole code an admin generated (bundles the server URL + token) —
      *  see InvitePayload for why the app never hardcodes a server address itself. */

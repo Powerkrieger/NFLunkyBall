@@ -13,6 +13,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Tab
@@ -39,6 +40,7 @@ import com.example.nflunkyball.model.provisionalLeaderboard
 import com.example.nflunkyball.model.provisionalPlayerStandings
 import com.example.nflunkyball.persistence.SavedTournament
 import com.example.nflunkyball.server.CompetitorStats
+import com.example.nflunkyball.server.StatsMode
 import com.example.nflunkyball.ui.organizer.OrganizerViewModel
 import com.example.nflunkyball.ui.theme.Spacing
 import java.util.Locale
@@ -160,6 +162,13 @@ fun HistoryScreen(
                     Modifier.fillMaxSize().padding(Spacing.md),
                     verticalArrangement = Arrangement.spacedBy(Spacing.xs)
                 ) {
+                    item {
+                        StatsModeSelector(
+                            selected = viewModel.statsMode,
+                            onSelect = viewModel::selectStatsMode,
+                            modifier = Modifier.padding(bottom = Spacing.sm)
+                        )
+                    }
                     items(leaderboard) { c ->
                         // c.id is -1 for a live-only team not yet in the backend's Competitor
                         // table (see mergeLiveStandings) — nothing to open a stats page for yet.
@@ -167,6 +176,16 @@ fun HistoryScreen(
                     }
                 }
             }
+        }
+    }
+}
+
+/** All / Singles / Teams lens for every server-computed stat — see [ViewerViewModel.statsMode]. */
+@Composable
+fun StatsModeSelector(selected: StatsMode, onSelect: (StatsMode) -> Unit, modifier: Modifier = Modifier) {
+    Row(modifier, horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+        StatsMode.entries.forEach { mode ->
+            FilterChip(selected = selected == mode, onClick = { onSelect(mode) }, label = { Text(mode.label) })
         }
     }
 }

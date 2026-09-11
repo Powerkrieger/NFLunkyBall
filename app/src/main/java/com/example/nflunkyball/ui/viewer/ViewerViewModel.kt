@@ -25,6 +25,7 @@ import com.example.nflunkyball.server.ServerApi
 import com.example.nflunkyball.server.TournamentDetail
 import com.example.nflunkyball.server.ServerCredentialsStore
 import com.example.nflunkyball.server.ServerResult
+import com.example.nflunkyball.server.StatsMode
 import com.example.nflunkyball.server.TournamentSummary
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -80,6 +81,22 @@ class ViewerViewModel(application: Application) : AndroidViewModel(application) 
         private set
     var playerStatsStatus by mutableStateOf<String?>(null)
         private set
+
+    /** Which matches the leaderboard and player pages count (all / singles only / team matches
+     *  only) — a view-time choice sent to the backend, which recomputes everything per request.
+     *  Session-scoped on purpose: it's a lens, not a setting. */
+    var statsMode by mutableStateOf(StatsMode.ALL)
+        private set
+
+    private var lastPlayerStatsId: Int? = null
+
+    /** Switches the lens and refreshes whatever is currently loaded under it. */
+    fun selectStatsMode(mode: StatsMode) {
+        if (mode == statsMode) return
+        statsMode = mode
+        loadHistory()
+        lastPlayerStatsId?.let { loadPlayerStats(it) }
+    }
 
     init {
         // Keep the saved entry for the current room in sync with live BLE state, so a viewer who
@@ -210,7 +227,7 @@ class ViewerViewModel(application: Application) : AndroidViewModel(application) 
                 }
                 is ServerResult.Failure -> historyStatus = result.message
             }
-            when (val result = api.listCompetitors(password)) {
+            when (val result = api.listCompetitors(password, statsMode)) {
                 is ServerResult.Success -> competitors = result.value
                 is ServerResult.Failure -> Unit
             }
@@ -224,8 +241,9 @@ class ViewerViewModel(application: Application) : AndroidViewModel(application) 
         // data under the new route (or hide a load failure behind it).
         playerStats = null
         playerStatsStatus = "Loading…"
+        lastPlayerStatsId = competitorId
         viewModelScope.launch {
-            when (val result = ServerApi(server).getCompetitorStats(competitorId, password)) {
+            when (val result = ServerApi(server).getCompetitorStats(competitorId, password, statsMode)) {
                 is ServerResult.Success -> {
                     playerStats = result.value
                     playerStatsStatus = null
@@ -275,7 +293,7 @@ class ViewerViewModel(application: Application) : AndroidViewModel(application) 
         withReadAccess { api, password -> api.getTournamentDetail(id, password) }
 
     suspend fun fetchMatchDetail(id: Int): ServerResult<MatchDetail> =
-        withReadAccess { api, password -> api.getMatchDetail(id, password) }
+        withReadAccess { api, password -> api.getMatchDetail(id, password, statsMode) }
 
     private suspend fun <T> withReadAccess(
         call: suspend (ServerApi, String) -> ServerResult<T>

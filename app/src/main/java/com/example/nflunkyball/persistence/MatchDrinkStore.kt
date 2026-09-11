@@ -34,8 +34,17 @@ class MatchDrinkStore(context: Context) {
 
     fun all(): Map<String, MatchDrinks> = cache.toMap()
 
-    fun set(matchId: String, teamADrink: String?, teamBDrink: String?) {
-        cache[matchId] = MatchDrinks(teamADrink?.trim()?.ifBlank { null }, teamBDrink?.trim()?.ifBlank { null })
+    fun set(matchId: String, drinks: MatchDrinks) {
+        val cleaned = MatchDrinks(
+            teamA = drinks.teamA?.trim()?.ifBlank { null },
+            teamB = drinks.teamB?.trim()?.ifBlank { null },
+            byPlayer = drinks.byPlayer.mapValues { it.value.trim() }.filterValues { it.isNotBlank() }
+        )
+        if (cleaned.teamA == null && cleaned.teamB == null && cleaned.byPlayer.isEmpty()) {
+            cache.remove(matchId)
+        } else {
+            cache[matchId] = cleaned
+        }
         save()
     }
 

@@ -80,6 +80,11 @@ fun PlayerStatsScreen(
         Column(
             Modifier.fillMaxSize().padding(padding).padding(Spacing.md).verticalScroll(rememberScrollState())
         ) {
+            StatsModeSelector(
+                selected = viewModel.statsMode,
+                onSelect = viewModel::selectStatsMode,
+                modifier = Modifier.padding(bottom = Spacing.sm)
+            )
             if (stats == null) {
                 Text(status ?: "Loading…", style = MaterialTheme.typography.bodyMedium)
                 return@Column
@@ -113,6 +118,9 @@ fun PlayerStatsScreen(
             stats.forfeitRate?.let {
                 Text("Forfeit rate (when losing): ${(it * 100).toInt()}%")
             }
+            if (stats.forfeitedDrinks > 0) {
+                Text("Drinks refused: ${stats.forfeitedDrinks}")
+            }
             stats.favoriteDrink?.let {
                 Text("Favorite drink: $it")
             }
@@ -129,7 +137,8 @@ fun PlayerStatsScreen(
             }
             val byMatch = remember(stats) {
                 stats.eloMatchHistory.map {
-                    EloPoint("${if (it.won) "W" else "L"} · vs ${it.opponentName} (${it.date.take(10)})", it.rating) {
+                    val with = if (it.teammates.isEmpty()) "" else " with ${it.teammates.joinToString(" & ") { t -> t.name }}"
+                    EloPoint("${if (it.won) "W" else "L"} · vs ${it.opponentName}$with (${it.date.take(10)})", it.rating) {
                         onOpenMatch(it.matchId)
                     }
                 }

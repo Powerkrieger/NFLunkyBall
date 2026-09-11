@@ -115,12 +115,13 @@ fun BracketScreen(
     pendingMatch?.let { match ->
         MatchResultDialog(
             match = match,
-            teamNames = teamNames,
+            teams = current.teams.associateBy { it.id },
             knownDrinks = viewModel.knownDrinks(),
+            existingDrinks = viewModel.drinksFor(match.id),
             onDismiss = { pendingMatch = null },
-            onConfirm = { result, drinkA, drinkB ->
+            onConfirm = { result, drinks ->
                 viewModel.recordBracketMatchResult(match.id, result)
-                viewModel.recordDrinks(match.id, drinkA, drinkB)
+                viewModel.recordDrinks(match.id, drinks)
                 pendingMatch = null
             },
             onClear = {
