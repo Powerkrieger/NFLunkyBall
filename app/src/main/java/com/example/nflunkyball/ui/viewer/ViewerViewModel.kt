@@ -176,12 +176,6 @@ class ViewerViewModel(application: Application) : AndroidViewModel(application) 
         entry.joinPayload?.let { join(it) }
     }
 
-    /** Manually forget a saved tournament — the one way to clear a duplicate entry (see
-     *  [SavedTournament]'s doc on why the same tournament can end up listed twice). */
-    fun removeSavedTournament(id: String) {
-        tournamentsStore.remove(id)
-    }
-
     fun decodeCachedTournament(cachedJson: String): Tournament? =
         runCatching { fetchJson.decodeFromString(Tournament.serializer(), cachedJson) }.getOrNull()
 
@@ -224,8 +218,11 @@ class ViewerViewModel(application: Application) : AndroidViewModel(application) 
     fun loadPlayerStats(competitorId: Int) {
         val server = resolveServerUrl() ?: return
         val password = joinPayload?.pw ?: credentialsStore.loadReadPassword() ?: return
+        // Drop the previous player's stats up front so switching players can't show the old
+        // data under the new route (or hide a load failure behind it).
+        playerStats = null
+        playerStatsStatus = "Loading…"
         viewModelScope.launch {
-            playerStatsStatus = "Loading…"
             when (val result = ServerApi(server).getCompetitorStats(competitorId, password)) {
                 is ServerResult.Success -> {
                     playerStats = result.value

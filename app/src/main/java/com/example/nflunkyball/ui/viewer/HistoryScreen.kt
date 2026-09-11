@@ -8,17 +8,12 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
@@ -35,7 +30,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.dp
 import com.example.nflunkyball.ble.BleCapability
 import com.example.nflunkyball.model.ELO_STARTING_RATING
 import com.example.nflunkyball.model.ProvisionalStanding
@@ -69,7 +63,6 @@ fun HistoryScreen(
     val watchedTournament by viewModel.tournament.collectAsState()
     var tabIndex by remember { mutableIntStateOf(0) }
     var showBluetoothOff by remember { mutableStateOf(false) }
-    var pendingRemoval by remember { mutableStateOf<SavedTournament?>(null) }
     val context = LocalContext.current
 
     if (showBluetoothOff) {
@@ -78,21 +71,6 @@ fun HistoryScreen(
             title = { Text("Bluetooth is off") },
             text = { Text("Turn on Bluetooth to reconnect and view live scores.") },
             confirmButton = { TextButton(onClick = { showBluetoothOff = false }) { Text("OK") } }
-        )
-    }
-
-    pendingRemoval?.let { entry ->
-        AlertDialog(
-            onDismissRequest = { pendingRemoval = null },
-            title = { Text("Remove \"${entry.name}\"?") },
-            text = { Text("This only removes it from this list — it doesn't affect the backend or anyone else's device.") },
-            confirmButton = {
-                TextButton(onClick = {
-                    viewModel.removeSavedTournament(entry.id)
-                    pendingRemoval = null
-                }) { Text("Remove") }
-            },
-            dismissButton = { TextButton(onClick = { pendingRemoval = null }) { Text("Cancel") } }
         )
     }
 
@@ -136,8 +114,7 @@ fun HistoryScreen(
                                         showBluetoothOff = true
                                     }
                                 }
-                            },
-                            onRemove = { pendingRemoval = entry }
+                            }
                         )
                     }
                 }
@@ -218,35 +195,18 @@ private fun HostedTournamentRow(name: String, phase: TournamentPhase, onClick: (
 }
 
 @Composable
-private fun SavedTournamentRow(entry: SavedTournament, onClick: () -> Unit, onRemove: () -> Unit) {
+private fun SavedTournamentRow(entry: SavedTournament, onClick: () -> Unit) {
     Card(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
     ) {
-        Row(
-            Modifier.fillMaxWidth().padding(start = Spacing.md, end = Spacing.xs, top = Spacing.sm, bottom = Spacing.sm),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(Modifier.weight(1f)) {
-                Text(entry.name, style = MaterialTheme.typography.titleMedium)
-                Text(
-                    if (entry.phase == TournamentPhase.FINISHED) "Finished" else "In progress · tap to reconnect",
-                    style = MaterialTheme.typography.bodySmall
-                )
-            }
-            // Muted and small on purpose — this only ever forgets a local list entry (see the
-            // confirmation dialog's text), never anything on the server, and shouldn't visually
-            // compete with a finished tournament's safely-archived row.
-            IconButton(onClick = onRemove, modifier = Modifier.size(32.dp)) {
-                Icon(
-                    Icons.Default.Delete,
-                    contentDescription = "Remove ${entry.name} from this list",
-                    tint = MaterialTheme.colorScheme.outline,
-                    modifier = Modifier.size(18.dp)
-                )
-            }
+        Column(Modifier.fillMaxWidth().padding(horizontal = Spacing.md, vertical = Spacing.sm)) {
+            Text(entry.name, style = MaterialTheme.typography.titleMedium)
+            Text(
+                if (entry.phase == TournamentPhase.FINISHED) "Finished" else "In progress · tap to reconnect",
+                style = MaterialTheme.typography.bodySmall
+            )
         }
     }
 }

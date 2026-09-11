@@ -26,7 +26,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -47,9 +46,8 @@ import com.patrykandpatrick.vico.core.cartesian.data.CartesianChartModelProducer
 import com.patrykandpatrick.vico.core.cartesian.data.LineCartesianLayerModel
 import java.util.Locale
 
-/** One point on the Elo chart, whichever granularity it came from. [won] is null for the
- *  by-tournament view (a tournament isn't a single win/loss). */
-private data class EloPoint(val label: String, val rating: Double, val won: Boolean? = null)
+/** One point on the Elo chart, whichever granularity it came from. */
+private data class EloPoint(val label: String, val rating: Double)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -82,13 +80,17 @@ fun PlayerStatsScreen(viewModel: ViewerViewModel, competitorId: Int, onBack: () 
                 "${stats.wins}W ${stats.losses}L · Elo ${"%.1f".format(Locale.US, stats.elo)}",
                 style = MaterialTheme.typography.titleMedium
             )
-            Text(
-                if (stats.currentStreak > 0) "Current streak: ${stats.currentStreak}W"
-                else if (stats.currentStreak < 0) "Current streak: ${-stats.currentStreak}L"
-                else "No matches played yet",
-                style = MaterialTheme.typography.bodyMedium
-            )
-            Text("Longest win streak: ${stats.longestWinStreak}", style = MaterialTheme.typography.bodyMedium)
+            if (stats.wins + stats.losses == 0) {
+                Text("No matches played yet", style = MaterialTheme.typography.bodyMedium)
+            } else {
+                Text(
+                    if (stats.currentStreak > 0) "Current streak: ${stats.currentStreak}W"
+                    else if (stats.currentStreak < 0) "Current streak: ${-stats.currentStreak}L"
+                    else "Current streak: none",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                Text("Longest win streak: ${stats.longestWinStreak}", style = MaterialTheme.typography.bodyMedium)
+            }
             Spacer2()
             // Both are the same underlying measurement (winnerScore = the loser's own
             // beer-finishing time, credited as the winner's score — see the backend's
@@ -108,7 +110,7 @@ fun PlayerStatsScreen(viewModel: ViewerViewModel, competitorId: Int, onBack: () 
             Spacer2()
             OpponentLine("Best matchup", stats.bestOpponent)
             OpponentLine("Toughest matchup", stats.worstOpponent)
-            OpponentLine("Most played (nemesis)", stats.nemesis)
+            OpponentLine("Nemesis (most played)", stats.nemesis)
             SimilarPlayerLine(stats.mostSimilarPlayer)
 
             val byTournament = remember(stats) {
@@ -116,7 +118,7 @@ fun PlayerStatsScreen(viewModel: ViewerViewModel, competitorId: Int, onBack: () 
             }
             val byMatch = remember(stats) {
                 stats.eloMatchHistory.map {
-                    EloPoint("vs ${it.opponentName} (${it.date.take(10)})", it.rating, it.won)
+                    EloPoint("${if (it.won) "W" else "L"} · vs ${it.opponentName} (${it.date.take(10)})", it.rating)
                 }
             }
             if (byTournament.isNotEmpty() || byMatch.isNotEmpty()) {
@@ -135,12 +137,7 @@ fun PlayerStatsScreen(viewModel: ViewerViewModel, competitorId: Int, onBack: () 
                             Modifier.fillMaxWidth().padding(vertical = Spacing.xs),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            val prefix = when (point.won) {
-                                true -> "W · "
-                                false -> "L · "
-                                null -> ""
-                            }
-                            Text("$prefix${point.label}")
+                            Text(point.label)
                             Text("%.1f".format(Locale.US, point.rating))
                         }
                         HorizontalDivider()
@@ -176,6 +173,8 @@ private fun SimilarPlayerLine(similar: SimilarPlayer?) {
 private fun EloChart(points: List<EloPoint>, modifier: Modifier = Modifier) {
     val modelProducer = remember { CartesianChartModelProducer() }
     LaunchedEffect(points) {
+        // Vico rejects an empty series outright; an empty list just leaves the chart blank.
+        if (points.isEmpty()) return@LaunchedEffect
         modelProducer.runTransaction {
             add(
                 LineCartesianLayerModel.partial {
