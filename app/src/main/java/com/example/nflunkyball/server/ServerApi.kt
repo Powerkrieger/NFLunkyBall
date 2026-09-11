@@ -62,6 +62,21 @@ data class EloHistoryEntry(
 )
 
 @Serializable
+data class EloMatchHistoryEntry(
+    @SerialName("match_id") val matchId: Int,
+    @SerialName("tournament_id") val tournamentId: Int,
+    @SerialName("tournament_name") val tournamentName: String,
+    val date: String,
+    @SerialName("opponent_id") val opponentId: Int,
+    @SerialName("opponent_name") val opponentName: String,
+    val won: Boolean,
+    val rating: Double
+)
+
+@Serializable
+data class SimilarPlayer(val id: Int, val name: String, val distance: Double)
+
+@Serializable
 data class CompetitorDetailStats(
     val id: Int,
     val name: String,
@@ -70,9 +85,16 @@ data class CompetitorDetailStats(
     val elo: Double,
     val avgSecondsWhenLost: Double?,
     val avgSecondsOpponentsWhenWon: Double?,
+    val forfeitRate: Double?,
+    val currentStreak: Int,
+    val longestWinStreak: Int,
+    val favoriteDrink: String?,
     val bestOpponent: OpponentSummary?,
     val worstOpponent: OpponentSummary?,
-    val eloHistory: List<EloHistoryEntry>
+    val nemesis: OpponentSummary?,
+    val mostSimilarPlayer: SimilarPlayer?,
+    val eloHistory: List<EloHistoryEntry>,
+    val eloMatchHistory: List<EloMatchHistoryEntry>
 )
 
 @Serializable

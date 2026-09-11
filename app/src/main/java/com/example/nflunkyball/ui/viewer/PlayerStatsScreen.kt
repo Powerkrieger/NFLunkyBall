@@ -18,16 +18,21 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.example.nflunkyball.server.EloHistoryEntry
 import com.example.nflunkyball.server.OpponentSummary
+import com.example.nflunkyball.server.SimilarPlayer
 import com.example.nflunkyball.ui.theme.Spacing
 import com.patrykandpatrick.vico.compose.cartesian.CartesianChartHost
 import com.patrykandpatrick.vico.compose.cartesian.axis.rememberBottom
@@ -41,6 +46,10 @@ import com.patrykandpatrick.vico.core.cartesian.axis.VerticalAxis
 import com.patrykandpatrick.vico.core.cartesian.data.CartesianChartModelProducer
 import com.patrykandpatrick.vico.core.cartesian.data.LineCartesianLayerModel
 import java.util.Locale
+
+/** One point on the Elo chart, whichever granularity it came from. [won] is null for the
+ *  by-tournament view (a tournament isn't a single win/loss). */
+private data class EloPoint(val label: String, val rating: Double, val won: Boolean? = null)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -73,29 +82,66 @@ fun PlayerStatsScreen(viewModel: ViewerViewModel, competitorId: Int, onBack: () 
                 "${stats.wins}W ${stats.losses}L · Elo ${"%.1f".format(Locale.US, stats.elo)}",
                 style = MaterialTheme.typography.titleMedium
             )
+            Text(
+                if (stats.currentStreak > 0) "Current streak: ${stats.currentStreak}W"
+                else if (stats.currentStreak < 0) "Current streak: ${-stats.currentStreak}L"
+                else "No matches played yet",
+                style = MaterialTheme.typography.bodyMedium
+            )
+            Text("Longest win streak: ${stats.longestWinStreak}", style = MaterialTheme.typography.bodyMedium)
             Spacer2()
+            // Both are the same underlying measurement (winnerScore = the loser's own
+            // beer-finishing time, credited as the winner's score — see the backend's
+            // player_detail_stats doc) viewed from either side of this player's matches.
             stats.avgSecondsWhenLost?.let {
-                Text("Avg. seconds to finish their beer when they lose: ${"%.1f".format(Locale.US, it)}")
+                Text("When they lose, they average ${"%.1f".format(Locale.US, it)}s to finish their drink")
             }
             stats.avgSecondsOpponentsWhenWon?.let {
-                Text("Avg. seconds their opponents take to beat them: ${"%.1f".format(Locale.US, it)}")
+                Text("When they win, their opponent averages ${"%.1f".format(Locale.US, it)}s to finish theirs")
+            }
+            stats.forfeitRate?.let {
+                Text("Forfeit rate (when losing): ${(it * 100).toInt()}%")
+            }
+            stats.favoriteDrink?.let {
+                Text("Favorite drink: $it")
             }
             Spacer2()
             OpponentLine("Best matchup", stats.bestOpponent)
             OpponentLine("Toughest matchup", stats.worstOpponent)
+            OpponentLine("Most played (nemesis)", stats.nemesis)
+            SimilarPlayerLine(stats.mostSimilarPlayer)
 
-            if (stats.eloHistory.isNotEmpty()) {
+            val byTournament = remember(stats) {
+                stats.eloHistory.map { EloPoint("${it.tournamentName} (${it.date.take(10)})", it.rating) }
+            }
+            val byMatch = remember(stats) {
+                stats.eloMatchHistory.map {
+                    EloPoint("vs ${it.opponentName} (${it.date.take(10)})", it.rating, it.won)
+                }
+            }
+            if (byTournament.isNotEmpty() || byMatch.isNotEmpty()) {
                 Spacer2()
                 Text("Elo over time", style = MaterialTheme.typography.titleMedium)
-                EloChart(stats.eloHistory, modifier = Modifier.padding(top = Spacing.sm))
+                var granularity by remember { mutableIntStateOf(0) }
+                TabRow(selectedTabIndex = granularity) {
+                    Tab(selected = granularity == 0, onClick = { granularity = 0 }, text = { Text("By tournament") })
+                    Tab(selected = granularity == 1, onClick = { granularity = 1 }, text = { Text("By match") })
+                }
+                val points = if (granularity == 0) byTournament else byMatch
+                EloChart(points, modifier = Modifier.padding(top = Spacing.sm))
                 Column(Modifier.padding(top = Spacing.sm)) {
-                    stats.eloHistory.forEach { entry ->
+                    points.forEach { point ->
                         Row(
                             Modifier.fillMaxWidth().padding(vertical = Spacing.xs),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Text("${entry.tournamentName} (${entry.date.take(10)})")
-                            Text("%.1f".format(Locale.US, entry.rating))
+                            val prefix = when (point.won) {
+                                true -> "W · "
+                                false -> "L · "
+                                null -> ""
+                            }
+                            Text("$prefix${point.label}")
+                            Text("%.1f".format(Locale.US, point.rating))
                         }
                         HorizontalDivider()
                     }
@@ -122,13 +168,18 @@ private fun OpponentLine(label: String, opponent: OpponentSummary?) {
 }
 
 @Composable
-private fun EloChart(history: List<EloHistoryEntry>, modifier: Modifier = Modifier) {
+private fun SimilarPlayerLine(similar: SimilarPlayer?) {
+    Text(if (similar != null) "Most similar player: ${similar.name}" else "Most similar player: not enough data yet")
+}
+
+@Composable
+private fun EloChart(points: List<EloPoint>, modifier: Modifier = Modifier) {
     val modelProducer = remember { CartesianChartModelProducer() }
-    LaunchedEffect(history) {
+    LaunchedEffect(points) {
         modelProducer.runTransaction {
             add(
                 LineCartesianLayerModel.partial {
-                    series(history.indices.map { it.toDouble() }, history.map { it.rating })
+                    series(points.indices.map { it.toDouble() }, points.map { it.rating })
                 }
             )
         }

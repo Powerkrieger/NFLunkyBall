@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -34,6 +35,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
 import com.example.nflunkyball.ble.BleCapability
 import com.example.nflunkyball.model.ELO_STARTING_RATING
 import com.example.nflunkyball.model.ProvisionalStanding
@@ -234,8 +236,16 @@ private fun SavedTournamentRow(entry: SavedTournament, onClick: () -> Unit, onRe
                     style = MaterialTheme.typography.bodySmall
                 )
             }
-            IconButton(onClick = onRemove) {
-                Icon(Icons.Default.Delete, contentDescription = "Remove ${entry.name} from this list")
+            // Muted and small on purpose — this only ever forgets a local list entry (see the
+            // confirmation dialog's text), never anything on the server, and shouldn't visually
+            // compete with a finished tournament's safely-archived row.
+            IconButton(onClick = onRemove, modifier = Modifier.size(32.dp)) {
+                Icon(
+                    Icons.Default.Delete,
+                    contentDescription = "Remove ${entry.name} from this list",
+                    tint = MaterialTheme.colorScheme.outline,
+                    modifier = Modifier.size(18.dp)
+                )
             }
         }
     }
