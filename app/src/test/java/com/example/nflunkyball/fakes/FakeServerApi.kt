@@ -3,6 +3,9 @@ package com.example.nflunkyball.fakes
 import com.example.nflunkyball.server.AccountStatus
 import com.example.nflunkyball.server.CompetitorDetailStats
 import com.example.nflunkyball.server.CompetitorStats
+import com.example.nflunkyball.server.EloRace
+import com.example.nflunkyball.server.HeadToHeadGrid
+import com.example.nflunkyball.server.PlayerMap
 import com.example.nflunkyball.server.MatchDetail
 import com.example.nflunkyball.server.RegisterResponse
 import com.example.nflunkyball.server.ServerApi
@@ -35,6 +38,9 @@ class FakeServerApi(val baseUrl: String = "https://example.test") : ServerApi {
     var tournamentDetailResult: ServerResult<TournamentDetail> = notStubbed()
     var matchDetailResult: ServerResult<MatchDetail> = notStubbed()
     var competitorStatsResult: ServerResult<CompetitorDetailStats> = notStubbed()
+    var playerMapResult: ServerResult<PlayerMap> = notStubbed()
+    var headToHeadResult: ServerResult<HeadToHeadGrid> = notStubbed()
+    var eloRaceResult: ServerResult<EloRace> = notStubbed()
 
     override suspend fun register(inviteToken: String, publicKeyBase64: String): ServerResult<RegisterResponse> {
         registrations += inviteToken to publicKeyBase64
@@ -62,6 +68,9 @@ class FakeServerApi(val baseUrl: String = "https://example.test") : ServerApi {
     override suspend fun getMatchDetail(id: Int, readPassword: String, mode: StatsMode) = matchDetailResult
     override suspend fun listCompetitors(readPassword: String, mode: StatsMode) = competitorsResult
     override suspend fun getCompetitorStats(id: Int, readPassword: String, mode: StatsMode) = competitorStatsResult
+    override suspend fun getPlayerMap(readPassword: String, mode: StatsMode) = playerMapResult
+    override suspend fun getHeadToHead(readPassword: String, mode: StatsMode) = headToHeadResult
+    override suspend fun getEloRace(readPassword: String, mode: StatsMode, limit: Int) = eloRaceResult
     override suspend fun getAccountStatus(accountId: Int, readPassword: String) = accountStatusResult
 
     private fun notStubbed() = ServerResult.Failure("not stubbed")

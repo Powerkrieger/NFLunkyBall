@@ -127,6 +127,28 @@ class KtorServerApi(private val baseUrl: String) : ServerApi {
         }.body()
     }
 
+    override suspend fun getPlayerMap(readPassword: String, mode: StatsMode): ServerResult<PlayerMap> = serverCall {
+        client.get("$baseUrl/competitors/map") {
+            parameter("mode", mode.query)
+            header("X-Read-Password", readPassword)
+        }.body()
+    }
+
+    override suspend fun getHeadToHead(readPassword: String, mode: StatsMode): ServerResult<HeadToHeadGrid> = serverCall {
+        client.get("$baseUrl/competitors/head-to-head") {
+            parameter("mode", mode.query)
+            header("X-Read-Password", readPassword)
+        }.body()
+    }
+
+    override suspend fun getEloRace(readPassword: String, mode: StatsMode, limit: Int): ServerResult<EloRace> = serverCall {
+        client.get("$baseUrl/competitors/elo-race") {
+            parameter("mode", mode.query)
+            parameter("limit", limit)
+            header("X-Read-Password", readPassword)
+        }.body()
+    }
+
     override suspend fun getAccountStatus(accountId: Int, readPassword: String): ServerResult<AccountStatus> = serverCall {
         client.get("$baseUrl/accounts/$accountId") {
             header("X-Read-Password", readPassword)

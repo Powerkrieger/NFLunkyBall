@@ -229,6 +229,25 @@
     <string name="settings_language_title">Sprache</string>
     <string name="settings_language_body">„System“ folgt der Gerätesprache und fällt auf Englisch zurück, wo die App nicht übersetzt ist.</string>
     <string name="language_system">System</string>
+    <string name="dim_win_rate">Siegquote</string>
+    <string name="dim_elo">Elo</string>
+    <string name="dim_own_drink_time">Eigene Trinkzeit</string>
+    <string name="dim_opponent_drink_time">Trinkzeit der Gegner</string>
+    <string name="dim_forfeits">Verweigerungen</string>
+    <string name="dim_matches">Gespielte Spiele</string>
+    <string name="map_axis_x">→ %1$s</string>
+    <string name="map_axis_y">↑ %1$s</string>
+    <string name="player_profile_title">Profil</string>
+    <string name="player_profile_hint">Jeder Wert skaliert vom niedrigsten (Mitte) bis zum höchsten (Rand) der Gruppe, mit dem ähnlichsten Spieler darübergelegt.</string>
+    <string name="player_map_title">Spielerkarte</string>
+    <string name="player_map_hint">Alle nach Ähnlichkeit ihrer Werte angeordnet — der nächste Punkt ist der ähnlichste Spieler. Tippe auf einen Punkt, um ihn zu öffnen.</string>
+    <string name="history_tab_charts">Diagramme</string>
+    <string name="charts_elo_race">Elo-Rennen</string>
+    <string name="charts_elo_race_hint">Die Wertung der besten Spieler nach jedem Turnier. Tippe auf einen Namen, um ihn zu öffnen.</string>
+    <string name="charts_map_hint">Alle nach Ähnlichkeit ihrer Werte angeordnet; nah beieinander heißt ähnliche Spieler. Tippe auf einen Punkt, um ihn zu öffnen.</string>
+    <string name="charts_h2h">Direktvergleich</string>
+    <string name="charts_h2h_hint">Jede Zelle: die Siege des Zeilenspielers gegen den Spaltenspieler. Nach Elo sortiert; tippe auf einen Namen, um ihn zu öffnen.</string>
+    <string name="h2h_legend">Grün = Zeilenspieler gewinnt meist, rot = verliert meist, grau = nie gespielt.</string>
 
     <plurals name="result_refused_count">
         <item quantity="one">%1$d verweigertes Getränk</item>

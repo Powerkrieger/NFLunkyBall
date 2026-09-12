@@ -14,6 +14,9 @@ import com.example.nflunkyball.persistence.ViewerTournamentsStore
 import com.example.nflunkyball.qr.JoinPayload
 import com.example.nflunkyball.server.CompetitorDetailStats
 import com.example.nflunkyball.server.CompetitorStats
+import com.example.nflunkyball.server.EloRace
+import com.example.nflunkyball.server.HeadToHeadGrid
+import com.example.nflunkyball.server.PlayerMap
 import com.example.nflunkyball.server.CredentialsStore
 import com.example.nflunkyball.server.MatchDetail
 import com.example.nflunkyball.server.ServerApi
@@ -76,6 +79,17 @@ class ViewerViewModel(
     private val _matchDetail = MutableStateFlow<LoadState<MatchDetail>>(LoadState.Idle)
     val matchDetail: StateFlow<LoadState<MatchDetail>> = _matchDetail
 
+    // Group-wide charts (Leaderboard → Charts, and the player page's map/radar). Loaded on
+    // demand and re-fetched under a new stats-mode lens like everything else.
+    private val _playerMap = MutableStateFlow<LoadState<PlayerMap>>(LoadState.Idle)
+    val playerMap: StateFlow<LoadState<PlayerMap>> = _playerMap
+
+    private val _headToHead = MutableStateFlow<LoadState<HeadToHeadGrid>>(LoadState.Idle)
+    val headToHead: StateFlow<LoadState<HeadToHeadGrid>> = _headToHead
+
+    private val _eloRace = MutableStateFlow<LoadState<EloRace>>(LoadState.Idle)
+    val eloRace: StateFlow<LoadState<EloRace>> = _eloRace
+
     /** Which matches the leaderboard and player pages count (all / singles only / team matches
      *  only) — a view-time choice sent to the backend, which recomputes everything per request.
      *  Session-scoped on purpose: it's a lens, not a setting. */
@@ -92,6 +106,17 @@ class ViewerViewModel(
         loadHistory()
         lastPlayerStatsId?.let { loadPlayerStats(it) }
         lastMatchId?.let { loadMatchDetail(it) }
+        if (_playerMap.value != LoadState.Idle) loadPlayerMap()
+        if (_headToHead.value != LoadState.Idle || _eloRace.value != LoadState.Idle) loadGroupCharts()
+    }
+
+    fun loadPlayerMap() = load(_playerMap) { api, password -> api.getPlayerMap(password, _statsMode.value) }
+
+    /** The Leaderboard's Charts tab: everything at once. */
+    fun loadGroupCharts() {
+        loadPlayerMap()
+        load(_headToHead) { api, password -> api.getHeadToHead(password, _statsMode.value) }
+        load(_eloRace) { api, password -> api.getEloRace(password, _statsMode.value) }
     }
 
     init {

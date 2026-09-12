@@ -48,6 +48,11 @@ import com.example.nflunkyball.ui.shared.format1
 import com.example.nflunkyball.ui.shared.formatSigned1
 import com.example.nflunkyball.server.UploadState
 import com.example.nflunkyball.ui.LoadState
+import com.example.nflunkyball.ui.shared.charts.EloRaceChart
+import com.example.nflunkyball.ui.shared.charts.HeadToHeadHeatmap
+import com.example.nflunkyball.ui.shared.charts.PlayerMapChart
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import com.example.nflunkyball.ui.theme.Spacing
 
 /** [hostedTournament] is the organizer side's own tournament, if this device is hosting one.
@@ -176,8 +181,11 @@ fun HistoryScreen(
                     text = { Text(stringResource(R.string.history_tab_this)) }
                 )
                 Tab(selected = leaderboardTab == 1, onClick = { leaderboardTab = 1 }, text = { Text(stringResource(R.string.history_tab_global)) })
+                Tab(selected = leaderboardTab == 2, onClick = { leaderboardTab = 2 }, text = { Text(stringResource(R.string.history_tab_charts)) })
             }
-            if (leaderboardTab == 0) {
+            if (leaderboardTab == 2) {
+                GroupCharts(viewModel, onOpenPlayer)
+            } else if (leaderboardTab == 0) {
                 if (currentTournament == null) {
                     Box(Modifier.fillMaxSize().padding(Spacing.md), contentAlignment = Alignment.TopCenter) {
                         Text(stringResource(R.string.history_none_in_progress), style = MaterialTheme.typography.bodyMedium)
@@ -219,6 +227,42 @@ fun HistoryScreen(
                 }
             }
         }
+    }
+}
+
+/** Leaderboard → Charts: the group-wide plots (Elo race, player map, head-to-head), all under
+ *  the same stats-mode lens as the lists. */
+@Composable
+private fun GroupCharts(viewModel: ViewerViewModel, onOpenPlayer: (Int) -> Unit) {
+    LaunchedEffect(Unit) { viewModel.loadGroupCharts() }
+    val statsMode by viewModel.statsMode.collectAsState()
+    val race by viewModel.eloRace.collectAsState()
+    val map by viewModel.playerMap.collectAsState()
+    val h2h by viewModel.headToHead.collectAsState()
+
+    Column(Modifier.fillMaxSize().padding(Spacing.md).verticalScroll(rememberScrollState())) {
+        StatsModeSelector(selected = statsMode, onSelect = viewModel::selectStatsMode, modifier = Modifier.padding(bottom = Spacing.sm))
+
+        ChartSection(stringResource(R.string.charts_elo_race), stringResource(R.string.charts_elo_race_hint), race) {
+            EloRaceChart(it, onOpenPlayer)
+        }
+        ChartSection(stringResource(R.string.player_map_title), stringResource(R.string.charts_map_hint), map) {
+            PlayerMapChart(it, highlightId = null, linkToId = null, onOpenPlayer = onOpenPlayer)
+        }
+        ChartSection(stringResource(R.string.charts_h2h), stringResource(R.string.charts_h2h_hint), h2h) {
+            HeadToHeadHeatmap(it, onOpenPlayer)
+        }
+    }
+}
+
+@Composable
+private fun <T> ChartSection(title: String, hint: String, state: LoadState<T>, content: @Composable (T) -> Unit) {
+    Text(title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = Spacing.md))
+    Text(hint, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(bottom = Spacing.sm))
+    when (val s = state) {
+        is LoadState.Loaded -> content(s.value)
+        is LoadState.Failed -> Text(s.text(), color = MaterialTheme.colorScheme.error)
+        LoadState.Idle, LoadState.Loading -> Text(stringResource(R.string.loading), style = MaterialTheme.typography.bodyMedium)
     }
 }
 

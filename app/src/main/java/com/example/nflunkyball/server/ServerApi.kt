@@ -26,6 +26,9 @@ interface ServerApi {
     suspend fun getMatchDetail(id: Int, readPassword: String, mode: StatsMode = StatsMode.ALL): ServerResult<MatchDetail>
     suspend fun listCompetitors(readPassword: String, mode: StatsMode = StatsMode.ALL): ServerResult<List<CompetitorStats>>
     suspend fun getCompetitorStats(id: Int, readPassword: String, mode: StatsMode = StatsMode.ALL): ServerResult<CompetitorDetailStats>
+    suspend fun getPlayerMap(readPassword: String, mode: StatsMode = StatsMode.ALL): ServerResult<PlayerMap>
+    suspend fun getHeadToHead(readPassword: String, mode: StatsMode = StatsMode.ALL): ServerResult<HeadToHeadGrid>
+    suspend fun getEloRace(readPassword: String, mode: StatsMode = StatsMode.ALL, limit: Int = 8): ServerResult<EloRace>
     /** Lets a linked device check whether its own account still works (e.g. an admin revoked
      *  it) — see SettingsScreen's "Organizer account" section. */
     suspend fun getAccountStatus(accountId: Int, readPassword: String): ServerResult<AccountStatus>

@@ -33,6 +33,10 @@ import com.example.nflunkyball.server.SimilarPlayer
 import com.example.nflunkyball.ui.shared.BackTopBar
 import com.example.nflunkyball.ui.shared.format1
 import com.example.nflunkyball.ui.LoadState
+import com.example.nflunkyball.ui.shared.charts.PlayerMapChart
+import com.example.nflunkyball.ui.shared.charts.RadarChart
+import com.example.nflunkyball.ui.shared.charts.RadarSeries
+import com.example.nflunkyball.ui.shared.charts.dimensionLabel
 import com.example.nflunkyball.ui.valueOrNull
 import androidx.compose.runtime.collectAsState
 import com.example.nflunkyball.ui.theme.Spacing
@@ -61,8 +65,9 @@ fun PlayerStatsScreen(
     onOpenMatch: (Int) -> Unit,
     onOpenTournament: (Int) -> Unit
 ) {
-    LaunchedEffect(competitorId) { viewModel.loadPlayerStats(competitorId) }
+    LaunchedEffect(competitorId) { viewModel.loadPlayerStats(competitorId); viewModel.loadPlayerMap() }
     val state by viewModel.playerStats.collectAsState()
+    val mapState by viewModel.playerMap.collectAsState()
     val stats = state.valueOrNull
     val statsMode by viewModel.statsMode.collectAsState()
 
@@ -123,6 +128,34 @@ fun PlayerStatsScreen(
             OpponentLine(stringResource(R.string.player_toughest_matchup), stats.worstOpponent, onOpenPlayer)
             OpponentLine(stringResource(R.string.player_nemesis), stats.nemesis, onOpenPlayer)
             SimilarPlayerLine(stats.mostSimilarPlayer, onOpenPlayer)
+
+            mapState.valueOrNull?.let { map ->
+                val me = map.points.firstOrNull { it.id == competitorId }
+                val similar = stats.mostSimilarPlayer?.let { s -> map.points.firstOrNull { it.id == s.id } }
+                if (me != null) {
+                    Spacer2()
+                    Text(stringResource(R.string.player_profile_title), style = MaterialTheme.typography.titleMedium)
+                    Text(stringResource(R.string.player_profile_hint), style = MaterialTheme.typography.bodySmall)
+                    RadarChart(
+                        axisLabels = map.dimensions.map { dimensionLabel(it) },
+                        series = listOfNotNull(
+                            RadarSeries(me.name, map.dimensions.map { me.profile[it] ?: 0.0 }, MaterialTheme.colorScheme.primary),
+                            similar?.let { RadarSeries(it.name, map.dimensions.map { d -> it.profile[d] ?: 0.0 }, MaterialTheme.colorScheme.secondary) }
+                        ),
+                        modifier = Modifier.padding(top = Spacing.sm)
+                    )
+                    Spacer2()
+                    Text(stringResource(R.string.player_map_title), style = MaterialTheme.typography.titleMedium)
+                    Text(stringResource(R.string.player_map_hint), style = MaterialTheme.typography.bodySmall)
+                    PlayerMapChart(
+                        map = map,
+                        highlightId = competitorId,
+                        linkToId = stats.mostSimilarPlayer?.id,
+                        onOpenPlayer = onOpenPlayer,
+                        modifier = Modifier.padding(top = Spacing.sm)
+                    )
+                }
+            }
 
             val tournamentPointFormat = stringResource(R.string.player_elo_point_tournament)
             val matchPointFormat = stringResource(R.string.player_elo_point_match)

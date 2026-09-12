@@ -238,6 +238,25 @@
     <string name="settings_language_title">Language</string>
     <string name="settings_language_body">System follows your device language and falls back to English where the app isn\'t translated.</string>
     <string name="language_system">System</string>
+    <string name="dim_win_rate">Win rate</string>
+    <string name="dim_elo">Elo</string>
+    <string name="dim_own_drink_time">Own drink time</string>
+    <string name="dim_opponent_drink_time">Opponents\' drink time</string>
+    <string name="dim_forfeits">Forfeits</string>
+    <string name="dim_matches">Matches played</string>
+    <string name="map_axis_x">→ %1$s</string>
+    <string name="map_axis_y">↑ %1$s</string>
+    <string name="player_profile_title">Profile</string>
+    <string name="player_profile_hint">Each stat scaled from the group\'s lowest (centre) to highest (edge), with the most similar player overlaid.</string>
+    <string name="player_map_title">Player map</string>
+    <string name="player_map_hint">Everyone placed by how alike their stats are — the nearest dot is the most similar player. Tap a dot to open them.</string>
+    <string name="history_tab_charts">Charts</string>
+    <string name="charts_elo_race">Elo race</string>
+    <string name="charts_elo_race_hint">The top players\' rating after each tournament. Tap a name to open them.</string>
+    <string name="charts_map_hint">Everyone placed by how alike their stats are; close together means similar players. Tap a dot to open them.</string>
+    <string name="charts_h2h">Head to head</string>
+    <string name="charts_h2h_hint">Each cell: the row player\'s wins against the column player. Ordered by Elo; tap a name to open them.</string>
+    <string name="h2h_legend">Green = row player mostly wins, red = mostly loses, grey = never played.</string>
 
     <plurals name="result_refused_count">
         <item quantity="one">%1$d refused drink</item>

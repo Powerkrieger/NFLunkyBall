@@ -171,6 +171,44 @@ data class TournamentDetail(
     val competitorIds: Map<String, Int>
 )
 
+/** One principal axis of the player map: how much each stat dimension contributes, and the
+ *  share of variance it explains. */
+@Serializable
+data class MapAxis(val loadings: Map<String, Double>, val explained: Double)
+
+/** A player on the 2D similarity map. [profile] is each stat scaled 0..1 across the group (for
+ *  the radar), [raw] the underlying values (null where a player has no such stat yet). */
+@Serializable
+data class MapPoint(
+    val id: Int,
+    val name: String,
+    val x: Double,
+    val y: Double,
+    val profile: Map<String, Double>,
+    val raw: Map<String, Double?>
+)
+
+/** The backend's PCA of its similarity feature space — see `player_map` in `app/stats.py`. */
+@Serializable
+data class PlayerMap(val dimensions: List<String>, val axes: List<MapAxis>, val points: List<MapPoint>)
+
+/** Matches and wins between one unordered pair of players (a < b). */
+@Serializable
+data class HeadToHeadCell(val a: Int, val b: Int, val matches: Int, val winsA: Int)
+
+@Serializable
+data class HeadToHeadGrid(val players: List<CompetitorRef>, val cells: List<HeadToHeadCell>)
+
+@Serializable
+data class RaceTournament(val id: Int, val name: String, val date: String)
+
+/** One player's rating after each tournament in [EloRace.tournaments]; null before they first played. */
+@Serializable
+data class RaceSeries(val id: Int, val name: String, val ratings: List<Double?>)
+
+@Serializable
+data class EloRace(val tournaments: List<RaceTournament>, val series: List<RaceSeries>)
+
 @Serializable
 data class AccountStatus(
     val id: Int,
