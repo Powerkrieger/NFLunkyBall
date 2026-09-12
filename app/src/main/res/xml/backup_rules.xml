@@ -1,8 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Credentials are encrypted under an Android Keystore key that never leaves this device, so
-     a restored copy would be undecryptable noise — keep both the current and the legacy prefs
-     file out of Auto Backup (API < 31; see data_extraction_rules.xml for API 31+). -->
+     a restored copy would be undecryptable noise — keep the prefs file out of Auto Backup (API < 31; see data_extraction_rules.xml for API 31+). -->
 <full-backup-content>
     <exclude domain="sharedpref" path="credentials.xml" />
-    <exclude domain="sharedpref" path="server_credentials.xml" />
 </full-backup-content>

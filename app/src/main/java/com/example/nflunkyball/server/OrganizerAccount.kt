@@ -1,9 +1,5 @@
 package com.example.nflunkyball.server
 
-import android.content.Context
-import android.util.Base64
-import androidx.security.crypto.EncryptedSharedPreferences
-import androidx.security.crypto.MasterKey
 
 data class OrganizerAccount(
     val accountId: Int,
@@ -33,78 +29,4 @@ interface CredentialsStore {
      *  organizer (the read password unlocks history for viewers too; see [OrganizerViewModel.unlinkAccount]
      *  for why unlinking shouldn't reach further than the account itself). */
     fun clearAccount()
-}
-
-/**
- * The pre-v0.11 [CredentialsStore] on Jetpack `EncryptedSharedPreferences` (deprecated along
- * with the whole androidx.security library). Kept only so [LegacyCredentialsMigration] can read
- * existing installs' credentials once and move them to [KeystoreCredentialsStore]; delete this
- * class and the `androidx.security:security-crypto` dependency together once every install has
- * been through a v0.11.x start.
- */
-@Suppress("DEPRECATION")
-class LegacyServerCredentialsStore(context: Context) : CredentialsStore {
-
-    private val prefs = EncryptedSharedPreferences.create(
-        context,
-        PREFS_NAME,
-        MasterKey.Builder(context).setKeyScheme(MasterKey.KeyScheme.AES256_GCM).build(),
-        EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-        EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-    )
-
-    override fun loadAccount(): OrganizerAccount? {
-        val accountId = prefs.getInt(KEY_ACCOUNT_ID, -1)
-        if (accountId == -1) return null
-        val displayName = prefs.getString(KEY_DISPLAY_NAME, null) ?: return null
-        val serverUrl = prefs.getString(KEY_SERVER_URL, null) ?: return null
-        val privateKeySeed = prefs.getString(KEY_PRIVATE_KEY, null)
-            ?.let { Base64.decode(it, Base64.NO_WRAP) } ?: return null
-        val publicKeyBytes = prefs.getString(KEY_PUBLIC_KEY, null)
-            ?.let { Base64.decode(it, Base64.NO_WRAP) } ?: return null
-        return OrganizerAccount(accountId, displayName, serverUrl, privateKeySeed, publicKeyBytes)
-    }
-
-    override fun saveAccount(account: OrganizerAccount) {
-        prefs.edit()
-            .putInt(KEY_ACCOUNT_ID, account.accountId)
-            .putString(KEY_DISPLAY_NAME, account.displayName)
-            .putString(KEY_SERVER_URL, account.serverUrl)
-            .putString(KEY_PRIVATE_KEY, Base64.encodeToString(account.privateKeySeed, Base64.NO_WRAP))
-            .putString(KEY_PUBLIC_KEY, Base64.encodeToString(account.publicKeyBytes, Base64.NO_WRAP))
-            .apply()
-    }
-
-    override fun loadReadPassword(): String? = prefs.getString(KEY_READ_PASSWORD, null)
-
-    override fun saveReadPassword(password: String) {
-        prefs.edit().putString(KEY_READ_PASSWORD, password).apply()
-    }
-
-    override fun loadViewerServerUrl(): String? = prefs.getString(KEY_VIEWER_SERVER_URL, null)
-
-    override fun saveViewerServerUrl(serverUrl: String) {
-        prefs.edit().putString(KEY_VIEWER_SERVER_URL, serverUrl).apply()
-    }
-
-    override fun clearAccount() {
-        prefs.edit()
-            .remove(KEY_ACCOUNT_ID)
-            .remove(KEY_DISPLAY_NAME)
-            .remove(KEY_SERVER_URL)
-            .remove(KEY_PRIVATE_KEY)
-            .remove(KEY_PUBLIC_KEY)
-            .apply()
-    }
-
-    companion object {
-        const val PREFS_NAME = "server_credentials"
-        private const val KEY_ACCOUNT_ID = "account_id"
-        private const val KEY_DISPLAY_NAME = "display_name"
-        private const val KEY_SERVER_URL = "server_url"
-        private const val KEY_PRIVATE_KEY = "private_key_seed"
-        private const val KEY_PUBLIC_KEY = "public_key"
-        private const val KEY_READ_PASSWORD = "read_password"
-        private const val KEY_VIEWER_SERVER_URL = "viewer_server_url"
-    }
 }

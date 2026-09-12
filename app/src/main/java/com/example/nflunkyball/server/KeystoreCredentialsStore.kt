@@ -8,9 +8,8 @@ import kotlin.io.encoding.ExperimentalEncodingApi
 /**
  * [CredentialsStore] on plain SharedPreferences with every value encrypted by a [SecretCipher]
  * — on device, AES-GCM under an Android Keystore key (see [AesGcmCipher.androidKeystoreKey]).
- * Replaces the deprecated Jetpack `EncryptedSharedPreferences`, which did the same thing via
- * Tink; existing installs are carried over once by [LegacyCredentialsMigration]. Only the fixed
- * key names are plaintext; they carry no information.
+ * Replaced the deprecated Jetpack `EncryptedSharedPreferences` in v0.11 (which did the same
+ * thing via Tink). Only the fixed key names are plaintext; they carry no information.
  *
  * Any value that fails to decrypt makes the whole account read as absent: a half-usable
  * account (id but no key) would only produce confusing sync failures.
