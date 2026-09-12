@@ -1,5 +1,8 @@
 package com.example.nflunkyball.ui.viewer
 
+import com.example.nflunkyball.ui.text
+import androidx.compose.ui.res.stringResource
+import com.example.nflunkyball.R
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.getValue
 import androidx.compose.foundation.clickable
@@ -82,39 +85,39 @@ fun HistoryScreen(
     if (showDiscardConfirm) {
         AlertDialog(
             onDismissRequest = { showDiscardConfirm = false },
-            title = { Text("Discard finished tournament?") },
-            text = { Text("It was never uploaded, so all its results will be lost. This can't be undone.") },
+            title = { Text(stringResource(R.string.history_discard_title)) },
+            text = { Text(stringResource(R.string.history_discard_body)) },
             confirmButton = {
-                TextButton(onClick = { showDiscardConfirm = false; onDiscardHosted() }) { Text("Discard") }
+                TextButton(onClick = { showDiscardConfirm = false; onDiscardHosted() }) { Text(stringResource(R.string.history_discard_action)) }
             },
-            dismissButton = { TextButton(onClick = { showDiscardConfirm = false }) { Text("Cancel") } }
+            dismissButton = { TextButton(onClick = { showDiscardConfirm = false }) { Text(stringResource(R.string.action_cancel)) } }
         )
     }
 
     if (showBluetoothOff) {
         AlertDialog(
             onDismissRequest = { showBluetoothOff = false },
-            title = { Text("Bluetooth is off") },
-            text = { Text("Turn on Bluetooth to reconnect and view live scores.") },
-            confirmButton = { TextButton(onClick = { showBluetoothOff = false }) { Text("OK") } }
+            title = { Text(stringResource(R.string.history_bt_off_title)) },
+            text = { Text(stringResource(R.string.history_bt_off_body)) },
+            confirmButton = { TextButton(onClick = { showBluetoothOff = false }) { Text(stringResource(R.string.action_ok)) } }
         )
     }
 
     Column(Modifier.fillMaxSize()) {
         TabRow(selectedTabIndex = tabIndex) {
-            Tab(selected = tabIndex == 0, onClick = { tabIndex = 0 }, text = { Text("Tournaments") })
-            Tab(selected = tabIndex == 1, onClick = { tabIndex = 1 }, text = { Text("Leaderboard") })
+            Tab(selected = tabIndex == 0, onClick = { tabIndex = 0 }, text = { Text(stringResource(R.string.history_tab_tournaments)) })
+            Tab(selected = tabIndex == 1, onClick = { tabIndex = 1 }, text = { Text(stringResource(R.string.history_tab_leaderboard)) })
         }
         when (val h = history) {
-            LoadState.Loading -> Text("Loading…", modifier = Modifier.padding(Spacing.md))
-            is LoadState.Failed -> Text(h.message, modifier = Modifier.padding(Spacing.md))
+            LoadState.Loading -> Text(stringResource(R.string.loading), modifier = Modifier.padding(Spacing.md))
+            is LoadState.Failed -> Text(h.text(), modifier = Modifier.padding(Spacing.md))
             LoadState.Idle, is LoadState.Loaded<*> -> Unit
         }
         if (tabIndex == 0) {
             if (saved.isEmpty() && hostedTournament == null) {
                 Box(Modifier.fillMaxSize().padding(Spacing.md), contentAlignment = Alignment.TopCenter) {
                     Text(
-                        "No tournaments yet — join one, or check back once the organizer finishes.",
+                        stringResource(R.string.history_empty),
                         style = MaterialTheme.typography.bodyMedium
                     )
                 }
@@ -169,14 +172,14 @@ fun HistoryScreen(
                 Tab(
                     selected = leaderboardTab == 0,
                     onClick = { leaderboardTab = 0 },
-                    text = { Text("This tournament") }
+                    text = { Text(stringResource(R.string.history_tab_this)) }
                 )
-                Tab(selected = leaderboardTab == 1, onClick = { leaderboardTab = 1 }, text = { Text("Global") })
+                Tab(selected = leaderboardTab == 1, onClick = { leaderboardTab = 1 }, text = { Text(stringResource(R.string.history_tab_global)) })
             }
             if (leaderboardTab == 0) {
                 if (currentTournament == null) {
                     Box(Modifier.fillMaxSize().padding(Spacing.md), contentAlignment = Alignment.TopCenter) {
-                        Text("No tournament in progress right now.", style = MaterialTheme.typography.bodyMedium)
+                        Text(stringResource(R.string.history_none_in_progress), style = MaterialTheme.typography.bodyMedium)
                     }
                 } else {
                     val teamNames = currentTournament.teams.associate { it.id to it.name }
@@ -223,10 +226,29 @@ fun HistoryScreen(
 fun StatsModeSelector(selected: StatsMode, onSelect: (StatsMode) -> Unit, modifier: Modifier = Modifier) {
     Row(modifier, horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
         StatsMode.entries.forEach { mode ->
-            FilterChip(selected = selected == mode, onClick = { onSelect(mode) }, label = { Text(mode.label) })
+            FilterChip(selected = selected == mode, onClick = { onSelect(mode) }, label = { Text(mode.label()) })
         }
     }
 }
+
+@Composable
+private fun StatsMode.label(): String = stringResource(
+    when (this) {
+        StatsMode.ALL -> R.string.stats_mode_all
+        StatsMode.SINGLES -> R.string.stats_mode_singles
+        StatsMode.TEAMS -> R.string.stats_mode_teams
+    }
+)
+
+@Composable
+private fun TournamentPhase.label(): String = stringResource(
+    when (this) {
+        TournamentPhase.SETUP -> R.string.phase_setup
+        TournamentPhase.GROUP_STAGE -> R.string.phase_group_stage
+        TournamentPhase.BRACKET -> R.string.phase_bracket
+        TournamentPhase.FINISHED -> R.string.phase_finished
+    }
+)
 
 @Composable
 private fun HostedTournamentRow(name: String, phase: TournamentPhase, onClick: () -> Unit) {
@@ -244,7 +266,7 @@ private fun HostedTournamentRow(name: String, phase: TournamentPhase, onClick: (
         Column(Modifier.fillMaxWidth().padding(horizontal = Spacing.md, vertical = Spacing.sm)) {
             Text(name, style = MaterialTheme.typography.titleMedium)
             Text(
-                "Hosting · ${phase.name.lowercase().replace('_', ' ')} · tap to continue",
+                stringResource(R.string.history_hosting_row, phase.label()),
                 style = MaterialTheme.typography.bodySmall
             )
         }
@@ -256,9 +278,9 @@ private fun HostedTournamentRow(name: String, phase: TournamentPhase, onClick: (
 private fun PendingUploadRow(name: String, status: UploadState, onRetry: () -> Unit, onDiscard: () -> Unit) {
     val statusText = when (status) {
         UploadState.Idle -> null
-        UploadState.Uploading -> "Uploading…"
-        UploadState.NotLinked -> "Not linked — link an organizer account to upload"
-        is UploadState.Failed -> "Upload failed: ${status.message}"
+        UploadState.Uploading -> stringResource(R.string.upload_uploading)
+        UploadState.NotLinked -> stringResource(R.string.upload_not_linked)
+        is UploadState.Failed -> stringResource(R.string.upload_failed, status.message)
     }
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -270,12 +292,12 @@ private fun PendingUploadRow(name: String, status: UploadState, onRetry: () -> U
         Column(Modifier.fillMaxWidth().padding(horizontal = Spacing.md, vertical = Spacing.sm)) {
             Text(name, style = MaterialTheme.typography.titleMedium)
             Text(
-                "Finished · not uploaded yet" + (statusText?.let { " · $it" } ?: ""),
+                statusText?.let { stringResource(R.string.history_pending_row_status, it) } ?: stringResource(R.string.history_pending_row),
                 style = MaterialTheme.typography.bodySmall
             )
             Row(Modifier.padding(top = Spacing.xs), horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                TextButton(onClick = onRetry, enabled = status != UploadState.Uploading) { Text("Retry upload") }
-                TextButton(onClick = onDiscard) { Text("Discard") }
+                TextButton(onClick = onRetry, enabled = status != UploadState.Uploading) { Text(stringResource(R.string.history_retry_upload)) }
+                TextButton(onClick = onDiscard) { Text(stringResource(R.string.history_discard_action)) }
             }
         }
     }
@@ -291,7 +313,7 @@ private fun SavedTournamentRow(entry: SavedTournament, onClick: () -> Unit) {
         Column(Modifier.fillMaxWidth().padding(horizontal = Spacing.md, vertical = Spacing.sm)) {
             Text(entry.name, style = MaterialTheme.typography.titleMedium)
             Text(
-                if (entry.phase == TournamentPhase.FINISHED) "Finished" else "In progress · tap to reconnect",
+                stringResource(if (entry.phase == TournamentPhase.FINISHED) R.string.history_row_finished else R.string.history_row_in_progress),
                 style = MaterialTheme.typography.bodySmall
             )
         }
@@ -305,7 +327,7 @@ private fun TournamentStandingRow(teamName: String, standing: ProvisionalStandin
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
         Text(teamName)
-        Text("${standing.winDelta}W ${standing.lossDelta}L · ${standing.eloDelta.formatSigned1()} elo")
+        Text(stringResource(R.string.history_standing_row, standing.winDelta, standing.lossDelta, standing.eloDelta.formatSigned1()))
     }
     HorizontalDivider()
 }
@@ -317,7 +339,7 @@ private fun CompetitorRow(c: CompetitorStats, onClick: () -> Unit) {
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
         Text(c.name)
-        Text("${c.elo.format1()} · ${c.wins}W ${c.losses}L")
+        Text(stringResource(R.string.history_competitor_row, c.elo.format1(), c.wins, c.losses))
     }
     HorizontalDivider()
 }

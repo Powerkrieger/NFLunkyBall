@@ -1,5 +1,8 @@
 package com.example.nflunkyball.ui.shared
 
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
+import com.example.nflunkyball.R
 import android.os.SystemClock
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -97,10 +100,10 @@ fun MatchResultDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (match.result == null) "Record result" else "Edit result") },
+        title = { Text(stringResource(if (match.result == null) R.string.result_title_record else R.string.result_title_edit)) },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState())) {
-                Text("Winner", style = MaterialTheme.typography.labelMedium)
+                Text(stringResource(R.string.result_winner), style = MaterialTheme.typography.labelMedium)
                 listOf(match.teamAId to nameA, match.teamBId to nameB).forEach { (teamId, name) ->
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         RadioButton(selected = winnerId == teamId, onClick = { winnerId = teamId })
@@ -110,7 +113,7 @@ fun MatchResultDialog(
                 Spacer(Modifier.height(Spacing.sm))
 
                 Text(
-                    if (losers.size == 1) "Loser's drink time" else "Losers' drink times (each on their own clock)",
+                    stringResource(if (losers.size == 1) R.string.result_loser_time_one else R.string.result_loser_time_many),
                     style = MaterialTheme.typography.labelMedium
                 )
                 losers.forEach { player ->
@@ -134,10 +137,10 @@ fun MatchResultDialog(
                     Spacer(Modifier.height(Spacing.sm))
                 }
 
-                Text("Drinks", style = MaterialTheme.typography.labelMedium)
+                Text(stringResource(R.string.result_drinks), style = MaterialTheme.typography.labelMedium)
                 (membersA + membersB).forEach { player ->
                     DrinkField(
-                        label = "$player's drink",
+                        label = stringResource(R.string.result_drink_label, player),
                         value = drinks[player] ?: "",
                         onValueChange = { drinks[player] = it },
                         knownDrinks = knownDrinks
@@ -151,7 +154,7 @@ fun MatchResultDialog(
                         onClick = onClear,
                         modifier = Modifier.padding(top = Spacing.sm),
                         colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
-                    ) { Text("Clear result (undo)") }
+                    ) { Text(stringResource(R.string.result_clear)) }
                 }
             }
         },
@@ -171,9 +174,9 @@ fun MatchResultDialog(
                     onConfirm(result, matchDrinks)
                 },
                 enabled = allLosersTimed && winners.isNotEmpty()
-            ) { Text("Save") }
+            ) { Text(stringResource(R.string.action_save)) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } }
     )
 }
 
@@ -214,25 +217,25 @@ private fun LoserCounter(
                     elapsedSeconds = 0L
                     timerStartMs = SystemClock.elapsedRealtime()
                 }
-            }) { Text(if (timerStartMs != null) "Stop" else "Start timer") }
+            }) { Text(stringResource(if (timerStartMs != null) R.string.result_timer_stop else R.string.result_timer_start)) }
             if (timerStartMs != null) {
-                Text("${elapsedSeconds}s", style = MaterialTheme.typography.bodyMedium)
+                Text(stringResource(R.string.result_elapsed, elapsedSeconds), style = MaterialTheme.typography.bodyMedium)
             }
-            TextButton(onClick = onRefusedDrink) { Text("Refused a drink") }
+            TextButton(onClick = onRefusedDrink) { Text(stringResource(R.string.result_refused)) }
         }
         OutlinedTextField(
             value = secondsText,
             onValueChange = { onSecondsChange(it.filter(Char::isDigit)) },
-            label = { Text("Seconds (incl. $FORFEIT_FLAT_SECONDS per refused drink)") },
+            label = { Text(stringResource(R.string.result_seconds_label, FORFEIT_FLAT_SECONDS)) },
             singleLine = true
         )
         if (forfeitedDrinks > 0) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    "$forfeitedDrinks refused ${if (forfeitedDrinks == 1) "drink" else "drinks"}",
+                    pluralStringResource(R.plurals.result_refused_count, forfeitedDrinks, forfeitedDrinks),
                     style = MaterialTheme.typography.bodySmall
                 )
-                TextButton(onClick = onResetRefusals) { Text("Reset") }
+                TextButton(onClick = onResetRefusals) { Text(stringResource(R.string.result_reset)) }
             }
         }
     }
@@ -251,7 +254,7 @@ private fun DrinkField(
             onValueChange = onValueChange,
             // Deliberately not synced anywhere live — see MatchDrinkStore's doc for why this
             // stays organizer-only until the tournament is finished and uploaded.
-            label = { Text("$label (optional, organizer-only)") },
+            label = { Text(stringResource(R.string.result_drink_field, label)) },
             singleLine = true
         )
         if (knownDrinks.isNotEmpty()) {

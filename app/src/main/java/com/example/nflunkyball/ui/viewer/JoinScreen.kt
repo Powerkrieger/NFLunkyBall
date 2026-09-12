@@ -1,5 +1,7 @@
 package com.example.nflunkyball.ui.viewer
 
+import androidx.compose.ui.res.stringResource
+import com.example.nflunkyball.R
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -26,6 +28,8 @@ fun JoinScreen(viewModel: ViewerViewModel, onJoined: () -> Unit) {
     var manualCode by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
 
+    val badQrMessage = stringResource(R.string.join_bad_qr)
+    val invalidCodeMessage = stringResource(R.string.join_invalid)
     val scanLauncher = rememberLauncherForActivityResult(ScanContract()) { result ->
         val text = result.contents ?: return@rememberLauncherForActivityResult
         val payload = JoinPayloadCodec.decode(text)
@@ -33,7 +37,7 @@ fun JoinScreen(viewModel: ViewerViewModel, onJoined: () -> Unit) {
             viewModel.join(payload)
             onJoined()
         } else {
-            error = "That QR code doesn't look like an NFLunkyBall join code."
+            error = badQrMessage
         }
     }
 
@@ -42,19 +46,19 @@ fun JoinScreen(viewModel: ViewerViewModel, onJoined: () -> Unit) {
             Modifier.fillMaxWidth().padding(Spacing.lg),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text("Join a tournament", style = MaterialTheme.typography.headlineSmall)
+            Text(stringResource(R.string.join_title), style = MaterialTheme.typography.headlineSmall)
 
             Button(
                 onClick = { scanLauncher.launch(ScanOptions().setOrientationLocked(false).setBeepEnabled(false)) },
                 modifier = Modifier.fillMaxWidth().padding(top = Spacing.lg)
-            ) { Text("Scan QR code") }
+            ) { Text(stringResource(R.string.join_scan)) }
 
-            Text("or", modifier = Modifier.padding(vertical = Spacing.md))
+            Text(stringResource(R.string.join_or), modifier = Modifier.padding(vertical = Spacing.md))
 
             OutlinedTextField(
                 value = manualCode,
                 onValueChange = { manualCode = it },
-                label = { Text("Enter code") },
+                label = { Text(stringResource(R.string.join_enter_code)) },
                 modifier = Modifier.fillMaxWidth()
             )
             error?.let {
@@ -67,12 +71,12 @@ fun JoinScreen(viewModel: ViewerViewModel, onJoined: () -> Unit) {
                         viewModel.join(payload)
                         onJoined()
                     } else {
-                        error = "Enter a valid code"
+                        error = invalidCodeMessage
                     }
                 },
                 enabled = manualCode.isNotBlank(),
                 modifier = Modifier.fillMaxWidth().padding(top = Spacing.md)
-            ) { Text("Join") }
+            ) { Text(stringResource(R.string.join_action)) }
         }
     }
 

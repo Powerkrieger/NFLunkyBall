@@ -68,10 +68,10 @@ data class EloMatchHistoryEntry(
 )
 
 /** Which matches a stats view counts — mirrors the backend's `mode` query parameter. */
-enum class StatsMode(val query: String, val label: String) {
-    ALL("all", "All"),
-    SINGLES("singles", "Singles"),
-    TEAMS("teams", "Teams")
+enum class StatsMode(val query: String) {
+    ALL("all"),
+    SINGLES("singles"),
+    TEAMS("teams")
 }
 
 @Serializable

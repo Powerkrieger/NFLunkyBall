@@ -1,5 +1,7 @@
 package com.example.nflunkyball.ui.organizer
 
+import androidx.compose.ui.res.stringResource
+import com.example.nflunkyball.R
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -19,6 +21,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.example.nflunkyball.server.InvitePayloadCodec
+import com.example.nflunkyball.server.LinkOutcome
 import com.example.nflunkyball.ui.theme.Spacing
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
@@ -46,54 +49,61 @@ fun LoginScreen(
 
     // Mirrors the viewer's join-QR flow (JoinScreen) — the admin page can render an invite as a
     // QR code too, so scanning beats retyping a long code by hand.
+    val badQrMessage = stringResource(R.string.login_bad_qr)
+    val invalidCodeMessage = stringResource(R.string.login_invalid_code)
+    val viewerMessage = stringResource(R.string.login_as_viewer)
+    val linkedAsFormat = stringResource(R.string.login_linked_as)
     val scanLauncher = rememberLauncherForActivityResult(ScanContract()) { result ->
         val text = result.contents ?: return@rememberLauncherForActivityResult
         if (InvitePayloadCodec.decode(text) != null) {
             inviteCode = text
             status = null
         } else {
-            status = "That QR code doesn't look like an NFLunkyBall invite code."
+            status = badQrMessage
         }
     }
 
     Column(Modifier.fillMaxSize().padding(Spacing.lg)) {
-        Text("Log in", style = MaterialTheme.typography.headlineSmall)
+        Text(stringResource(R.string.login_title), style = MaterialTheme.typography.headlineSmall)
         Text(
-            "Ask whoever runs the group's history server for an invite code — it's a one-time " +
-                "code that also tells the app where the server lives. Whether it logs you in as " +
-                "an organizer or just a viewer depends on which kind of code it is.",
+            stringResource(R.string.login_body),
             style = MaterialTheme.typography.bodyMedium,
             modifier = Modifier.padding(top = Spacing.sm, bottom = Spacing.md)
         )
         OutlinedTextField(
             value = inviteCode,
             onValueChange = { inviteCode = it },
-            label = { Text("Invite code") },
+            label = { Text(stringResource(R.string.login_invite_code)) },
             modifier = Modifier.fillMaxWidth()
         )
         OutlinedButton(
             onClick = { scanLauncher.launch(ScanOptions().setOrientationLocked(false).setBeepEnabled(false)) },
             modifier = Modifier.fillMaxWidth().padding(top = Spacing.sm)
-        ) { Text("Scan QR code instead") }
+        ) { Text(stringResource(R.string.login_scan)) }
         status?.let { Text(it, modifier = Modifier.padding(top = Spacing.sm)) }
         Button(
             onClick = {
                 linking = true
                 scope.launch {
-                    val result = viewModel.linkAccount(inviteCode)
+                    val outcome = viewModel.linkAccount(inviteCode)
                     linking = false
-                    status = result.fold({ it }, { it.message })
-                    if (result.isSuccess) onDone()
+                    status = when (outcome) {
+                        is LinkOutcome.Organizer -> linkedAsFormat.format(outcome.displayName)
+                        LinkOutcome.Viewer -> viewerMessage
+                        LinkOutcome.InvalidCode -> invalidCodeMessage
+                        is LinkOutcome.Rejected -> outcome.message
+                    }
+                    if (outcome is LinkOutcome.Organizer || outcome == LinkOutcome.Viewer) onDone()
                 }
             },
             enabled = inviteCode.isNotBlank() && !linking,
             modifier = Modifier.fillMaxWidth().padding(top = Spacing.md)
-        ) { Text("Log in") }
+        ) { Text(stringResource(R.string.login_title)) }
         onJoinTournament?.let {
             TextButton(
                 onClick = it,
                 modifier = Modifier.fillMaxWidth().padding(top = Spacing.sm)
-            ) { Text("Just watching one tournament? Scan its code instead") }
+            ) { Text(stringResource(R.string.login_just_watching)) }
         }
     }
 }

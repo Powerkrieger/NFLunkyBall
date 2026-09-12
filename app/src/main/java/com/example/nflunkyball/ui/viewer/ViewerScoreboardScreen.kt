@@ -1,5 +1,7 @@
 package com.example.nflunkyball.ui.viewer
 
+import androidx.compose.ui.res.stringResource
+import com.example.nflunkyball.R
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -43,15 +45,15 @@ fun ViewerScoreboardScreen(viewModel: ViewerViewModel, onOpenHistory: () -> Unit
         val payload = viewModel.joinPayload.collectAsState().value
         AlertDialog(
             onDismissRequest = { showInvite = false },
-            title = { Text("Invite others") },
+            title = { Text(stringResource(R.string.scoreboard_invite_title)) },
             text = {
                 if (payload != null) {
                     RoomCodeDisplay(payload)
                 } else {
-                    Text("No join code available.")
+                    Text(stringResource(R.string.scoreboard_no_code))
                 }
             },
-            confirmButton = { TextButton(onClick = { showInvite = false }) { Text("Close") } }
+            confirmButton = { TextButton(onClick = { showInvite = false }) { Text(stringResource(R.string.action_close)) } }
         )
     }
 
@@ -72,7 +74,7 @@ fun ViewerScoreboardScreen(viewModel: ViewerViewModel, onOpenHistory: () -> Unit
                 val progress = receiveProgress
                 if (progress != null) {
                     Text(
-                        "Reading state of version ${progress.version}",
+                        stringResource(R.string.scoreboard_reading, progress.version),
                         style = MaterialTheme.typography.bodySmall
                     )
                     ChunkProgressBar(progress, modifier = Modifier.padding(top = Spacing.xs, bottom = Spacing.sm))
@@ -81,7 +83,7 @@ fun ViewerScoreboardScreen(viewModel: ViewerViewModel, onOpenHistory: () -> Unit
 
             val current = tournament
             if (current == null) {
-                Text("Waiting for the organizer's scores…", style = MaterialTheme.typography.bodyLarge)
+                Text(stringResource(R.string.scoreboard_waiting), style = MaterialTheme.typography.bodyLarge)
             } else {
                 Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
                     Text(
@@ -90,9 +92,9 @@ fun ViewerScoreboardScreen(viewModel: ViewerViewModel, onOpenHistory: () -> Unit
                         color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.weight(1f)
                     )
-                    TextButton(onClick = { showInvite = true }) { Text("Invite") }
+                    TextButton(onClick = { showInvite = true }) { Text(stringResource(R.string.scoreboard_invite)) }
                     if (viewModel.historyAvailable()) {
-                        TextButton(onClick = onOpenHistory) { Text("History") }
+                        TextButton(onClick = onOpenHistory) { Text(stringResource(R.string.scoreboard_history)) }
                     }
                 }
                 val teamNames = current.teams.associate { it.id to it.name }
@@ -116,7 +118,7 @@ fun ViewerScoreboardScreen(viewModel: ViewerViewModel, onOpenHistory: () -> Unit
                 }
                 if (current.bracketMatches.isNotEmpty()) {
                     Text(
-                        "Bracket",
+                        stringResource(R.string.scoreboard_bracket),
                         style = MaterialTheme.typography.titleMedium,
                         modifier = Modifier.padding(top = Spacing.lg)
                     )

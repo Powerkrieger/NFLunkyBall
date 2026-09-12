@@ -1,5 +1,6 @@
 package com.example.nflunkyball.ui.viewer
 
+import com.example.nflunkyball.R
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.nflunkyball.ble.LiveReceiver
@@ -190,14 +191,15 @@ class ViewerViewModel(
                         _tournamentDetail.value = LoadState.Loaded(ArchivedTournament(result.value.tournament, result.value))
                         return@launch
                     }
-                    is ServerResult.Failure -> failure = result.message
+                    is ServerResult.Failure -> failure = result.message.takeUnless { it == NO_ACCESS }
                 }
             }
             val cached = entry?.cachedTournamentJson?.let { library.decode(it) }
             _tournamentDetail.value = when {
                 cached != null -> LoadState.Loaded(ArchivedTournament(cached, detail = null))
-                entry?.cachedTournamentJson != null -> LoadState.Failed("Couldn't read this tournament's saved data")
-                else -> LoadState.Failed(failure ?: "This tournament isn't available yet")
+                entry?.cachedTournamentJson != null -> LoadState.Failed(reasonRes = R.string.error_cached_unreadable)
+                failure != null -> LoadState.Failed(failure)
+                else -> LoadState.Failed(reasonRes = R.string.error_tournament_unavailable)
             }
         }
     }
@@ -205,18 +207,25 @@ class ViewerViewModel(
     private fun <T> load(target: MutableStateFlow<LoadState<T>>, call: suspend (ServerApi, String) -> ServerResult<T>) {
         target.value = LoadState.Loading
         viewModelScope.launch {
-            target.value = when (val result = withReadAccess(call)) {
-                is ServerResult.Success -> LoadState.Loaded(result.value)
-                is ServerResult.Failure -> LoadState.Failed(result.message)
-            }
+            target.value = withReadAccess(call).toLoadState()
         }
     }
 
     private suspend fun <T> withReadAccess(
         call: suspend (ServerApi, String) -> ServerResult<T>
     ): ServerResult<T> {
-        val access = readAccess() ?: return ServerResult.Failure("No server access — join a tournament or log in first")
+        val access = readAccess() ?: return ServerResult.Failure(NO_ACCESS)
         return call(access.api, access.password)
+    }
+
+    private fun <T> ServerResult<T>.toLoadState(): LoadState<T> = when (this) {
+        is ServerResult.Success -> LoadState.Loaded(value)
+        is ServerResult.Failure -> if (message == NO_ACCESS) LoadState.Failed(reasonRes = R.string.error_no_server_access) else LoadState.Failed(message)
+    }
+
+    private companion object {
+        /** Sentinel so the one app-originated read failure can be shown localised (see [toLoadState]). */
+        const val NO_ACCESS = "no-server-access"
     }
 
     override fun onCleared() {

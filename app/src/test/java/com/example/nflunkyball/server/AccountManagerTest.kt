@@ -24,9 +24,9 @@ class AccountManagerTest {
         api.registerResult = ServerResult.Success(RegisterResponse(accountId = 3, displayName = "Anna", readPassword = "pw"))
         val manager = manager(this)
 
-        val result = manager.link(inviteCode(server = "https://srv", token = "abc"))
+        val outcome = manager.link(inviteCode(server = "https://srv", token = "abc"))
 
-        assertEquals("Linked as Anna", result.getOrThrow())
+        assertEquals(LinkOutcome.Organizer("Anna"), outcome)
         assertEquals("abc", api.registrations.single().first)
         val account = manager.account.value!!
         assertEquals(3, account.accountId)
@@ -43,7 +43,7 @@ class AccountManagerTest {
         api.registerResult = ServerResult.Success(RegisterResponse(accountId = null, displayName = null, readPassword = "pw"))
         val manager = manager(this)
 
-        assertEquals("Logged in as viewer", manager.link(inviteCode(server = "https://srv")).getOrThrow())
+        assertEquals(LinkOutcome.Viewer, manager.link(inviteCode(server = "https://srv")))
         assertNull(manager.account.value)
         assertEquals("pw", manager.readPassword.value)
         assertEquals("https://srv", credentials.viewerServerUrl)
@@ -51,15 +51,14 @@ class AccountManagerTest {
 
     @Test
     fun `garbage invite code fails without touching the server`() = runTest {
-        val result = manager(this).link("not-an-invite")
-        assertTrue(result.isFailure)
+        assertEquals(LinkOutcome.InvalidCode, manager(this).link("not-an-invite"))
         assertTrue(api.registrations.isEmpty())
     }
 
     @Test
     fun `server rejection surfaces its message`() = runTest {
         api.registerResult = ServerResult.Failure("Invite already used")
-        assertEquals("Invite already used", manager(this).link(inviteCode()).exceptionOrNull()?.message)
+        assertEquals(LinkOutcome.Rejected("Invite already used"), manager(this).link(inviteCode()))
     }
 
     @Test

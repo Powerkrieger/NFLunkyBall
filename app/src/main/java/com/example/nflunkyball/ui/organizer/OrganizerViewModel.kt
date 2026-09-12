@@ -29,6 +29,7 @@ import com.example.nflunkyball.persistence.TournamentRepository
 import com.example.nflunkyball.server.AccountManager
 import com.example.nflunkyball.server.ArchiveUploader
 import com.example.nflunkyball.server.CompetitorStats
+import com.example.nflunkyball.server.LinkOutcome
 import com.example.nflunkyball.server.OrganizerAccount
 import com.example.nflunkyball.server.ServerApiFactory
 import com.example.nflunkyball.server.ServerResult
@@ -183,8 +184,8 @@ class OrganizerViewModel(
     fun knownDrinks(): List<String> =
         drinkStore.all().values.flatMap { listOfNotNull(it.teamA, it.teamB) + it.byPlayer.values }.distinct().sorted()
 
-    /** See [AccountManager.link]; the message is user-facing either way. */
-    suspend fun linkAccount(inviteCode: String): Result<String> = accountManager.link(inviteCode)
+    /** See [AccountManager.link]. */
+    suspend fun linkAccount(inviteCode: String): LinkOutcome = accountManager.link(inviteCode)
 
     override fun onCleared() {
         super.onCleared()

@@ -1,5 +1,7 @@
 package com.example.nflunkyball.ui.shared
 
+import androidx.compose.ui.res.stringResource
+import com.example.nflunkyball.R
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -28,8 +30,8 @@ fun RenameDialog(
             OutlinedTextField(value = value, onValueChange = { value = it }, singleLine = true)
         },
         confirmButton = {
-            TextButton(onClick = { onConfirm(value) }, enabled = value.isNotBlank()) { Text("Save") }
+            TextButton(onClick = { onConfirm(value) }, enabled = value.isNotBlank()) { Text(stringResource(R.string.action_save)) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } }
     )
 }

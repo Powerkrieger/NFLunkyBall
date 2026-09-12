@@ -1,5 +1,8 @@
 package com.example.nflunkyball.ui.organizer
 
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
+import com.example.nflunkyball.R
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -46,7 +49,7 @@ fun ManageGroupsScreen(viewModel: OrganizerViewModel, onBack: () -> Unit) {
 
     Scaffold(
         topBar = {
-            BackTopBar(title = "Manage groups", onBack = onBack)
+            BackTopBar(title = stringResource(R.string.groups_title), onBack = onBack)
         }
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding).padding(Spacing.md)) {
@@ -54,14 +57,14 @@ fun ManageGroupsScreen(viewModel: OrganizerViewModel, onBack: () -> Unit) {
                 OutlinedTextField(
                     value = newGroupName,
                     onValueChange = { newGroupName = it },
-                    label = { Text("Group name") },
+                    label = { Text(stringResource(R.string.group_name)) },
                     modifier = Modifier.weight(1f)
                 )
                 Button(
                     onClick = { viewModel.addGroup(newGroupName); newGroupName = "" },
                     enabled = newGroupName.isNotBlank(),
                     modifier = Modifier.padding(start = Spacing.sm)
-                ) { Text("Add") }
+                ) { Text(stringResource(R.string.action_add)) }
             }
 
             HorizontalDivider(Modifier.padding(vertical = Spacing.md))
@@ -81,22 +84,22 @@ fun ManageGroupsScreen(viewModel: OrganizerViewModel, onBack: () -> Unit) {
                             Column(Modifier.weight(1f)) {
                                 Text(group.name, style = MaterialTheme.typography.bodyLarge)
                                 Text(
-                                    "${group.teamIds.size} player" + if (group.teamIds.size == 1) "" else "s",
+                                    pluralStringResource(R.plurals.group_player_count, group.teamIds.size, group.teamIds.size),
                                     style = MaterialTheme.typography.bodySmall
                                 )
                                 if (!removable) {
                                     Text(
-                                        "Has players — remove them first",
+                                        stringResource(R.string.group_has_players),
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.error
                                     )
                                 }
                             }
                             IconButton(onClick = { renamingGroup = group }) {
-                                Icon(Icons.Default.Edit, contentDescription = "Rename ${group.name}")
+                                Icon(Icons.Default.Edit, contentDescription = stringResource(R.string.rename_named, group.name))
                             }
                             IconButton(onClick = { viewModel.removeGroup(group.id) }, enabled = removable) {
-                                Icon(Icons.Default.Delete, contentDescription = "Remove ${group.name}")
+                                Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.remove_named, group.name))
                             }
                         }
                     }
@@ -107,7 +110,7 @@ fun ManageGroupsScreen(viewModel: OrganizerViewModel, onBack: () -> Unit) {
 
     renamingGroup?.let { group ->
         RenameDialog(
-            title = "Rename group",
+            title = stringResource(R.string.group_rename_title),
             initialValue = group.name,
             onDismiss = { renamingGroup = null },
             onConfirm = { newName ->

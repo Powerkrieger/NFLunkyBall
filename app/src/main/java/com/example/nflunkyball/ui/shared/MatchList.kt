@@ -1,5 +1,7 @@
 package com.example.nflunkyball.ui.shared
 
+import androidx.compose.ui.res.stringResource
+import com.example.nflunkyball.R
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -62,11 +64,11 @@ private fun MatchRowContent(
     ) {
         Column(Modifier.weight(1f)) {
             match.roundLabel?.let { Text(it, style = MaterialTheme.typography.labelSmall) }
-            Text("$teamAName vs $teamBName")
+            Text(stringResource(R.string.match_versus, teamAName, teamBName))
             match.result?.let { result ->
                 val winnerName = teamNames[result.winnerId] ?: result.winnerId
                 Text(
-                    "$winnerName wins (${result.winnerScore})",
+                    stringResource(R.string.match_winner_line, winnerName, result.winnerScore),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.primary
                 )
@@ -74,7 +76,7 @@ private fun MatchRowContent(
         }
         if (onRecordResult != null) {
             TextButton(onClick = { onRecordResult(match) }) {
-                Text(if (match.result == null) "Record" else "Edit")
+                Text(stringResource(if (match.result == null) R.string.match_record else R.string.match_edit))
             }
         }
     }

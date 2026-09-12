@@ -12,6 +12,16 @@ import kotlinx.coroutines.launch
  *  SettingsScreen's "Organizer account" section, which surfaces this. */
 enum class AccountSyncStatus { CHECKING, CAN_SYNC, REVOKED, UNKNOWN }
 
+/** What redeeming an invite code led to — see [AccountManager.link]. */
+sealed interface LinkOutcome {
+    data class Organizer(val displayName: String) : LinkOutcome
+    data object Viewer : LinkOutcome
+    /** The code didn't decode at all; nothing was sent to any server. */
+    data object InvalidCode : LinkOutcome
+    /** The server refused it (used up, unknown, unreachable…) with its own message. */
+    data class Rejected(val message: String) : LinkOutcome
+}
+
 /**
  * This device's relationship to the group's history server: the organizer account (if one is
  * linked — private key never leaves the device) and the shared read password. Owns linking via
@@ -56,12 +66,11 @@ class AccountManager(
      * Redeems an invite code — the whole code an admin generated, which bundles the server URL
      * and token (see [InvitePayload] for why the app never hardcodes a server address). The server
      * decides what it grants: an organizer invite yields an account + fresh keypair, a viewer
-     * invite just standing read access. Returns the message to show the user either way.
+     * invite just standing read access.
      */
     @OptIn(ExperimentalEncodingApi::class)
-    suspend fun link(inviteCode: String): Result<String> {
-        val invite = InvitePayloadCodec.decode(inviteCode)
-            ?: return Result.failure(IllegalArgumentException("That doesn't look like a valid invite code"))
+    suspend fun link(inviteCode: String): LinkOutcome {
+        val invite = InvitePayloadCodec.decode(inviteCode) ?: return LinkOutcome.InvalidCode
         val keyPair = Ed25519.generateKeyPair()
         val publicKeyB64 = Base64.encode(keyPair.publicKeyBytes)
         return when (val result = serverApi(invite.server).register(invite.token, publicKeyB64)) {
@@ -80,15 +89,15 @@ class AccountManager(
                     )
                     credentials.saveAccount(account)
                     _account.value = account
-                    Result.success("Linked as $displayName")
+                    LinkOutcome.Organizer(displayName)
                 } else {
                     // A viewer invite: no Account/keypair, just standing read access — same
                     // two values a scanned tournament QR provides.
                     credentials.saveViewerServerUrl(invite.server)
-                    Result.success("Logged in as viewer")
+                    LinkOutcome.Viewer
                 }
             }
-            is ServerResult.Failure -> Result.failure(IllegalStateException(result.message))
+            is ServerResult.Failure -> LinkOutcome.Rejected(result.message)
         }
     }
 

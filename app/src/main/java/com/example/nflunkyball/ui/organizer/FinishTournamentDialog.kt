@@ -1,5 +1,7 @@
 package com.example.nflunkyball.ui.organizer
 
+import androidx.compose.ui.res.stringResource
+import com.example.nflunkyball.R
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -40,26 +42,26 @@ fun FinishTournamentDialog(
     if (showDatePicker) {
         DatePickerDialog(
             onDismissRequest = { showDatePicker = false },
-            confirmButton = { TextButton(onClick = { showDatePicker = false }) { Text("OK") } },
-            dismissButton = { TextButton(onClick = { showDatePicker = false }) { Text("Cancel") } }
+            confirmButton = { TextButton(onClick = { showDatePicker = false }) { Text(stringResource(R.string.action_ok)) } },
+            dismissButton = { TextButton(onClick = { showDatePicker = false }) { Text(stringResource(R.string.action_cancel)) } }
         ) { DatePicker(state = dateState) }
     }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Finish tournament") },
+        title = { Text(stringResource(R.string.finish_title)) },
         text = {
             Column {
                 val dateMillis = dateState.selectedDateMillis ?: System.currentTimeMillis()
                 val formatted = remember(dateMillis) {
                     SimpleDateFormat("yyyy-MM-dd", Locale.US).format(dateMillis)
                 }
-                TextButton(onClick = { showDatePicker = true }) { Text("Date: $formatted") }
+                TextButton(onClick = { showDatePicker = true }) { Text(stringResource(R.string.finish_date, formatted)) }
                 Spacer(Modifier.height(Spacing.sm))
                 OutlinedTextField(
                     value = location,
                     onValueChange = { location = it },
-                    label = { Text("Location (optional)") },
+                    label = { Text(stringResource(R.string.finish_location)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -67,7 +69,7 @@ fun FinishTournamentDialog(
                 OutlinedTextField(
                     value = referees,
                     onValueChange = { referees = it },
-                    label = { Text("Referees (optional)") },
+                    label = { Text(stringResource(R.string.finish_referees)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -75,11 +77,11 @@ fun FinishTournamentDialog(
                 OutlinedTextField(
                     value = comment,
                     onValueChange = { comment = it },
-                    label = { Text("Comment (optional)") },
+                    label = { Text(stringResource(R.string.finish_comment)) },
                     modifier = Modifier.fillMaxWidth()
                 )
                 Text(
-                    "All optional — none of this is synced live, it's only saved with the final upload.",
+                    stringResource(R.string.finish_note),
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.padding(top = Spacing.sm)
                 )
@@ -95,8 +97,8 @@ fun FinishTournamentDialog(
                         comment = comment
                     )
                 )
-            }) { Text("Finish") }
+            }) { Text(stringResource(R.string.finish_action)) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } }
     )
 }

@@ -1,5 +1,7 @@
 package com.example.nflunkyball.ui.organizer
 
+import androidx.compose.ui.res.stringResource
+import com.example.nflunkyball.R
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -48,7 +50,7 @@ fun BracketScreen(
     var showFinishDialog by remember { mutableStateOf(false) }
 
     Scaffold(
-        topBar = { OrganizerTopBar("${current.name} — Bracket", viewModel, onOpenSettings) }
+        topBar = { OrganizerTopBar(stringResource(R.string.bracket_title, current.name), viewModel, onOpenSettings) }
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(padding)) {
             Column(
@@ -64,7 +66,7 @@ fun BracketScreen(
                     modifier = Modifier.padding(top = Spacing.sm)
                 )
                 Button(onClick = { showAddMatch = true }, modifier = Modifier.padding(top = Spacing.md)) {
-                    Text("Add bracket match")
+                    Text(stringResource(R.string.bracket_add_match))
                 }
                 Button(
                     onClick = {
@@ -74,7 +76,7 @@ fun BracketScreen(
                         if (account == null) showUnlinkedWarning = true else showFinishDialog = true
                     },
                     modifier = Modifier.fillMaxWidth().padding(top = Spacing.lg, bottom = Spacing.lg)
-                ) { Text("Finish Tournament") }
+                ) { Text(stringResource(R.string.bracket_finish)) }
             }
             // Viewer emoji reactions (BLE mode only — server mode has no back-channel) float over
             // whatever the organizer is doing rather than needing their own screen.
@@ -85,16 +87,13 @@ fun BracketScreen(
     if (showUnlinkedWarning) {
         AlertDialog(
             onDismissRequest = { showUnlinkedWarning = false },
-            title = { Text("Not linked to a server") },
+            title = { Text(stringResource(R.string.bracket_unlinked_title)) },
             text = {
-                Text(
-                    "This tournament isn't linked to an organizer account, so it can't be saved " +
-                        "to history. Link an account now to save it, or finish without saving."
-                )
+                Text(stringResource(R.string.bracket_unlinked_body))
             },
             confirmButton = {
                 TextButton(onClick = { showUnlinkedWarning = false; onLinkAccount() }) {
-                    Text("Link account")
+                    Text(stringResource(R.string.bracket_link_account))
                 }
             },
             dismissButton = {
@@ -104,7 +103,7 @@ fun BracketScreen(
                     // asking for referees/location/comment first — they'd just be discarded.
                     onFinish(TournamentFinishInfo(System.currentTimeMillis(), "", "", ""))
                 }) {
-                    Text("Finish without saving")
+                    Text(stringResource(R.string.bracket_finish_without_saving))
                 }
             }
         )
@@ -160,14 +159,14 @@ private fun AddBracketMatchDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Add bracket match") },
+        title = { Text(stringResource(R.string.bracket_add_match)) },
         text = {
             val options = teams.map { it.id to it.name }
             fun nameOf(id: String) = teams.firstOrNull { it.id == id }?.name ?: ""
             Column {
-                DropdownField(label = "Team A", options = options, selectedLabel = nameOf(teamAId), onSelect = { teamAId = it })
+                DropdownField(label = stringResource(R.string.bracket_team_a), options = options, selectedLabel = nameOf(teamAId), onSelect = { teamAId = it })
                 DropdownField(
-                    label = "Team B",
+                    label = stringResource(R.string.bracket_team_b),
                     options = options,
                     selectedLabel = nameOf(teamBId),
                     onSelect = { teamBId = it },
@@ -176,17 +175,18 @@ private fun AddBracketMatchDialog(
                 OutlinedTextField(
                     value = roundLabel,
                     onValueChange = { roundLabel = it },
-                    label = { Text("Round (e.g. Semifinal)") },
+                    label = { Text(stringResource(R.string.bracket_round_label)) },
                     modifier = Modifier.padding(top = Spacing.sm)
                 )
             }
         },
         confirmButton = {
+            val defaultRound = stringResource(R.string.bracket_default_round)
             TextButton(
-                onClick = { onConfirm(teamAId, teamBId, roundLabel.ifBlank { "Bracket" }) },
+                onClick = { onConfirm(teamAId, teamBId, roundLabel.ifBlank { defaultRound }) },
                 enabled = teamAId.isNotBlank() && teamBId.isNotBlank() && teamAId != teamBId
-            ) { Text("Add") }
+            ) { Text(stringResource(R.string.action_add)) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } }
     )
 }

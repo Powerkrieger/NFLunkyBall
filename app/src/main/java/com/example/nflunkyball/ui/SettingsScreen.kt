@@ -1,5 +1,7 @@
 package com.example.nflunkyball.ui
 
+import androidx.compose.ui.res.stringResource
+import com.example.nflunkyball.R
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -51,7 +53,7 @@ fun SettingsScreen(
 
     Scaffold(
         topBar = {
-            BackTopBar(title = "Settings", onBack = onBack)
+            BackTopBar(title = stringResource(R.string.settings_title), onBack = onBack)
         }
     ) { padding ->
         Column(
@@ -63,30 +65,26 @@ fun SettingsScreen(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
             ) {
                 Column(Modifier.padding(Spacing.md)) {
-                    Text("Organizer account", style = MaterialTheme.typography.titleMedium)
+                    Text(stringResource(R.string.settings_account_title), style = MaterialTheme.typography.titleMedium)
                     Text(
                         // Deliberately independent of any tournament: an account only controls
                         // whether this device can sync/save to a server and pull known-player
                         // suggestions — hosting and scoring a tournament (over Bluetooth at
                         // least) works without one.
                         if (account != null) {
-                            "Linked as ${account.displayName} (${account.serverUrl})"
+                            stringResource(R.string.settings_account_linked, account.displayName, account.serverUrl)
                         } else {
-                            "Not linked. Without an account, tournaments can still be hosted and " +
-                                "scored over Bluetooth, but can't be synced to a server, saved to " +
-                                "history, or use known-player suggestions."
+                            stringResource(R.string.settings_account_not_linked)
                         },
                         style = MaterialTheme.typography.bodySmall,
                         modifier = Modifier.padding(top = Spacing.xs)
                     )
                     if (account != null) {
                         val (statusText, statusColor) = when (syncStatus) {
-                            null, AccountSyncStatus.CHECKING -> "Checking sync status…" to Color.Unspecified
-                            AccountSyncStatus.CAN_SYNC -> "Can sync" to Color.Unspecified
-                            AccountSyncStatus.REVOKED ->
-                                "This account has been revoked and can't sync — add a new invite " +
-                                    "token to restore access." to MaterialTheme.colorScheme.error
-                            AccountSyncStatus.UNKNOWN -> "Couldn't check sync status (offline?)" to Color.Unspecified
+                            null, AccountSyncStatus.CHECKING -> stringResource(R.string.settings_sync_checking) to Color.Unspecified
+                            AccountSyncStatus.CAN_SYNC -> stringResource(R.string.settings_sync_ok) to Color.Unspecified
+                            AccountSyncStatus.REVOKED -> stringResource(R.string.settings_sync_revoked) to MaterialTheme.colorScheme.error
+                            AccountSyncStatus.UNKNOWN -> stringResource(R.string.settings_sync_unknown) to Color.Unspecified
                         }
                         Text(
                             statusText,
@@ -97,10 +95,10 @@ fun SettingsScreen(
                         OutlinedButton(
                             onClick = { showUnlinkConfirm = true },
                             modifier = Modifier.padding(top = Spacing.sm)
-                        ) { Text("Unlink account") }
+                        ) { Text(stringResource(R.string.settings_unlink)) }
                     } else {
                         Button(onClick = onLinkAccount, modifier = Modifier.padding(top = Spacing.sm)) {
-                            Text("Log in")
+                            Text(stringResource(R.string.settings_log_in))
                         }
                     }
                 }
@@ -115,11 +113,9 @@ fun SettingsScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(Modifier.weight(1f)) {
-                        Text("Use Bluetooth instead of server", style = MaterialTheme.typography.titleMedium)
+                        Text(stringResource(R.string.settings_ble_title), style = MaterialTheme.typography.titleMedium)
                         Text(
-                            "Live scores sync through the server by default. Turn this on to sync " +
-                                "directly between phones over Bluetooth instead — useful with no " +
-                                "internet, but only works at close range.",
+                            stringResource(R.string.settings_ble_body),
                             style = MaterialTheme.typography.bodySmall,
                             modifier = Modifier.padding(top = Spacing.xs)
                         )
@@ -139,20 +135,16 @@ fun SettingsScreen(
     if (showUnlinkConfirm) {
         AlertDialog(
             onDismissRequest = { showUnlinkConfirm = false },
-            title = { Text("Unlink organizer account?") },
+            title = { Text(stringResource(R.string.settings_unlink_confirm_title)) },
             text = {
-                Text(
-                    "This only forgets the account on this device — it doesn't delete anything " +
-                        "on the server, and doesn't touch any tournament you're currently hosting " +
-                        "(it just loses server sync until you link again)."
-                )
+                Text(stringResource(R.string.settings_unlink_confirm_body))
             },
             confirmButton = {
                 TextButton(onClick = { showUnlinkConfirm = false; viewModel.unlinkAccount() }) {
-                    Text("Unlink")
+                    Text(stringResource(R.string.settings_unlink_confirm_action))
                 }
             },
-            dismissButton = { TextButton(onClick = { showUnlinkConfirm = false }) { Text("Cancel") } }
+            dismissButton = { TextButton(onClick = { showUnlinkConfirm = false }) { Text(stringResource(R.string.action_cancel)) } }
         )
     }
 }

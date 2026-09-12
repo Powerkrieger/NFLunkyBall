@@ -1,5 +1,7 @@
 package com.example.nflunkyball.ui.shared
 
+import androidx.compose.ui.res.stringResource
+import com.example.nflunkyball.R
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
@@ -31,7 +33,7 @@ fun RoomCodeDisplay(payload: JoinPayload, modifier: Modifier = Modifier) {
             Modifier.padding(Spacing.lg),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Image(bitmap = bitmap.asImageBitmap(), contentDescription = "Join QR code")
+            Image(bitmap = bitmap.asImageBitmap(), contentDescription = stringResource(R.string.room_qr_description))
             Text(
                 payload.room,
                 style = MaterialTheme.typography.displaySmall,

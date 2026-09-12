@@ -1,5 +1,7 @@
 package com.example.nflunkyball.ui
 
+import androidx.compose.ui.res.stringResource
+import com.example.nflunkyball.R
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -45,7 +47,7 @@ fun HomeScreen(
         ) {
             Icon(
                 Icons.Default.Info,
-                contentDescription = "Rulebook",
+                contentDescription = stringResource(R.string.home_rulebook),
                 tint = MaterialTheme.colorScheme.onSecondaryContainer
             )
         }
@@ -59,7 +61,7 @@ fun HomeScreen(
         ) {
             Icon(
                 Icons.Default.Settings,
-                contentDescription = "Settings",
+                contentDescription = stringResource(R.string.home_settings),
                 tint = MaterialTheme.colorScheme.onSecondaryContainer
             )
         }
@@ -69,7 +71,7 @@ fun HomeScreen(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
-                "NFLunkyBall",
+                stringResource(R.string.app_name),
                 style = MaterialTheme.typography.displaySmall,
                 color = MaterialTheme.colorScheme.primary
             )
@@ -78,26 +80,26 @@ fun HomeScreen(
             // are the more useful default actions on an otherwise-empty home screen. Filled =
             // the highlighted action, outlined = the rest, same visual language either way.
             HomeActionButton(
-                text = "My tournaments",
+                text = stringResource(R.string.home_my_tournaments),
                 highlighted = hasActiveOrLinkedSession,
                 onClick = onMyTournaments,
                 modifier = Modifier.fillMaxWidth().padding(top = Spacing.xl)
             )
             HomeActionButton(
-                text = "Host a tournament",
+                text = stringResource(R.string.home_host),
                 highlighted = !hasActiveOrLinkedSession,
                 onClick = onHost,
                 modifier = Modifier.fillMaxWidth().padding(top = Spacing.md)
             )
             HomeActionButton(
-                text = "Join a tournament",
+                text = stringResource(R.string.home_join),
                 highlighted = !hasActiveOrLinkedSession,
                 onClick = onJoin,
                 modifier = Modifier.fillMaxWidth().padding(top = Spacing.md)
             )
         }
         Text(
-            "v${BuildConfig.VERSION_NAME}",
+            stringResource(R.string.home_version, BuildConfig.VERSION_NAME),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.align(Alignment.BottomEnd).padding(Spacing.sm)

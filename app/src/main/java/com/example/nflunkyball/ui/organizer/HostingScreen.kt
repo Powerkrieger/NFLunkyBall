@@ -1,5 +1,7 @@
 package com.example.nflunkyball.ui.organizer
 
+import androidx.compose.ui.res.stringResource
+import com.example.nflunkyball.R
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -71,7 +73,7 @@ private fun HostingScreenContent(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(Spacing.lg),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text("Share this to let people watch", style = MaterialTheme.typography.titleMedium)
+        Text(stringResource(R.string.hosting_share), style = MaterialTheme.typography.titleMedium)
 
         if (roomId != null && tournament != null) {
             val code = RoomCode.encode(roomId)
@@ -84,22 +86,22 @@ private fun HostingScreenContent(
         Spacer(Modifier.height(Spacing.lg))
 
         if (useBleSync) {
-            val versionText = broadcastVersion?.let { "Broadcasting version $it" } ?: "Starting broadcast…"
+            val versionText = broadcastVersion?.let { stringResource(R.string.hosting_broadcasting, it) } ?: stringResource(R.string.hosting_starting_broadcast)
             Text(versionText, style = MaterialTheme.typography.bodyMedium)
         } else {
-            Text(serverSyncStatus.label() ?: "Starting sync…", style = MaterialTheme.typography.bodyMedium)
+            Text(serverSyncStatus.label() ?: stringResource(R.string.sync_starting), style = MaterialTheme.typography.bodyMedium)
         }
 
         if (account != null) {
-            Text("Hosting as ${account.displayName}", style = MaterialTheme.typography.bodyMedium)
+            Text(stringResource(R.string.hosting_as, account.displayName), style = MaterialTheme.typography.bodyMedium)
         } else {
             Button(onClick = onLinkAccount, modifier = Modifier.fillMaxWidth().padding(top = Spacing.sm)) {
-                Text("Link organizer account")
+                Text(stringResource(R.string.hosting_link_account))
             }
         }
 
         Button(onClick = onContinue, modifier = Modifier.fillMaxWidth().padding(top = Spacing.lg)) {
-            Text("Continue to scoring")
+            Text(stringResource(R.string.hosting_continue))
         }
     }
 }

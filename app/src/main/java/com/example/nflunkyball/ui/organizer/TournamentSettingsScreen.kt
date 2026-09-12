@@ -1,5 +1,7 @@
 package com.example.nflunkyball.ui.organizer
 
+import androidx.compose.ui.res.stringResource
+import com.example.nflunkyball.R
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -52,23 +54,23 @@ fun TournamentSettingsScreen(
 
     Scaffold(
         topBar = {
-            BackTopBar(title = "Tournament settings", onBack = onBack)
+            BackTopBar(title = stringResource(R.string.tsettings_title), onBack = onBack)
         }
     ) { padding ->
         Column(
             Modifier.fillMaxSize().padding(padding).padding(Spacing.md),
             verticalArrangement = Arrangement.spacedBy(Spacing.sm)
         ) {
-            SettingsRow("Manage players", onClick = onManagePlayers)
-            SettingsRow("Manage groups", onClick = onManageGroups)
-            SettingsRow("Show viewer code") { showRoomCode = true }
+            SettingsRow(stringResource(R.string.players_title), onClick = onManagePlayers)
+            SettingsRow(stringResource(R.string.groups_title), onClick = onManageGroups)
+            SettingsRow(stringResource(R.string.tsettings_show_code)) { showRoomCode = true }
             // Always available, not just while unlinked — an existing link can stop working
             // (account revoked, credentials lost) with no local sign other than sync quietly
             // failing, so re-entering a fresh invite token needs to work as a recovery path too.
-            SettingsRow(if (account == null) "Link organizer account" else "Add invite token") {
+            SettingsRow(stringResource(if (account == null) R.string.hosting_link_account else R.string.tsettings_add_token)) {
                 onLinkAccount()
             }
-            SettingsRow("Abandon tournament", destructive = true) { showAbandonConfirm = true }
+            SettingsRow(stringResource(R.string.tsettings_abandon), destructive = true) { showAbandonConfirm = true }
         }
     }
 
@@ -77,25 +79,25 @@ fun TournamentSettingsScreen(
         val payload = JoinPayload(room = RoomCode.encode(roomId), server = account?.serverUrl, pw = readPassword, tid = current.id)
         AlertDialog(
             onDismissRequest = { showRoomCode = false },
-            title = { Text("Share this to let people watch") },
+            title = { Text(stringResource(R.string.hosting_share)) },
             text = { RoomCodeDisplay(payload) },
-            confirmButton = { TextButton(onClick = { showRoomCode = false }) { Text("Close") } }
+            confirmButton = { TextButton(onClick = { showRoomCode = false }) { Text(stringResource(R.string.action_close)) } }
         )
     }
 
     if (showAbandonConfirm) {
         AlertDialog(
             onDismissRequest = { showAbandonConfirm = false },
-            title = { Text("Abandon tournament?") },
-            text = { Text("This deletes \"${current.name}\" from this device, including all recorded scores. This can't be undone.") },
+            title = { Text(stringResource(R.string.tsettings_abandon_title)) },
+            text = { Text(stringResource(R.string.tsettings_abandon_body, current.name)) },
             confirmButton = {
                 TextButton(onClick = {
                     showAbandonConfirm = false
                     viewModel.clearTournament()
                     onAbandoned()
-                }) { Text("Abandon") }
+                }) { Text(stringResource(R.string.tsettings_abandon_action)) }
             },
-            dismissButton = { TextButton(onClick = { showAbandonConfirm = false }) { Text("Cancel") } }
+            dismissButton = { TextButton(onClick = { showAbandonConfirm = false }) { Text(stringResource(R.string.action_cancel)) } }
         )
     }
 }

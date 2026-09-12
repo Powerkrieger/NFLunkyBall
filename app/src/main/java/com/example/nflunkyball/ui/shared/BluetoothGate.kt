@@ -1,5 +1,7 @@
 package com.example.nflunkyball.ui.shared
 
+import androidx.compose.ui.res.stringResource
+import com.example.nflunkyball.R
 import android.content.Intent
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -50,18 +52,18 @@ fun BluetoothGate(content: @Composable () -> Unit) {
         ) {
             if (hasAdapter) {
                 Text(
-                    "Bluetooth is off. NFLunkyBall needs it turned on to broadcast or view live scores.",
+                    stringResource(R.string.bluetooth_off_gate),
                     style = MaterialTheme.typography.bodyLarge
                 )
                 Button(
                     onClick = { launcher.launch(Intent(Settings.ACTION_BLUETOOTH_SETTINGS)) },
                     modifier = Modifier.padding(top = Spacing.md)
                 ) {
-                    Text("Open Bluetooth settings")
+                    Text(stringResource(R.string.bluetooth_open_settings))
                 }
             } else {
                 Text(
-                    "This device doesn't have Bluetooth, so live scores can't work here.",
+                    stringResource(R.string.bluetooth_unavailable),
                     style = MaterialTheme.typography.bodyLarge
                 )
             }

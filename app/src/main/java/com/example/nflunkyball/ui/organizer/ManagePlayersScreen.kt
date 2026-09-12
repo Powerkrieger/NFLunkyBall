@@ -1,5 +1,7 @@
 package com.example.nflunkyball.ui.organizer
 
+import androidx.compose.ui.res.stringResource
+import com.example.nflunkyball.R
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -51,13 +53,13 @@ fun ManagePlayersScreen(viewModel: OrganizerViewModel, onBack: () -> Unit) {
 
     Scaffold(
         topBar = {
-            BackTopBar(title = "Manage players", onBack = onBack)
+            BackTopBar(title = stringResource(R.string.players_title), onBack = onBack)
         }
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding).padding(Spacing.md)) {
             if (current.groups.isEmpty()) {
                 Text(
-                    "Add a group first (see Manage groups) before adding players.",
+                    stringResource(R.string.players_need_group),
                     style = MaterialTheme.typography.bodyMedium
                 )
             } else {
@@ -66,15 +68,14 @@ fun ManagePlayersScreen(viewModel: OrganizerViewModel, onBack: () -> Unit) {
                     onValueChange = { newPlayerName = it },
                     label = {
                         Text(
-                            if (current.squadSize > 1) "Team members (comma-separated, any number)"
-                            else "Player name"
+                            stringResource(if (current.squadSize > 1) R.string.players_members_label else R.string.player_name)
                         )
                     },
                     modifier = Modifier.fillMaxWidth()
                 )
                 if (current.groups.size > 1) {
                     DropdownField(
-                        label = "Group",
+                        label = stringResource(R.string.players_group_label),
                         options = current.groups.map { it.id to it.name },
                         selectedLabel = current.groups.firstOrNull { it.id == newPlayerGroupId }?.name
                             ?: current.groups.first().name,
@@ -90,7 +91,7 @@ fun ManagePlayersScreen(viewModel: OrganizerViewModel, onBack: () -> Unit) {
                     },
                     enabled = newPlayerName.isNotBlank(),
                     modifier = Modifier.fillMaxWidth().padding(top = Spacing.sm)
-                ) { Text("Add") }
+                ) { Text(stringResource(R.string.action_add)) }
             }
 
             HorizontalDivider(Modifier.padding(vertical = Spacing.md))
@@ -110,22 +111,22 @@ fun ManagePlayersScreen(viewModel: OrganizerViewModel, onBack: () -> Unit) {
                             Column(Modifier.weight(1f)) {
                                 Text(team.name, style = MaterialTheme.typography.bodyLarge)
                                 Text(
-                                    groupNameFor(team.id) ?: "No group",
+                                    groupNameFor(team.id) ?: stringResource(R.string.players_no_group),
                                     style = MaterialTheme.typography.bodySmall
                                 )
                                 if (!removable) {
                                     Text(
-                                        "Already has recorded results — can't remove",
+                                        stringResource(R.string.players_has_results),
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.error
                                     )
                                 }
                             }
                             IconButton(onClick = { renamingTeam = team }) {
-                                Icon(Icons.Default.Edit, contentDescription = "Rename ${team.name}")
+                                Icon(Icons.Default.Edit, contentDescription = stringResource(R.string.rename_named, team.name))
                             }
                             IconButton(onClick = { viewModel.removePlayer(team.id) }, enabled = removable) {
-                                Icon(Icons.Default.Delete, contentDescription = "Remove ${team.name}")
+                                Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.remove_named, team.name))
                             }
                         }
                     }
@@ -136,7 +137,7 @@ fun ManagePlayersScreen(viewModel: OrganizerViewModel, onBack: () -> Unit) {
 
     renamingTeam?.let { team ->
         RenameDialog(
-            title = "Rename player",
+            title = stringResource(R.string.player_rename_title),
             initialValue = team.name,
             onDismiss = { renamingTeam = null },
             onConfirm = { newName ->

@@ -1,5 +1,7 @@
 package com.example.nflunkyball.ui.organizer
 
+import androidx.compose.ui.res.stringResource
+import com.example.nflunkyball.R
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -104,42 +106,42 @@ fun SetupScreen(
             .padding(Spacing.md)
             .verticalScroll(rememberScrollState())
     ) {
-        Text("New tournament", style = MaterialTheme.typography.headlineSmall)
+        Text(stringResource(R.string.setup_title), style = MaterialTheme.typography.headlineSmall)
         OutlinedTextField(
             value = tournamentName,
             onValueChange = { tournamentName = it },
-            label = { Text("Tournament name") },
+            label = { Text(stringResource(R.string.setup_name)) },
             modifier = Modifier.fillMaxWidth().padding(top = Spacing.sm)
         )
 
-        Text("Format", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = Spacing.lg))
+        Text(stringResource(R.string.setup_format), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = Spacing.lg))
         Row(Modifier.padding(top = Spacing.xs), horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-            listOf(false to "Singles", true to "Teams").forEach { (isTeams, label) ->
+            listOf(false to R.string.setup_singles, true to R.string.setup_teams).forEach { (isTeams, label) ->
                 FilterChip(
                     selected = teamMode == isTeams,
                     // Changing the format mid-setup would leave half-built squads behind, so it's
                     // locked once the first team exists.
                     enabled = teams.isEmpty() && pendingMembers.isEmpty(),
                     onClick = { teamMode = isTeams },
-                    label = { Text(label) }
+                    label = { Text(stringResource(label)) }
                 )
             }
         }
         if (teamMode) {
             Text(
-                "Teams can be any size, and sides don't have to match — 2 v 3 is fine.",
+                stringResource(R.string.setup_teams_hint),
                 style = MaterialTheme.typography.bodySmall
             )
         }
 
         // Groups first — teams get assigned to a group as they're added below, so having the
         // groups already exist here means that dropdown is never empty.
-        Text("Groups", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = Spacing.lg))
+        Text(stringResource(R.string.setup_groups), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = Spacing.lg))
         Row(verticalAlignment = Alignment.CenterVertically) {
             OutlinedTextField(
                 value = groupNameInput,
                 onValueChange = { groupNameInput = it },
-                label = { Text("Group name") },
+                label = { Text(stringResource(R.string.group_name)) },
                 modifier = Modifier.weight(1f)
             )
             Button(
@@ -151,19 +153,19 @@ fun SetupScreen(
                     }
                 },
                 modifier = Modifier.padding(start = Spacing.sm)
-            ) { Text("Add") }
+            ) { Text(stringResource(R.string.action_add)) }
         }
-        groupNames.forEach { name -> Text("• $name", Modifier.padding(vertical = 2.dp)) }
+        groupNames.forEach { name -> Text(stringResource(R.string.setup_group_bullet, name), Modifier.padding(vertical = 2.dp)) }
 
         Text(
-            if (teamMode) "Teams" else "Players",
+            stringResource(if (teamMode) R.string.setup_teams else R.string.setup_players),
             style = MaterialTheme.typography.titleMedium,
             modifier = Modifier.padding(top = Spacing.lg)
         )
         if (teamMode) {
             Text(
-                if (pendingMembers.isEmpty()) "Pick the players for the next team, then add it"
-                else "Next team: ${Team.autoName(pendingMembers)}",
+                if (pendingMembers.isEmpty()) stringResource(R.string.setup_pick_members)
+                else stringResource(R.string.setup_next_team, Team.autoName(pendingMembers)),
                 style = MaterialTheme.typography.bodySmall
             )
             if (pendingMembers.isNotEmpty()) {
@@ -179,7 +181,7 @@ fun SetupScreen(
                     }
                 }
                 Button(onClick = { addPendingTeam() }, modifier = Modifier.padding(top = Spacing.xs)) {
-                    Text("Add team (${pendingMembers.size})")
+                    Text(stringResource(R.string.setup_add_team, pendingMembers.size))
                 }
             }
         }
@@ -187,20 +189,20 @@ fun SetupScreen(
             OutlinedTextField(
                 value = playerNameInput,
                 onValueChange = { playerNameInput = it },
-                label = { Text("Player name") },
+                label = { Text(stringResource(R.string.player_name)) },
                 modifier = Modifier.weight(1f)
             )
             Button(
                 onClick = { addPlayer(playerNameInput); playerNameInput = "" },
                 modifier = Modifier.padding(start = Spacing.sm)
-            ) { Text("Add") }
+            ) { Text(stringResource(R.string.action_add)) }
         }
 
         // Already sorted by Elo desc (see OrganizerViewModel.loadKnownCompetitors).
         val suggestions = knownCompetitors.filter { it.name.lowercase() !in takenNames }
         if (suggestions.isNotEmpty()) {
             Text(
-                "Known players",
+                stringResource(R.string.setup_known_players),
                 style = MaterialTheme.typography.labelMedium,
                 modifier = Modifier.padding(top = Spacing.sm)
             )
@@ -208,7 +210,7 @@ fun SetupScreen(
                 items(suggestions) { competitor ->
                     SuggestionChip(
                         onClick = { addPlayer(competitor.name) },
-                        label = { Text("${competitor.name} (${competitor.elo.format1()})") },
+                        label = { Text(stringResource(R.string.setup_known_player_chip, competitor.name, competitor.elo.format1())) },
                         modifier = Modifier.padding(end = Spacing.sm)
                     )
                 }
@@ -233,7 +235,7 @@ fun SetupScreen(
                             teamIds.forEach { teamId -> assignments[teamId] = groupName }
                         }
                     }
-                ) { Text("Auto-assign to groups") }
+                ) { Text(stringResource(R.string.setup_auto_assign)) }
                 TextButton(
                     onClick = {
                         val assigned = assignGroupsRandomly(teams.map { it.id }, groupNames)
@@ -241,7 +243,7 @@ fun SetupScreen(
                             teamIds.forEach { teamId -> assignments[teamId] = groupName }
                         }
                     }
-                ) { Text("Random groups") }
+                ) { Text(stringResource(R.string.setup_random_groups)) }
             }
         }
 
@@ -260,7 +262,7 @@ fun SetupScreen(
                     focusManager.clearFocus()
                     expanded = true
                 }) {
-                    Text(assignments[team.id] ?: "Assign group")
+                    Text(assignments[team.id] ?: stringResource(R.string.setup_assign_group))
                 }
                 DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
                     groupNames.forEach { groupName ->
@@ -275,19 +277,20 @@ fun SetupScreen(
                     }
                 }
                 TextButton(onClick = { teams.remove(team); assignments.remove(team.id) }) {
-                    Text("✕")
+                    Text(stringResource(R.string.action_remove_short))
                 }
             }
         }
 
         val allAssigned = teams.isNotEmpty() && teams.all { assignments.containsKey(it.id) }
+        val defaultName = stringResource(R.string.setup_default_name)
         Button(
             onClick = {
                 val grouped = groupNames.associateWith { groupName ->
                     teams.filter { assignments[it.id] == groupName }.map { it.id }
                 }
                 onStart(
-                    tournamentName.ifBlank { "Flunkyball Tournament" },
+                    tournamentName.ifBlank { defaultName },
                     teams.toList(),
                     grouped,
                     if (teamMode) teams.maxOf { it.memberNames.size } else 1
@@ -295,7 +298,7 @@ fun SetupScreen(
             },
             enabled = tournamentName.isNotBlank() && allAssigned && pendingMembers.isEmpty(),
             modifier = Modifier.fillMaxWidth().padding(top = Spacing.lg, bottom = Spacing.lg)
-        ) { Text("Start Group Stage") }
+        ) { Text(stringResource(R.string.setup_start)) }
     }
 }
 
@@ -305,21 +308,15 @@ private fun ActiveTournamentGuard(name: String, pendingUpload: Boolean, onNaviga
         Modifier.fillMaxSize().padding(Spacing.lg),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text("You already have an active tournament", style = MaterialTheme.typography.headlineSmall)
+        Text(stringResource(R.string.setup_active_title), style = MaterialTheme.typography.headlineSmall)
         Text(
-            if (pendingUpload) {
-                "\"$name\" is finished but hasn't been uploaded to history yet. Retry the upload " +
-                    "or discard it before starting another one."
-            } else {
-                "\"$name\" is still in progress on this device. Finish or abandon it before " +
-                    "starting another one."
-            },
+            stringResource(if (pendingUpload) R.string.setup_active_pending else R.string.setup_active_in_progress, name),
             style = MaterialTheme.typography.bodyMedium,
             modifier = Modifier.padding(top = Spacing.sm)
         )
         Button(
             onClick = onNavigateToMyTournaments,
             modifier = Modifier.fillMaxWidth().padding(top = Spacing.lg)
-        ) { Text("Go to My tournaments") }
+        ) { Text(stringResource(R.string.setup_go_my_tournaments)) }
     }
 }

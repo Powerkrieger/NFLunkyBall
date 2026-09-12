@@ -1,5 +1,7 @@
 package com.example.nflunkyball.ui.shared
 
+import androidx.compose.ui.res.stringResource
+import com.example.nflunkyball.R
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -41,14 +43,14 @@ fun PermissionsGate(content: @Composable () -> Unit) {
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
-                "NFLunkyBall needs Bluetooth and camera access to broadcast/view scores and scan join codes.",
+                stringResource(R.string.permissions_body),
                 style = MaterialTheme.typography.bodyLarge
             )
             Button(
                 onClick = { launcher.launch(BlePermissions.required) },
                 modifier = Modifier.padding(top = Spacing.md)
             ) {
-                Text("Grant permissions")
+                Text(stringResource(R.string.permissions_grant))
             }
         }
     }

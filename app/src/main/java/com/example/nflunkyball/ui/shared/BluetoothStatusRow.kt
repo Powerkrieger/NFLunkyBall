@@ -1,5 +1,7 @@
 package com.example.nflunkyball.ui.shared
 
+import androidx.compose.ui.res.stringResource
+import com.example.nflunkyball.R
 import android.content.Intent
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -44,9 +46,9 @@ fun BluetoothStatusRow(modifier: Modifier = Modifier) {
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text("Bluetooth is off", style = MaterialTheme.typography.bodyMedium)
+        Text(stringResource(R.string.bluetooth_off_short), style = MaterialTheme.typography.bodyMedium)
         TextButton(onClick = { launcher.launch(Intent(Settings.ACTION_BLUETOOTH_SETTINGS)) }) {
-            Text("Turn on")
+            Text(stringResource(R.string.bluetooth_turn_on))
         }
     }
 }

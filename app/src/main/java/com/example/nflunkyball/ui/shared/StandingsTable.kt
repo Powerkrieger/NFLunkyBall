@@ -1,5 +1,7 @@
 package com.example.nflunkyball.ui.shared
 
+import androidx.compose.ui.res.stringResource
+import com.example.nflunkyball.R
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -28,9 +30,9 @@ fun StandingsTable(
     ) {
         Column(Modifier.padding(horizontal = Spacing.md, vertical = Spacing.sm)) {
             Row(Modifier.padding(vertical = Spacing.xs)) {
-                Text("Team", Modifier.weight(2f), style = MaterialTheme.typography.labelMedium)
-                Text("W", Modifier.width(32.dp), style = MaterialTheme.typography.labelMedium)
-                Text("L", Modifier.width(32.dp), style = MaterialTheme.typography.labelMedium)
+                Text(stringResource(R.string.standings_team), Modifier.weight(2f), style = MaterialTheme.typography.labelMedium)
+                Text(stringResource(R.string.standings_wins_short), Modifier.width(32.dp), style = MaterialTheme.typography.labelMedium)
+                Text(stringResource(R.string.standings_losses_short), Modifier.width(32.dp), style = MaterialTheme.typography.labelMedium)
             }
             HorizontalDivider()
             standings.forEach { standing ->

@@ -1,5 +1,8 @@
 package com.example.nflunkyball.ui.viewer
 
+import com.example.nflunkyball.ui.text
+import androidx.compose.ui.res.stringResource
+import com.example.nflunkyball.R
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.getValue
 import androidx.compose.foundation.clickable
@@ -67,7 +70,7 @@ fun PlayerStatsScreen(
 
     Scaffold(
         topBar = {
-            BackTopBar(title = stats?.name ?: "Player", onBack = onBack)
+            BackTopBar(title = stats?.name ?: stringResource(R.string.player_title_fallback), onBack = onBack)
         }
     ) { padding ->
         Column(
@@ -79,70 +82,75 @@ fun PlayerStatsScreen(
                 modifier = Modifier.padding(bottom = Spacing.sm)
             )
             if (stats == null) {
-                Text((state as? LoadState.Failed)?.message ?: "Loading…", style = MaterialTheme.typography.bodyMedium)
+                Text((state as? LoadState.Failed)?.text() ?: stringResource(R.string.loading), style = MaterialTheme.typography.bodyMedium)
                 return@Column
             }
 
             Text(
-                "${stats.wins}W ${stats.losses}L · Elo ${stats.elo.format1()}",
+                stringResource(R.string.player_summary, stats.wins, stats.losses, stats.elo.format1()),
                 style = MaterialTheme.typography.titleMedium
             )
             if (stats.wins + stats.losses == 0) {
-                Text("No matches played yet", style = MaterialTheme.typography.bodyMedium)
+                Text(stringResource(R.string.player_no_matches), style = MaterialTheme.typography.bodyMedium)
             } else {
                 Text(
-                    if (stats.currentStreak > 0) "Current streak: ${stats.currentStreak}W"
-                    else if (stats.currentStreak < 0) "Current streak: ${-stats.currentStreak}L"
-                    else "Current streak: none",
+                    if (stats.currentStreak > 0) stringResource(R.string.player_streak_wins, stats.currentStreak)
+                    else if (stats.currentStreak < 0) stringResource(R.string.player_streak_losses, -stats.currentStreak)
+                    else stringResource(R.string.player_streak_none),
                     style = MaterialTheme.typography.bodyMedium
                 )
-                Text("Longest win streak: ${stats.longestWinStreak}", style = MaterialTheme.typography.bodyMedium)
+                Text(stringResource(R.string.player_longest_streak, stats.longestWinStreak), style = MaterialTheme.typography.bodyMedium)
             }
             Spacer2()
             // Both are the same underlying measurement (winnerScore = the loser's own
             // beer-finishing time, credited as the winner's score — see the backend's
             // player_detail_stats doc) viewed from either side of this player's matches.
             stats.avgSecondsWhenLost?.let {
-                Text("When they lose, they average ${it.format1()}s to finish their drink")
+                Text(stringResource(R.string.player_avg_lost, it.format1()))
             }
             stats.avgSecondsOpponentsWhenWon?.let {
-                Text("When they win, their opponent averages ${it.format1()}s to finish theirs")
+                Text(stringResource(R.string.player_avg_won, it.format1()))
             }
             stats.forfeitRate?.let {
-                Text("Forfeit rate (when losing): ${(it * 100).toInt()}%")
+                Text(stringResource(R.string.player_forfeit_rate, (it * 100).toInt()))
             }
             if (stats.forfeitedDrinks > 0) {
-                Text("Drinks refused: ${stats.forfeitedDrinks}")
+                Text(stringResource(R.string.player_drinks_refused, stats.forfeitedDrinks))
             }
             stats.favoriteDrink?.let {
-                Text("Favorite drink: $it")
+                Text(stringResource(R.string.player_favorite_drink, it))
             }
             Spacer2()
-            OpponentLine("Best matchup", stats.bestOpponent, onOpenPlayer)
-            OpponentLine("Toughest matchup", stats.worstOpponent, onOpenPlayer)
-            OpponentLine("Nemesis (most played)", stats.nemesis, onOpenPlayer)
+            OpponentLine(stringResource(R.string.player_best_matchup), stats.bestOpponent, onOpenPlayer)
+            OpponentLine(stringResource(R.string.player_toughest_matchup), stats.worstOpponent, onOpenPlayer)
+            OpponentLine(stringResource(R.string.player_nemesis), stats.nemesis, onOpenPlayer)
             SimilarPlayerLine(stats.mostSimilarPlayer, onOpenPlayer)
 
-            val byTournament = remember(stats) {
+            val tournamentPointFormat = stringResource(R.string.player_elo_point_tournament)
+            val matchPointFormat = stringResource(R.string.player_elo_point_match)
+            val withFormat = stringResource(R.string.player_with_teammates)
+            val wonShort = stringResource(R.string.player_won_short)
+            val lostShort = stringResource(R.string.player_lost_short)
+            val byTournament = remember(stats, tournamentPointFormat) {
                 stats.eloHistory.map {
-                    EloPoint("${it.tournamentName} (${it.date.take(10)})", it.rating) { onOpenTournament(it.tournamentId) }
+                    EloPoint(tournamentPointFormat.format(it.tournamentName, it.date.take(10)), it.rating) { onOpenTournament(it.tournamentId) }
                 }
             }
-            val byMatch = remember(stats) {
+            val byMatch = remember(stats, matchPointFormat) {
                 stats.eloMatchHistory.map {
-                    val with = if (it.teammates.isEmpty()) "" else " with ${it.teammates.joinToString(" & ") { t -> t.name }}"
-                    EloPoint("${if (it.won) "W" else "L"} · vs ${it.opponentName}$with (${it.date.take(10)})", it.rating) {
+                    val with = if (it.teammates.isEmpty()) "" else withFormat.format(it.teammates.joinToString(" & ") { t -> t.name })
+                    EloPoint(matchPointFormat.format(if (it.won) wonShort else lostShort, it.opponentName, with, it.date.take(10)), it.rating) {
                         onOpenMatch(it.matchId)
                     }
                 }
             }
             if (byTournament.isNotEmpty() || byMatch.isNotEmpty()) {
                 Spacer2()
-                Text("Elo over time", style = MaterialTheme.typography.titleMedium)
+                Text(stringResource(R.string.player_elo_over_time), style = MaterialTheme.typography.titleMedium)
                 var granularity by remember { mutableIntStateOf(0) }
                 TabRow(selectedTabIndex = granularity) {
-                    Tab(selected = granularity == 0, onClick = { granularity = 0 }, text = { Text("By tournament") })
-                    Tab(selected = granularity == 1, onClick = { granularity = 1 }, text = { Text("By match") })
+                    Tab(selected = granularity == 0, onClick = { granularity = 0 }, text = { Text(stringResource(R.string.player_by_tournament)) })
+                    Tab(selected = granularity == 1, onClick = { granularity = 1 }, text = { Text(stringResource(R.string.player_by_match)) })
                 }
                 val points = if (granularity == 0) byTournament else byMatch
                 EloChart(points, modifier = Modifier.padding(top = Spacing.sm))
@@ -172,19 +180,19 @@ private fun Spacer2() {
 private fun OpponentLine(label: String, opponent: OpponentSummary?, onOpenPlayer: (Int) -> Unit) {
     if (opponent != null) {
         LinkLine(
-            "$label: ${opponent.name} (${(opponent.winRate * 100).toInt()}% over ${opponent.matches} matches)"
+            stringResource(R.string.player_opponent_line, label, opponent.name, (opponent.winRate * 100).toInt(), opponent.matches)
         ) { onOpenPlayer(opponent.id) }
     } else {
-        Text("$label: not enough data yet")
+        Text(stringResource(R.string.player_not_enough_data, label))
     }
 }
 
 @Composable
 private fun SimilarPlayerLine(similar: SimilarPlayer?, onOpenPlayer: (Int) -> Unit) {
     if (similar != null) {
-        LinkLine("Most similar player: ${similar.name}") { onOpenPlayer(similar.id) }
+        LinkLine(stringResource(R.string.player_most_similar, similar.name)) { onOpenPlayer(similar.id) }
     } else {
-        Text("Most similar player: not enough data yet")
+        Text(stringResource(R.string.player_most_similar_none))
     }
 }
 

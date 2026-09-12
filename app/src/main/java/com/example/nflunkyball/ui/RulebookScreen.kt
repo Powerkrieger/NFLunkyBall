@@ -1,5 +1,7 @@
 package com.example.nflunkyball.ui
 
+import androidx.compose.ui.res.stringResource
+import com.example.nflunkyball.R
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -19,7 +21,7 @@ import com.example.nflunkyball.ui.theme.Spacing
 fun RulebookScreen(onBack: () -> Unit) {
     Scaffold(
         topBar = {
-            BackTopBar(title = "Rulebook", onBack = onBack)
+            BackTopBar(title = stringResource(R.string.rulebook_title), onBack = onBack)
         }
     ) { padding ->
         Box(
@@ -27,7 +29,7 @@ fun RulebookScreen(onBack: () -> Unit) {
             contentAlignment = Alignment.Center
         ) {
             Text(
-                "Der Schiedsrichter hat immer Recht.",
+                stringResource(R.string.rulebook_rule_1),
                 style = MaterialTheme.typography.headlineSmall,
                 textAlign = TextAlign.Center
             )

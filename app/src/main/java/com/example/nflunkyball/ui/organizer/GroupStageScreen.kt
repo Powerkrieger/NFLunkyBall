@@ -1,5 +1,7 @@
 package com.example.nflunkyball.ui.organizer
 
+import androidx.compose.ui.res.stringResource
+import com.example.nflunkyball.R
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -70,7 +72,7 @@ fun GroupStageScreen(
                 Button(
                     onClick = onAdvanceToBracket,
                     modifier = Modifier.fillMaxWidth().padding(top = Spacing.lg, bottom = Spacing.lg)
-                ) { Text("Advance to Bracket") }
+                ) { Text(stringResource(R.string.group_stage_advance)) }
             }
             // Viewer emoji reactions (BLE mode only — server mode has no back-channel) float over
             // whatever the organizer is doing rather than needing their own screen.

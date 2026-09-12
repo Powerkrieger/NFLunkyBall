@@ -1,5 +1,7 @@
 package com.example.nflunkyball.ui.organizer
 
+import androidx.compose.ui.res.stringResource
+import com.example.nflunkyball.R
 import androidx.compose.foundation.layout.Column
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
@@ -22,13 +24,14 @@ import com.example.nflunkyball.sync.SyncState
  */
 /** The one-line status text for server-mode sync, shared by the top bar and HostingScreen;
  *  null when there's nothing to say (BLE mode / not hosting). */
+@Composable
 fun SyncState.label(): String? = when (this) {
     SyncState.Off -> null
-    SyncState.NotLinked -> "Not linked — link an organizer account to sync"
-    SyncState.Starting -> "Starting sync…"
-    SyncState.Syncing -> "Syncing…"
-    SyncState.Synced -> "Synced"
-    is SyncState.Failed -> "Sync failed: $message"
+    SyncState.NotLinked -> stringResource(R.string.sync_not_linked)
+    SyncState.Starting -> stringResource(R.string.sync_starting)
+    SyncState.Syncing -> stringResource(R.string.sync_syncing)
+    SyncState.Synced -> stringResource(R.string.sync_synced)
+    is SyncState.Failed -> stringResource(R.string.sync_failed, message)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -46,8 +49,8 @@ fun OrganizerTopBar(
             Column {
                 Text(title)
                 if (viewModel.useBleSync()) {
-                    if (broadcastVersion != null) {
-                        Text("Broadcasting v$broadcastVersion", style = MaterialTheme.typography.labelSmall)
+                    broadcastVersion?.let { version ->
+                        Text(stringResource(R.string.topbar_broadcasting, version), style = MaterialTheme.typography.labelSmall)
                     }
                 } else {
                     serverSyncStatus.label()?.let { Text(it, style = MaterialTheme.typography.labelSmall) }
@@ -56,7 +59,7 @@ fun OrganizerTopBar(
         },
         actions = {
             IconButton(onClick = onOpenSettings) {
-                Icon(Icons.Default.MoreVert, contentDescription = "Tournament settings")
+                Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.topbar_settings))
             }
         }
     )

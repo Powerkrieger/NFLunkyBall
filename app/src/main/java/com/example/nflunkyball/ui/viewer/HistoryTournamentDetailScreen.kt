@@ -1,5 +1,8 @@
 package com.example.nflunkyball.ui.viewer
 
+import com.example.nflunkyball.ui.text
+import androidx.compose.ui.res.stringResource
+import com.example.nflunkyball.R
 import androidx.compose.runtime.getValue
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -47,7 +50,7 @@ fun HistoryTournamentDetailScreen(
 
     when (val current = state) {
         is LoadState.Loaded -> TournamentBody(current.value.tournament, current.value.detail, onOpenMatch, onOpenPlayer)
-        is LoadState.Failed -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text(current.message) }
+        is LoadState.Failed -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text(current.text()) }
         LoadState.Idle, LoadState.Loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             CircularProgressIndicator()
         }
@@ -74,8 +77,8 @@ private fun TournamentBody(
         )
         detail?.let { d ->
             Text(d.date.take(10), style = MaterialTheme.typography.bodyMedium)
-            d.location?.takeIf { it.isNotBlank() }?.let { Text("Location: $it", style = MaterialTheme.typography.bodyMedium) }
-            d.referees?.takeIf { it.isNotBlank() }?.let { Text("Referees: $it", style = MaterialTheme.typography.bodyMedium) }
+            d.location?.takeIf { it.isNotBlank() }?.let { Text(stringResource(R.string.detail_location, it), style = MaterialTheme.typography.bodyMedium) }
+            d.referees?.takeIf { it.isNotBlank() }?.let { Text(stringResource(R.string.detail_referees, it), style = MaterialTheme.typography.bodyMedium) }
             d.comment?.takeIf { it.isNotBlank() }?.let {
                 Text(it, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = Spacing.xs))
             }
@@ -83,7 +86,7 @@ private fun TournamentBody(
 
         val squads = tournament.squadSize > 1 || tournament.teams.any { it.members.size > 1 }
         Text(
-            if (squads) "Teams" else "Players",
+            stringResource(if (squads) R.string.setup_teams else R.string.setup_players),
             style = MaterialTheme.typography.titleMedium,
             modifier = Modifier.padding(top = Spacing.lg)
         )
@@ -97,7 +100,7 @@ private fun TournamentBody(
             team.memberNames.forEachIndexed { index, member ->
                 val competitorId = memberIds.getOrNull(index)
                 Text(
-                    if (squads) "    $member" else member,
+                    if (squads) stringResource(R.string.detail_member_indented, member) else member,
                     color = if (competitorId != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier
                         .fillMaxWidth()
@@ -129,7 +132,7 @@ private fun TournamentBody(
         }
         if (tournament.bracketMatches.isNotEmpty()) {
             Text(
-                "Bracket",
+                stringResource(R.string.scoreboard_bracket),
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.padding(top = Spacing.lg)
             )

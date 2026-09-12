@@ -1,5 +1,9 @@
 package com.example.nflunkyball.ui.viewer
 
+import com.example.nflunkyball.ui.text
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
+import com.example.nflunkyball.R
 import androidx.compose.runtime.getValue
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
@@ -47,7 +51,7 @@ fun MatchDetailScreen(
 
     Scaffold(
         topBar = {
-            BackTopBar(title = detail?.let { "${it.teamAName} vs ${it.teamBName}" } ?: "Match", onBack = onBack)
+            BackTopBar(title = detail?.let { stringResource(R.string.match_versus, it.teamAName, it.teamBName) } ?: stringResource(R.string.match_title_fallback), onBack = onBack)
         }
     ) { padding ->
         Column(
@@ -55,7 +59,7 @@ fun MatchDetailScreen(
         ) {
             val match = detail
             if (match == null) {
-                Text((state as? LoadState.Failed)?.message ?: "Loading…", style = MaterialTheme.typography.bodyMedium)
+                Text((state as? LoadState.Failed)?.text() ?: stringResource(R.string.loading), style = MaterialTheme.typography.bodyMedium)
                 return@Column
             }
 
@@ -80,34 +84,40 @@ fun MatchDetailScreen(
             SideCard(name = match.teamBName, players = match.sideB, won = !match.winnerIsA, onOpenPlayer = onOpenPlayer)
             Spacer(Modifier.height(Spacing.md))
 
-            Text("Result", style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.match_result), style = MaterialTheme.typography.titleMedium)
             val winningName = if (match.winnerIsA) match.teamAName else match.teamBName
             val losers = if (match.winnerIsA) match.sideB else match.sideA
-            Text("$winningName wins")
+            Text(stringResource(R.string.match_wins, winningName))
             losers.forEach { loser ->
                 Text(loserLine(loser, showName = losers.size > 1))
             }
             Spacer(Modifier.height(Spacing.md))
 
-            Text("Head to head", style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.match_head_to_head), style = MaterialTheme.typography.titleMedium)
             val h2h = match.headToHead
             Text(
-                "${match.competitorA.name} ${h2h.winsA} – ${h2h.winsB} ${match.competitorB.name} " +
-                    "over ${h2h.matches} ${if (h2h.matches == 1) "match" else "matches"}"
+                pluralStringResource(
+                    R.plurals.match_h2h_line, h2h.matches,
+                    match.competitorA.name, h2h.winsA, h2h.winsB, match.competitorB.name, h2h.matches
+                )
             )
         }
     }
 }
 
+@Composable
 private fun loserLine(loser: MatchPlayer, showName: Boolean): String {
-    val seconds = loser.seconds ?: return if (showName) "${loser.name}: no time recorded" else "No time recorded"
-    val prefix = if (showName) "${loser.name}: " else ""
-    val refusals = when (loser.forfeitedDrinks) {
-        0 -> ""
-        1 -> " (incl. 1 refused drink)"
-        else -> " (incl. ${loser.forfeitedDrinks} refused drinks)"
+    val seconds = loser.seconds
+        ?: return if (showName) stringResource(R.string.match_no_time_named, loser.name) else stringResource(R.string.match_no_time)
+    val base = if (showName) {
+        stringResource(R.string.match_seconds_on_counter_named, loser.name, seconds)
+    } else {
+        stringResource(R.string.match_seconds_on_counter, seconds)
     }
-    return "$prefix$seconds seconds on the counter$refusals"
+    val refusals = if (loser.forfeitedDrinks == 0) "" else {
+        pluralStringResource(R.plurals.match_refusals_suffix, loser.forfeitedDrinks, loser.forfeitedDrinks)
+    }
+    return base + refusals
 }
 
 /** One side of the match: the squad name (or the player, for singles) and a tappable row per
@@ -123,7 +133,7 @@ private fun SideCard(name: String, players: List<MatchPlayer>, won: Boolean, onO
         Column(Modifier.fillMaxWidth().padding(horizontal = Spacing.md, vertical = Spacing.sm)) {
             Row(Modifier.fillMaxWidth()) {
                 Text(name, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-                Text(if (won) "Winner" else "Loser", style = MaterialTheme.typography.labelMedium)
+                Text(stringResource(if (won) R.string.match_winner else R.string.match_loser), style = MaterialTheme.typography.labelMedium)
             }
             players.forEach { player ->
                 Column(
@@ -136,12 +146,12 @@ private fun SideCard(name: String, players: List<MatchPlayer>, won: Boolean, onO
                     val after = player.eloAfter
                     if (before != null && after != null) {
                         Text(
-                            "Elo ${before.format1()} → ${after.format1()} (${(after - before).formatSigned1()})",
+                            stringResource(R.string.match_elo_line, before.format1(), after.format1(), (after - before).formatSigned1()),
                             style = MaterialTheme.typography.bodySmall
                         )
                     }
                     player.drink?.takeIf { it.isNotBlank() }?.let {
-                        Text("Drink: $it", style = MaterialTheme.typography.bodySmall)
+                        Text(stringResource(R.string.match_drink, it), style = MaterialTheme.typography.bodySmall)
                     }
                 }
             }
