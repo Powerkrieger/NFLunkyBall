@@ -26,13 +26,24 @@ import kotlinx.serialization.json.Json
 
 private const val TAG = "TournamentBroadcaster"
 
+/** Organizer-side live transport over BLE, as the sync layer sees it — see [TournamentBroadcaster]. */
+interface LiveBroadcaster {
+    /** Viewers' emoji reactions for the room being broadcast. */
+    val emojiEvents: SharedFlow<EmojiPacket>
+    /** The version currently being cycled out over BLE — null whenever nothing is on air. */
+    val broadcastVersion: StateFlow<Int?>
+    /** Starts (re)broadcasting on [roomId] with every new value from [tournamentUpdates]. */
+    fun start(roomId: Int, tournamentUpdates: Flow<Tournament>, scope: CoroutineScope)
+    fun stop()
+}
+
 /**
  * Organizer role: continuously broadcasts the current [Tournament] state as a room, and
  * listens for viewers' emoji reactions. Connectionless in both directions — see
  * `ble/` package docs / the project plan for why (needs to scale to ~20 simultaneous viewers,
  * past Bluetooth Classic's ~7-connection piconet limit).
  */
-class TournamentBroadcaster(private val adapter: BluetoothAdapter, private val context: Context) {
+class TournamentBroadcaster(private val adapter: BluetoothAdapter, private val context: Context) : LiveBroadcaster {
 
     // encodeDefaults=false (the kotlinx default) — every default-valued field omitted from the
     // wire payload shrinks the chunk count on this bandwidth-starved transport; decoding still
@@ -40,19 +51,16 @@ class TournamentBroadcaster(private val adapter: BluetoothAdapter, private val c
     private val json = Json
 
     private val _emojiEvents = MutableSharedFlow<EmojiPacket>(extraBufferCapacity = 32)
-    val emojiEvents: SharedFlow<EmojiPacket> = _emojiEvents
+    override val emojiEvents: SharedFlow<EmojiPacket> = _emojiEvents
 
-    /** The version currently being cycled out over BLE, so the hosting UI can show "broadcasting
-     *  version N" — null whenever nothing is actively broadcasting. */
     private val _broadcastVersion = MutableStateFlow<Int?>(null)
-    val broadcastVersion: StateFlow<Int?> = _broadcastVersion
+    override val broadcastVersion: StateFlow<Int?> = _broadcastVersion
 
     private var broadcastJob: Job? = null
     private var scanJob: Job? = null
 
-    /** Starts (re)broadcasting on [roomId] with every new value from [tournamentUpdates]. */
     @SuppressLint("MissingPermission")
-    fun start(roomId: Int, tournamentUpdates: Flow<Tournament>, scope: CoroutineScope) {
+    override fun start(roomId: Int, tournamentUpdates: Flow<Tournament>, scope: CoroutineScope) {
         stop()
 
         scanJob = scope.launch {
@@ -79,7 +87,7 @@ class TournamentBroadcaster(private val adapter: BluetoothAdapter, private val c
         }
     }
 
-    fun stop() {
+    override fun stop() {
         broadcastJob?.cancel()
         scanJob?.cancel()
         broadcastJob = null

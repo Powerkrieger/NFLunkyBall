@@ -1,16 +1,13 @@
 package com.example.nflunkyball.ui.organizer
 
-import android.app.Application
-import android.bluetooth.BluetoothAdapter
-import android.bluetooth.BluetoothManager
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.nflunkyball.ble.EmojiPalette
+import com.example.nflunkyball.ble.LiveBroadcaster
 import com.example.nflunkyball.ble.RoomCode
-import com.example.nflunkyball.ble.TournamentBroadcaster
 import com.example.nflunkyball.model.MatchDrinks
 import com.example.nflunkyball.model.MatchResult
 import com.example.nflunkyball.model.Team
@@ -30,16 +27,16 @@ import com.example.nflunkyball.model.withPhase
 import com.example.nflunkyball.model.withTeamAdded
 import com.example.nflunkyball.model.withTeamRemoved
 import com.example.nflunkyball.model.withTeamRenamed
-import com.example.nflunkyball.persistence.AppSettingsStore
+import com.example.nflunkyball.persistence.AppSettings
 import com.example.nflunkyball.persistence.FinishInfoStore
 import com.example.nflunkyball.persistence.MatchDrinkStore
 import com.example.nflunkyball.persistence.TournamentRepository
 import com.example.nflunkyball.server.CompetitorStats
+import com.example.nflunkyball.server.CredentialsStore
 import com.example.nflunkyball.server.Ed25519
 import com.example.nflunkyball.server.InvitePayloadCodec
 import com.example.nflunkyball.server.OrganizerAccount
-import com.example.nflunkyball.server.ServerCredentialsStore
-import com.example.nflunkyball.server.ServerApi
+import com.example.nflunkyball.server.ServerApiFactory
 import com.example.nflunkyball.server.ServerResult
 import com.example.nflunkyball.server.UploadSigner
 import com.example.nflunkyball.server.UploadTournament
@@ -61,17 +58,20 @@ import kotlinx.serialization.json.Json
  *  and [SettingsScreen]'s "Organizer account" section, which surfaces this. */
 enum class AccountSyncStatus { CHECKING, CAN_SYNC, REVOKED, UNKNOWN }
 
-class OrganizerViewModel(application: Application) : AndroidViewModel(application) {
+/** Dependencies come from [com.example.nflunkyball.AppContainer]; every one has a plain-JVM
+ *  substitute so this class is unit-testable. [broadcaster] is null on a device without
+ *  Bluetooth. */
+class OrganizerViewModel(
+    private val repository: TournamentRepository,
+    private val credentialsStore: CredentialsStore,
+    private val settings: AppSettings,
+    private val drinkStore: MatchDrinkStore,
+    private val finishInfoStore: FinishInfoStore,
+    private val broadcaster: LiveBroadcaster?,
+    private val serverApi: ServerApiFactory
+) : ViewModel() {
 
     private val uploadJson = Json { encodeDefaults = true }
-    private val repository = TournamentRepository(application)
-    private val credentialsStore = ServerCredentialsStore(application)
-    private val settingsStore = AppSettingsStore(application)
-    private val drinkStore = MatchDrinkStore(application)
-    private val finishInfoStore = FinishInfoStore(application)
-    private val bluetoothAdapter: BluetoothAdapter? =
-        application.getSystemService(BluetoothManager::class.java)?.adapter
-    private val broadcaster = bluetoothAdapter?.let { TournamentBroadcaster(it, application) }
 
     val tournament: StateFlow<Tournament?> = repository.tournament
 
@@ -134,7 +134,7 @@ class OrganizerViewModel(application: Application) : AndroidViewModel(applicatio
         }
         _accountSyncStatus.value = AccountSyncStatus.CHECKING
         viewModelScope.launch {
-            _accountSyncStatus.value = when (val result = ServerApi(account.serverUrl).getAccountStatus(account.accountId, password)) {
+            _accountSyncStatus.value = when (val result = serverApi(account.serverUrl).getAccountStatus(account.accountId, password)) {
                 is ServerResult.Success -> if (result.value.revoked) AccountSyncStatus.REVOKED else AccountSyncStatus.CAN_SYNC
                 is ServerResult.Failure -> AccountSyncStatus.UNKNOWN
             }
@@ -144,7 +144,9 @@ class OrganizerViewModel(application: Application) : AndroidViewModel(applicatio
     /** Read fresh each time rather than cached at construction — this ViewModel outlives a
      *  single visit to the Settings screen, so a toggle flipped there mid-session must be seen
      *  the next time hosting actually starts. */
-    fun useBleSync(): Boolean = settingsStore.useBleSync()
+    fun useBleSync(): Boolean = settings.useBleSync()
+
+    fun setUseBleSync(enabled: Boolean) = settings.setUseBleSync(enabled)
 
     /** Known players from past tournaments this group has recorded, so the organizer can pick
      *  existing ones instead of retyping — also how a returning organizer confirms their
@@ -153,7 +155,7 @@ class OrganizerViewModel(application: Application) : AndroidViewModel(applicatio
         val account = organizerAccount ?: return
         val password = readPassword ?: return
         viewModelScope.launch {
-            when (val result = ServerApi(account.serverUrl).listCompetitors(password)) {
+            when (val result = serverApi(account.serverUrl).listCompetitors(password)) {
                 is ServerResult.Success ->
                     knownCompetitors = result.value.sortedWith(compareByDescending<CompetitorStats> { it.elo }.thenBy { it.name })
                 is ServerResult.Failure -> Unit
@@ -172,12 +174,12 @@ class OrganizerViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun startHosting() {
         if (useBleSync()) {
-            val adapter = bluetoothAdapter ?: return
+            val broadcaster = broadcaster ?: return
             val id = tournament.value?.id?.let { RoomCode.forTournament(it) } ?: return
-            broadcaster?.start(id, repository.tournament.filterNotNull(), viewModelScope)
+            broadcaster.start(id, repository.tournament.filterNotNull(), viewModelScope)
             emojiBridgeJob?.cancel()
             emojiBridgeJob = viewModelScope.launch {
-                broadcaster?.emojiEvents?.collect { packet ->
+                broadcaster.emojiEvents.collect { packet ->
                     _emojiEvents.emit(EmojiPalette.emojiFor(packet.emojiCode))
                 }
             }
@@ -227,7 +229,7 @@ class OrganizerViewModel(application: Application) : AndroidViewModel(applicatio
         _serverSyncStatus.value = "Syncing…"
         val bodyJson = uploadJson.encodeToString(Tournament.serializer(), current)
         val signed = UploadSigner.sign(account.privateKeySeed, current.id, bodyJson)
-        val result = ServerApi(account.serverUrl)
+        val result = serverApi(account.serverUrl)
             .pushLiveTournament(current.id, account.accountId, signed.timestamp, signed.signatureBase64, bodyJson)
         _serverSyncStatus.value = when (result) {
             is ServerResult.Success -> "Synced"
@@ -340,7 +342,7 @@ class OrganizerViewModel(application: Application) : AndroidViewModel(applicatio
         viewModelScope.launch {
             val keyPair = Ed25519.generateKeyPair()
             val publicKeyB64 = Base64.encode(keyPair.publicKeyBytes)
-            when (val result = ServerApi(invite.server).register(invite.token, publicKeyB64)) {
+            when (val result = serverApi(invite.server).register(invite.token, publicKeyB64)) {
                 is ServerResult.Success -> {
                     val accountId = result.value.accountId
                     val displayName = result.value.displayName
@@ -400,7 +402,7 @@ class OrganizerViewModel(application: Application) : AndroidViewModel(applicatio
             val payload = current.toUploadPayload(drinkStore.all(), finishInfo)
             val bodyJson = uploadJson.encodeToString(UploadTournament.serializer(), payload)
             val signed = UploadSigner.sign(account.privateKeySeed, current.id, bodyJson)
-            val result = ServerApi(account.serverUrl)
+            val result = serverApi(account.serverUrl)
                 .uploadTournament(account.accountId, signed.timestamp, signed.signatureBase64, bodyJson)
             when (result) {
                 is ServerResult.Success -> clearTournament()

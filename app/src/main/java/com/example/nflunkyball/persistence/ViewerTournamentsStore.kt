@@ -46,8 +46,10 @@ object SavedTournamentList {
 
 /** Viewer-side persistence: recently joined and downloaded tournaments survive the app being
  *  killed, so reconnecting or browsing history never requires re-scanning a QR code. */
-class ViewerTournamentsStore(context: Context) {
-    private val file = JsonFile(File(context.filesDir, "viewer_tournaments.json"))
+class ViewerTournamentsStore(dir: File) {
+    constructor(context: Context) : this(context.filesDir)
+
+    private val file = JsonFile(File(dir, "viewer_tournaments.json"))
     private val json = Json { encodeDefaults = true; ignoreUnknownKeys = true }
     private val listSerializer = ListSerializer(SavedTournament.serializer())
 

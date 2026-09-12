@@ -19,6 +19,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -111,8 +112,9 @@ private object Routes {
 @Composable
 private fun NfLunkyBallApp() {
     val navController = rememberNavController()
-    val organizerViewModel: OrganizerViewModel = viewModel()
-    val viewerViewModel: ViewerViewModel = viewModel()
+    val factory = (LocalContext.current.applicationContext as NfLunkyBallApplication).container.viewModelFactory
+    val organizerViewModel: OrganizerViewModel = viewModel(factory = factory)
+    val viewerViewModel: ViewerViewModel = viewModel(factory = factory)
 
     // Evaluated once at composition (a device's link state doesn't change without an explicit
     // navigation afterward), so an already-linked device — organizer or viewer, however that was

@@ -16,26 +16,35 @@ import kotlinx.serialization.json.Json
 
 private const val TAG = "TournamentReceiver"
 
+/** Viewer-side live transport over BLE, as the sync layer sees it — see [TournamentReceiver]. */
+interface LiveReceiver {
+    /** Latest fully reassembled state for the joined room; reset to null on [start]. */
+    val tournament: StateFlow<Tournament?>
+    /** How much of the in-flight version has arrived — null until something has been received. */
+    val receiveProgress: StateFlow<ChunkProgress?>
+    fun start(roomId: Int, scope: CoroutineScope)
+    fun stop()
+    suspend fun sendEmoji(roomId: Int, emojiCode: Byte)
+}
+
 /**
  * Viewer role: scans for a room's broadcast [Tournament] state and can send emoji reactions.
  * Connectionless in both directions — see [TournamentBroadcaster].
  */
-class TournamentReceiver(private val adapter: BluetoothAdapter) {
+class TournamentReceiver(private val adapter: BluetoothAdapter) : LiveReceiver {
 
     private val json = Json { ignoreUnknownKeys = true }
 
     private val _tournament = MutableStateFlow<Tournament?>(null)
-    val tournament: StateFlow<Tournament?> = _tournament
+    override val tournament: StateFlow<Tournament?> = _tournament
 
-    /** How much of the in-flight version has arrived so far, for a "reading state of version N"
-     *  UI — null whenever nothing has been received yet (or since the last [stop]). */
     private val _receiveProgress = MutableStateFlow<ChunkProgress?>(null)
-    val receiveProgress: StateFlow<ChunkProgress?> = _receiveProgress
+    override val receiveProgress: StateFlow<ChunkProgress?> = _receiveProgress
 
     private var receiveJob: Job? = null
 
     @SuppressLint("MissingPermission")
-    fun start(roomId: Int, scope: CoroutineScope) {
+    override fun start(roomId: Int, scope: CoroutineScope) {
         stop()
         _tournament.value = null
         // Legacy and extended-advertising chunk streams carry the same tournament version but
@@ -82,14 +91,14 @@ class TournamentReceiver(private val adapter: BluetoothAdapter) {
         return reassemblers[BleConstants.TYPE_STATE_CHUNK]?.progress()
     }
 
-    fun stop() {
+    override fun stop() {
         receiveJob?.cancel()
         receiveJob = null
         _receiveProgress.value = null
     }
 
     @SuppressLint("MissingPermission")
-    suspend fun sendEmoji(roomId: Int, emojiCode: Byte) {
+    override suspend fun sendEmoji(roomId: Int, emojiCode: Byte) {
         val advertiser = adapter.bluetoothLeAdvertiser ?: return
         advertiser.burst(
             PacketCodec.encodeEmoji(EmojiPacket(roomId, emojiCode)),

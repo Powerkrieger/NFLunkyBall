@@ -15,8 +15,10 @@ import kotlinx.serialization.json.Json
  * directly) to ever carry it. Only merged in by [com.example.nflunkyball.ui.organizer.OrganizerViewModel.uploadToHistory]
  * via [com.example.nflunkyball.server.toUploadPayload], at the very end of a tournament.
  */
-class MatchDrinkStore(context: Context) {
-    private val file = JsonFile(File(context.filesDir, "match_drinks.json"))
+class MatchDrinkStore(dir: File) {
+    constructor(context: Context) : this(context.filesDir)
+
+    private val file = JsonFile(File(dir, "match_drinks.json"))
     private val json = Json { ignoreUnknownKeys = true }
 
     private var cache: MutableMap<String, MatchDrinks> = load()

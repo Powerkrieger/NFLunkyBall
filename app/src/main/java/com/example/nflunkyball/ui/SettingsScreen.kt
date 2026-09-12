@@ -27,8 +27,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
-import com.example.nflunkyball.persistence.AppSettingsStore
 import com.example.nflunkyball.ui.organizer.AccountSyncStatus
 import com.example.nflunkyball.ui.organizer.OrganizerViewModel
 import com.example.nflunkyball.ui.shared.BackTopBar
@@ -41,9 +39,7 @@ fun SettingsScreen(
     onBack: () -> Unit,
     onLinkAccount: () -> Unit
 ) {
-    val context = LocalContext.current
-    val settingsStore = remember { AppSettingsStore(context) }
-    var useBleSync by remember { mutableStateOf(settingsStore.useBleSync()) }
+    var useBleSync by remember { mutableStateOf(organizerViewModel.useBleSync()) }
     var showUnlinkConfirm by remember { mutableStateOf(false) }
     val account = organizerViewModel.organizerAccount
     val syncStatus by organizerViewModel.accountSyncStatus.collectAsState()
@@ -133,7 +129,7 @@ fun SettingsScreen(
                         checked = useBleSync,
                         onCheckedChange = {
                             useBleSync = it
-                            settingsStore.setUseBleSync(it)
+                            organizerViewModel.setUseBleSync(it)
                         }
                     )
                 }

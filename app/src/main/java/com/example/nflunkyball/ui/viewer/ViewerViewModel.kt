@@ -1,29 +1,27 @@
 package com.example.nflunkyball.ui.viewer
 
-import android.app.Application
-import android.bluetooth.BluetoothAdapter
-import android.bluetooth.BluetoothManager
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.nflunkyball.ble.EmojiPalette
+import com.example.nflunkyball.ble.LiveReceiver
 import com.example.nflunkyball.ble.RoomCode
-import com.example.nflunkyball.ble.TournamentReceiver
 import com.example.nflunkyball.ble.ChunkProgress
 import com.example.nflunkyball.model.Tournament
 import com.example.nflunkyball.model.TournamentPhase
-import com.example.nflunkyball.persistence.AppSettingsStore
+import com.example.nflunkyball.persistence.AppSettings
 import com.example.nflunkyball.persistence.SavedTournament
 import com.example.nflunkyball.persistence.ViewerTournamentsStore
 import com.example.nflunkyball.qr.JoinPayload
 import com.example.nflunkyball.server.CompetitorDetailStats
 import com.example.nflunkyball.server.CompetitorStats
+import com.example.nflunkyball.server.CredentialsStore
 import com.example.nflunkyball.server.MatchDetail
 import com.example.nflunkyball.server.ServerApi
+import com.example.nflunkyball.server.ServerApiFactory
 import com.example.nflunkyball.server.TournamentDetail
-import com.example.nflunkyball.server.ServerCredentialsStore
 import com.example.nflunkyball.server.ServerResult
 import com.example.nflunkyball.server.StatsMode
 import com.example.nflunkyball.server.TournamentSummary
@@ -39,15 +37,17 @@ import kotlinx.serialization.json.Json
  *  freshness for simplicity; BLE mode (the fallback for offline venues) is still near-instant. */
 private const val LIVE_POLL_INTERVAL_MS = 12_000L
 
-class ViewerViewModel(application: Application) : AndroidViewModel(application) {
+/** Dependencies come from [com.example.nflunkyball.AppContainer]; every one has a plain-JVM
+ *  substitute so this class is unit-testable. [receiver] is null on a device without Bluetooth. */
+class ViewerViewModel(
+    private val receiver: LiveReceiver?,
+    private val credentialsStore: CredentialsStore,
+    private val settings: AppSettings,
+    private val tournamentsStore: ViewerTournamentsStore,
+    private val serverApi: ServerApiFactory
+) : ViewModel() {
 
     private val fetchJson = Json { ignoreUnknownKeys = true }
-    private val bluetoothAdapter: BluetoothAdapter? =
-        application.getSystemService(BluetoothManager::class.java)?.adapter
-    private val receiver = bluetoothAdapter?.let { TournamentReceiver(it) }
-    private val credentialsStore = ServerCredentialsStore(application)
-    private val settingsStore = AppSettingsStore(application)
-    private val tournamentsStore = ViewerTournamentsStore(application)
 
     /** Fed either by a bridge collecting [TournamentReceiver.tournament] (BLE mode) or by a
      *  polling loop hitting the server's live-sync endpoint (server mode) — see [join]. Not
@@ -134,7 +134,7 @@ class ViewerViewModel(application: Application) : AndroidViewModel(application) 
     /** Read fresh each time rather than cached at construction — this ViewModel outlives a
      *  single visit to the Settings screen, so a toggle flipped there mid-session must be seen
      *  the next time a room is joined. */
-    fun useBleSync(): Boolean = settingsStore.useBleSync()
+    fun useBleSync(): Boolean = settings.useBleSync()
 
     fun join(payload: JoinPayload) {
         joinPayload = payload
@@ -179,7 +179,7 @@ class ViewerViewModel(application: Application) : AndroidViewModel(application) 
         val password = payload.pw
         return viewModelScope.launch {
             if (server == null || tournamentId == null || password == null) return@launch
-            val api = ServerApi(server)
+            val api = serverApi(server)
             while (isActive) {
                 when (val result = api.getLiveTournamentJson(tournamentId, password)) {
                     is ServerResult.Success -> decodeCachedTournament(result.value)?.let { _tournament.value = it }
@@ -213,7 +213,7 @@ class ViewerViewModel(application: Application) : AndroidViewModel(application) 
             ?: credentialsStore.loadAccount()?.serverUrl
             ?: return null
         val password = joinPayload?.pw ?: credentialsStore.loadReadPassword() ?: return null
-        return ReadAccess(ServerApi(server), password)
+        return ReadAccess(serverApi(server), password)
     }
 
     fun sendEmoji(emoji: String) {

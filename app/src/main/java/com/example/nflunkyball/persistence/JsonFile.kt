@@ -35,9 +35,14 @@ internal class JsonFile(private val file: File) {
         writer.execute { file.delete() }
     }
 
-    private companion object {
+    internal companion object {
         val writer = Executors.newSingleThreadExecutor { runnable ->
             Thread(runnable, "json-file-writer").apply { isDaemon = true }
+        }
+
+        /** Blocks until every write/delete queued so far has hit disk — for tests only. */
+        fun awaitIdle() {
+            writer.submit {}.get()
         }
     }
 }

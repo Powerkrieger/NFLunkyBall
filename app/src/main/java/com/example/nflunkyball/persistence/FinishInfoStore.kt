@@ -12,8 +12,10 @@ import kotlinx.serialization.json.Json
  * asking for date/location/referees again — and so the finished tournament itself is never
  * discarded until the server actually has it. Cleared together with [MatchDrinkStore].
  */
-class FinishInfoStore(context: Context) {
-    private val file = JsonFile(File(context.filesDir, "finish_info.json"))
+class FinishInfoStore(dir: File) {
+    constructor(context: Context) : this(context.filesDir)
+
+    private val file = JsonFile(File(dir, "finish_info.json"))
     private val json = Json { ignoreUnknownKeys = true }
 
     private var cache: TournamentFinishInfo? = load()

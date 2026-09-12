@@ -8,8 +8,10 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.serialization.json.Json
 
 /** Organizer-side persistence: the in-progress tournament survives the app being killed. */
-class TournamentRepository(context: Context) {
-    private val file = JsonFile(File(context.filesDir, "tournament.json"))
+class TournamentRepository(dir: File) {
+    constructor(context: Context) : this(context.filesDir)
+
+    private val file = JsonFile(File(dir, "tournament.json"))
     private val json = Json { encodeDefaults = true }
 
     private val _tournament = MutableStateFlow(load())

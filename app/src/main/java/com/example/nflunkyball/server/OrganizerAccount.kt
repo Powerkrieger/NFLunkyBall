@@ -17,9 +17,26 @@ data class OrganizerAccount(
  * On-device storage for server credentials: the organizer's account/keypair (if this device has
  * linked one — the private key never leaves it) and the shared group read password (used by
  * both the organizer, to embed in the QR it shows viewers, and viewers themselves, to unlock the
- * history screens).
+ * history screens). Interface so JVM tests can substitute an in-memory one.
  */
-class ServerCredentialsStore(context: Context) {
+interface CredentialsStore {
+    fun loadAccount(): OrganizerAccount?
+    fun saveAccount(account: OrganizerAccount)
+    fun loadReadPassword(): String?
+    fun saveReadPassword(password: String)
+    /** Last known server address for a pure viewer (never linked an organizer account) —
+     *  so returning to History after reopening the app works without rescanning a QR. */
+    fun loadViewerServerUrl(): String?
+    fun saveViewerServerUrl(serverUrl: String)
+    /** Clears only the organizer identity (which account, and its keypair) — not the shared
+     *  read password or last-known viewer server URL, since neither is specific to *being* an
+     *  organizer (the read password unlocks history for viewers too; see [OrganizerViewModel.unlinkAccount]
+     *  for why unlinking shouldn't reach further than the account itself). */
+    fun clearAccount()
+}
+
+/** [CredentialsStore] on EncryptedSharedPreferences. */
+class ServerCredentialsStore(context: Context) : CredentialsStore {
 
     private val prefs = EncryptedSharedPreferences.create(
         context,
@@ -29,7 +46,7 @@ class ServerCredentialsStore(context: Context) {
         EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
     )
 
-    fun loadAccount(): OrganizerAccount? {
+    override fun loadAccount(): OrganizerAccount? {
         val accountId = prefs.getInt(KEY_ACCOUNT_ID, -1)
         if (accountId == -1) return null
         val displayName = prefs.getString(KEY_DISPLAY_NAME, null) ?: return null
@@ -41,7 +58,7 @@ class ServerCredentialsStore(context: Context) {
         return OrganizerAccount(accountId, displayName, serverUrl, privateKeySeed, publicKeyBytes)
     }
 
-    fun saveAccount(account: OrganizerAccount) {
+    override fun saveAccount(account: OrganizerAccount) {
         prefs.edit()
             .putInt(KEY_ACCOUNT_ID, account.accountId)
             .putString(KEY_DISPLAY_NAME, account.displayName)
@@ -51,25 +68,19 @@ class ServerCredentialsStore(context: Context) {
             .apply()
     }
 
-    fun loadReadPassword(): String? = prefs.getString(KEY_READ_PASSWORD, null)
+    override fun loadReadPassword(): String? = prefs.getString(KEY_READ_PASSWORD, null)
 
-    fun saveReadPassword(password: String) {
+    override fun saveReadPassword(password: String) {
         prefs.edit().putString(KEY_READ_PASSWORD, password).apply()
     }
 
-    /** Last known server address for a pure viewer (never linked an organizer account) —
-     *  so returning to History after reopening the app works without rescanning a QR. */
-    fun loadViewerServerUrl(): String? = prefs.getString(KEY_VIEWER_SERVER_URL, null)
+    override fun loadViewerServerUrl(): String? = prefs.getString(KEY_VIEWER_SERVER_URL, null)
 
-    fun saveViewerServerUrl(serverUrl: String) {
+    override fun saveViewerServerUrl(serverUrl: String) {
         prefs.edit().putString(KEY_VIEWER_SERVER_URL, serverUrl).apply()
     }
 
-    /** Clears only the organizer identity (which account, and its keypair) — not the shared
-     *  read password or last-known viewer server URL, since neither is specific to *being* an
-     *  organizer (the read password unlocks history for viewers too; see [OrganizerViewModel.unlinkAccount]
-     *  for why unlinking shouldn't reach further than the account itself). */
-    fun clearAccount() {
+    override fun clearAccount() {
         prefs.edit()
             .remove(KEY_ACCOUNT_ID)
             .remove(KEY_DISPLAY_NAME)
