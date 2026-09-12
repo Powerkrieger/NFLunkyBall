@@ -5,9 +5,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.nflunkyball.ble.EmojiPalette
 import com.example.nflunkyball.ble.LiveBroadcaster
-import com.example.nflunkyball.ble.RoomCode
 import com.example.nflunkyball.model.MatchDrinks
 import com.example.nflunkyball.model.MatchResult
 import com.example.nflunkyball.model.Team
@@ -39,16 +37,11 @@ import com.example.nflunkyball.server.CredentialsStore
 import com.example.nflunkyball.server.OrganizerAccount
 import com.example.nflunkyball.server.ServerApiFactory
 import com.example.nflunkyball.server.ServerResult
-import com.example.nflunkyball.server.UploadSigner
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.MutableStateFlow
+import com.example.nflunkyball.sync.LiveSyncHost
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.launch
-import kotlinx.serialization.json.Json
 
 /** Dependencies come from [com.example.nflunkyball.AppContainer]; every one has a plain-JVM
  *  substitute so this class is unit-testable. [broadcaster] is null on a device without
@@ -63,30 +56,18 @@ class OrganizerViewModel(
     private val serverApi: ServerApiFactory
 ) : ViewModel() {
 
-    private val liveJson = Json { encodeDefaults = true }
     private val accountManager = AccountManager(credentialsStore, serverApi, viewModelScope)
+    private val liveSync = LiveSyncHost(settings, broadcaster, account = { accountManager.account.value }, serverApi, viewModelScope)
     private val uploader = ArchiveUploader(
         repository, drinkStore, finishInfoStore, account = { accountManager.account.value }, serverApi, viewModelScope
     )
 
     val tournament: StateFlow<Tournament?> = repository.tournament
 
-    /** The version currently on air, or null while hosting is off/not yet started — see
-     *  [HostingScreen]'s "broadcasting version N" status. Only moves in BLE mode. */
-    val broadcastVersion: StateFlow<Int?> = broadcaster?.broadcastVersion ?: MutableStateFlow(null)
-
-    /** Server-mode counterpart to [broadcastVersion] — null until the first push attempt.
-     *  Only moves in server mode (see [useBleSync]). */
-    private val _serverSyncStatus = MutableStateFlow<String?>(null)
-    val serverSyncStatus: StateFlow<String?> = _serverSyncStatus
-
-    private var serverSyncJob: Job? = null
-
-    /** Bridges [TournamentBroadcaster.emojiEvents] into [emojiEvents] while hosting over BLE.
-     *  Tracked so a repeat [startHosting] (HostingScreen is re-entered every time it's shown,
-     *  and linking an account mid-tournament calls it again) replaces the bridge instead of
-     *  stacking another collector — which would emit every reaction N times. */
-    private var emojiBridgeJob: Job? = null
+    // Live sync — see LiveSyncHost. BLE mode moves broadcastVersion, server mode serverSyncStatus.
+    val broadcastVersion: StateFlow<Int?> = liveSync.broadcastVersion
+    val serverSyncStatus: StateFlow<String?> = liveSync.serverSyncStatus
+    val emojiEvents: SharedFlow<String> = liveSync.emojiEvents
 
     // Account + archive upload — see AccountManager / ArchiveUploader for the rules.
     val organizerAccount: StateFlow<OrganizerAccount?> = accountManager.account
@@ -99,9 +80,6 @@ class OrganizerViewModel(
      *  rough skill ranking rather than an alphabetical list. */
     var knownCompetitors by mutableStateOf<List<CompetitorStats>>(emptyList())
         private set
-
-    private val _emojiEvents = MutableSharedFlow<String>(extraBufferCapacity = 32)
-    val emojiEvents: SharedFlow<String> = _emojiEvents
 
     fun checkAccountSyncStatus() = accountManager.checkSyncStatus()
 
@@ -136,70 +114,14 @@ class OrganizerViewModel(
         repository.start(newTournament(name, teams, groupAssignments, squadSize))
     }
 
+    /** (Re)starts live sync for the current tournament over whichever transport Settings
+     *  selects — safe to call again after a mode switch or once an account gets linked. */
     fun startHosting() {
-        if (useBleSync()) {
-            val broadcaster = broadcaster ?: return
-            val id = tournament.value?.id?.let { RoomCode.forTournament(it) } ?: return
-            broadcaster.start(id, repository.tournament.filterNotNull(), viewModelScope)
-            emojiBridgeJob?.cancel()
-            emojiBridgeJob = viewModelScope.launch {
-                broadcaster.emojiEvents.collect { packet ->
-                    _emojiEvents.emit(EmojiPalette.emojiFor(packet.emojiCode))
-                }
-            }
-        } else {
-            startServerSync()
-        }
+        val id = tournament.value?.id ?: return
+        liveSync.start(id, repository.tournament.filterNotNull())
     }
 
-    fun stopHosting() {
-        broadcaster?.stop()
-        emojiBridgeJob?.cancel()
-        emojiBridgeJob = null
-        stopServerSync()
-    }
-
-    private fun stopServerSync() {
-        serverSyncJob?.cancel()
-        serverSyncJob = null
-        _serverSyncStatus.value = null
-    }
-
-    /** Server-mode counterpart to [TournamentBroadcaster.start] — pushes the current state to
-     *  the live-sync endpoint every time it changes, instead of advertising it over BLE. Needs
-     *  a linked account to sign with — unlike hosting over BLE, a tournament can exist locally
-     *  with none linked yet (e.g. credentials got lost, or the organizer skipped linking and
-     *  wants to add it later — see [SettingsScreen]'s account section, [TournamentSettingsScreen]'s
-     *  "Add invite token" row, and [BracketScreen]'s finish-without-linking warning), so this
-     *  surfaces that state instead of silently doing nothing. Called again once linking
-     *  completes to actually start syncing. */
-    private fun startServerSync() {
-        val account = organizerAccount.value
-        if (account == null) {
-            stopServerSync()
-            _serverSyncStatus.value = "Not linked — link an organizer account to sync"
-            return
-        }
-        serverSyncJob?.cancel()
-        _serverSyncStatus.value = "Starting sync…"
-        serverSyncJob = viewModelScope.launch {
-            repository.tournament.filterNotNull().collectLatest { current ->
-                pushLiveState(account, current)
-            }
-        }
-    }
-
-    private suspend fun pushLiveState(account: OrganizerAccount, current: Tournament) {
-        _serverSyncStatus.value = "Syncing…"
-        val bodyJson = liveJson.encodeToString(Tournament.serializer(), current)
-        val signed = UploadSigner.sign(account.privateKeySeed, current.id, bodyJson)
-        val result = serverApi(account.serverUrl)
-            .pushLiveTournament(current.id, account.accountId, signed.timestamp, signed.signatureBase64, bodyJson)
-        _serverSyncStatus.value = when (result) {
-            is ServerResult.Success -> "Synced"
-            is ServerResult.Failure -> "Sync failed: ${result.message}"
-        }
-    }
+    fun stopHosting() = liveSync.stop()
 
     // Every edit below is a pure transform in model/TournamentEdits.kt — see there for the rules.
 
@@ -270,7 +192,7 @@ class OrganizerViewModel(
     /** See [AccountManager.unlink]. An in-progress tournament keeps hosting over BLE untouched
      *  and simply loses server sync until relinked. */
     fun unlinkAccount() {
-        stopServerSync()
+        liveSync.stopServerSync()
         accountManager.unlink()
         knownCompetitors = emptyList()
     }

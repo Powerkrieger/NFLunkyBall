@@ -5,7 +5,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.nflunkyball.ble.EmojiPalette
 import com.example.nflunkyball.ble.LiveReceiver
 import com.example.nflunkyball.ble.RoomCode
 import com.example.nflunkyball.ble.ChunkProgress
@@ -25,17 +24,10 @@ import com.example.nflunkyball.server.TournamentDetail
 import com.example.nflunkyball.server.ServerResult
 import com.example.nflunkyball.server.StatsMode
 import com.example.nflunkyball.server.TournamentSummary
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.MutableStateFlow
+import com.example.nflunkyball.sync.LiveSyncViewer
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
-
-/** How often a server-mode viewer re-fetches live state — no push channel, so this trades
- *  freshness for simplicity; BLE mode (the fallback for offline venues) is still near-instant. */
-private const val LIVE_POLL_INTERVAL_MS = 12_000L
 
 /** Dependencies come from [com.example.nflunkyball.AppContainer]; every one has a plain-JVM
  *  substitute so this class is unit-testable. [receiver] is null on a device without Bluetooth. */
@@ -48,21 +40,13 @@ class ViewerViewModel(
 ) : ViewModel() {
 
     private val fetchJson = Json { ignoreUnknownKeys = true }
+    private val liveSync = LiveSyncViewer(settings, receiver, serverApi, viewModelScope)
 
-    /** Fed either by a bridge collecting [TournamentReceiver.tournament] (BLE mode) or by a
-     *  polling loop hitting the server's live-sync endpoint (server mode) — see [join]. Not
-     *  aliased directly to `receiver.tournament` because which mode is active can change
-     *  between joins (the Settings toggle), unlike adapter presence which is fixed per device. */
-    private val _tournament = MutableStateFlow<Tournament?>(null)
-    val tournament: StateFlow<Tournament?> = _tournament
+    /** The currently watched room's live state, over BLE or server polling — see [LiveSyncViewer]. */
+    val tournament: StateFlow<Tournament?> = liveSync.tournament
 
-    /** Whichever of the BLE receiver-bridge or server poll loop is currently feeding
-     *  [_tournament] — cancelled and replaced each time [join] runs. */
-    private var syncJob: Job? = null
-
-    /** How much of the in-flight version has arrived, for a "reading state of version N" +
-     *  missing-chunks bar — see [ViewerScoreboardScreen]. */
-    val receiveProgress: StateFlow<ChunkProgress?> = receiver?.receiveProgress ?: MutableStateFlow(null)
+    /** BLE reassembly progress for the "reading state of version N" bar — see [ViewerScoreboardScreen]. */
+    val receiveProgress: StateFlow<ChunkProgress?> = liveSync.receiveProgress
 
     /** Tournaments this viewer has joined live (reconnectable) or downloaded from the backend
      *  (viewable offline) — survives the app being killed. See [ViewerTournamentsStore]. */
@@ -140,7 +124,7 @@ class ViewerViewModel(
         joinPayload = payload
         payload.pw?.let { credentialsStore.saveReadPassword(it) }
         payload.server?.let { credentialsStore.saveViewerServerUrl(it) }
-        val roomId = RoomCode.decode(payload.room) ?: return
+        if (RoomCode.decode(payload.room) == null) return
 
         val entryId = payload.room.uppercase()
         val existing = tournamentsStore.tournaments.value.find { it.id == entryId }
@@ -158,36 +142,7 @@ class ViewerViewModel(
 
         // Saving the entry above happens regardless, so reconnecting later (even after a mode
         // switch in Settings) can still find this room.
-        syncJob?.cancel()
-        _tournament.value = null
-        syncJob = if (useBleSync()) {
-            receiver?.start(roomId, viewModelScope)
-            viewModelScope.launch { receiver?.tournament?.collect { _tournament.value = it } }
-        } else {
-            startServerPolling(payload)
-        }
-    }
-
-    /** Server-mode counterpart to the BLE receiver bridge above — re-fetches the organizer's
-     *  live-pushed state every [LIVE_POLL_INTERVAL_MS] until the join target changes. Silently
-     *  does nothing if [payload] lacks what it needs (manually-typed room codes only ever carry
-     *  [JoinPayload.room] — see [JoinPayload]'s doc — so server mode simply can't work for
-     *  those; BLE mode remains available as the fallback). */
-    private fun startServerPolling(payload: JoinPayload): Job {
-        val server = payload.server
-        val tournamentId = payload.tid
-        val password = payload.pw
-        return viewModelScope.launch {
-            if (server == null || tournamentId == null || password == null) return@launch
-            val api = serverApi(server)
-            while (isActive) {
-                when (val result = api.getLiveTournamentJson(tournamentId, password)) {
-                    is ServerResult.Success -> decodeCachedTournament(result.value)?.let { _tournament.value = it }
-                    is ServerResult.Failure -> Unit
-                }
-                delay(LIVE_POLL_INTERVAL_MS)
-            }
-        }
+        liveSync.join(payload)
     }
 
     /** Resume watching a previously-joined tournament without re-scanning its QR code. */
@@ -216,10 +171,7 @@ class ViewerViewModel(
         return ReadAccess(serverApi(server), password)
     }
 
-    fun sendEmoji(emoji: String) {
-        val roomId = joinPayload?.let { RoomCode.decode(it.room) } ?: return
-        viewModelScope.launch { receiver?.sendEmoji(roomId, EmojiPalette.codeFor(emoji)) }
-    }
+    fun sendEmoji(emoji: String) = liveSync.sendEmoji(emoji)
 
     fun historyAvailable(): Boolean = readAccess() != null
 
@@ -310,7 +262,7 @@ class ViewerViewModel(
     }
 
     override fun onCleared() {
-        receiver?.stop()
-        syncJob?.cancel()
+        super.onCleared()
+        liveSync.stop()
     }
 }
