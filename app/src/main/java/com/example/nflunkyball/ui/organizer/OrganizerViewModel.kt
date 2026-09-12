@@ -11,15 +11,25 @@ import androidx.lifecycle.viewModelScope
 import com.example.nflunkyball.ble.EmojiPalette
 import com.example.nflunkyball.ble.RoomCode
 import com.example.nflunkyball.ble.TournamentBroadcaster
-import com.example.nflunkyball.model.Group
-import com.example.nflunkyball.model.Match
 import com.example.nflunkyball.model.MatchDrinks
 import com.example.nflunkyball.model.MatchResult
 import com.example.nflunkyball.model.Team
 import com.example.nflunkyball.model.Tournament
 import com.example.nflunkyball.model.TournamentFinishInfo
 import com.example.nflunkyball.model.TournamentPhase
-import com.example.nflunkyball.model.generateRoundRobinMatches
+import com.example.nflunkyball.model.canRemoveGroup
+import com.example.nflunkyball.model.canRemoveTeam
+import com.example.nflunkyball.model.newTournament
+import com.example.nflunkyball.model.withBracketMatchAdded
+import com.example.nflunkyball.model.withBracketMatchResult
+import com.example.nflunkyball.model.withGroupAdded
+import com.example.nflunkyball.model.withGroupMatchResult
+import com.example.nflunkyball.model.withGroupRemoved
+import com.example.nflunkyball.model.withGroupRenamed
+import com.example.nflunkyball.model.withPhase
+import com.example.nflunkyball.model.withTeamAdded
+import com.example.nflunkyball.model.withTeamRemoved
+import com.example.nflunkyball.model.withTeamRenamed
 import com.example.nflunkyball.persistence.AppSettingsStore
 import com.example.nflunkyball.persistence.FinishInfoStore
 import com.example.nflunkyball.persistence.MatchDrinkStore
@@ -34,7 +44,6 @@ import com.example.nflunkyball.server.ServerResult
 import com.example.nflunkyball.server.UploadSigner
 import com.example.nflunkyball.server.UploadTournament
 import com.example.nflunkyball.server.toUploadPayload
-import java.util.UUID
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlinx.coroutines.Job
@@ -158,20 +167,7 @@ class OrganizerViewModel(application: Application) : AndroidViewModel(applicatio
         groupAssignments: Map<String, List<String>>,
         squadSize: Int = 1
     ) {
-        val groups = groupAssignments.map { (groupName, teamIds) ->
-            val bareGroup = Group(id = UUID.randomUUID().toString(), name = groupName, teamIds = teamIds)
-            bareGroup.copy(matches = bareGroup.generateRoundRobinMatches())
-        }
-        repository.start(
-            Tournament(
-                id = UUID.randomUUID().toString(),
-                name = name,
-                teams = teams,
-                groups = groups,
-                phase = TournamentPhase.GROUP_STAGE,
-                squadSize = squadSize
-            )
-        )
+        repository.start(newTournament(name, teams, groupAssignments, squadSize))
     }
 
     fun startHosting() {
@@ -239,132 +235,35 @@ class OrganizerViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    fun recordGroupMatchResult(groupId: String, matchId: String, result: MatchResult?) {
-        repository.update { t ->
-            t.copy(
-                groups = t.groups.map { g ->
-                    if (g.id != groupId) g
-                    else g.copy(matches = g.matches.map { m -> if (m.id == matchId) m.copy(result = result) else m })
-                }
-            )
-        }
-    }
+    // Every edit below is a pure transform in model/TournamentEdits.kt — see there for the rules.
 
-    fun advanceToBracket() {
-        repository.update { it.copy(phase = TournamentPhase.BRACKET) }
-    }
+    fun recordGroupMatchResult(groupId: String, matchId: String, result: MatchResult?) =
+        repository.update { it.withGroupMatchResult(groupId, matchId, result) }
 
-    /** Adds a new team to an in-progress group, generating matches against every team already
-     *  in it — existing results are untouched, only the new pairings are appended. [playerName]
-     *  is one player for singles; for a squad tournament it's the members separated by commas
-     *  or "&" (the squad gets the "Anna & Ben" auto-name). */
-    fun addPlayer(groupId: String, playerName: String) {
-        val members = playerName.split(',', '&').map { it.trim() }.filter { it.isNotBlank() }
-        if (members.isEmpty()) return
-        repository.update { t ->
-            val newTeam = if (t.squadSize > 1 || members.size > 1) {
-                Team(id = UUID.randomUUID().toString(), name = Team.autoName(members), members = members)
-            } else {
-                Team(id = UUID.randomUUID().toString(), name = members.single())
-            }
-            t.copy(
-                teams = t.teams + newTeam,
-                groups = t.groups.map { g ->
-                    if (g.id != groupId) g
-                    else g.copy(
-                        teamIds = g.teamIds + newTeam.id,
-                        matches = g.matches + g.teamIds.map { existingTeamId ->
-                            Match(id = UUID.randomUUID().toString(), teamAId = existingTeamId, teamBId = newTeam.id)
-                        }
-                    )
-                }
-            )
-        }
-    }
+    fun recordBracketMatchResult(matchId: String, result: MatchResult?) =
+        repository.update { it.withBracketMatchResult(matchId, result) }
 
-    /** Starts a new, empty round-robin group mid-tournament — e.g. once enough late arrivals
-     *  show up to field a second group. Add players to it afterwards via [addPlayer]. */
-    fun addGroup(groupName: String) {
-        val name = groupName.trim()
-        if (name.isBlank()) return
-        repository.update { t ->
-            t.copy(groups = t.groups + Group(id = UUID.randomUUID().toString(), name = name, teamIds = emptyList()))
-        }
-    }
+    fun advanceToBracket() = repository.update { it.withPhase(TournamentPhase.BRACKET) }
 
-    fun renamePlayer(teamId: String, newName: String) {
-        val name = newName.trim()
-        if (name.isBlank()) return
-        repository.update { t ->
-            t.copy(teams = t.teams.map { if (it.id == teamId) it.copy(name = name) else it })
-        }
-    }
+    fun addPlayer(groupId: String, playerName: String) = repository.update { it.withTeamAdded(groupId, playerName) }
 
-    /** True if [teamId] can be safely removed — only ever false once a match involving them
-     *  actually has a recorded result, since dropping them past that point would corrupt
-     *  standings/history rather than just tidying up an unplayed pairing. Checked both here (for
-     *  the UI to grey the action out) and again inside [removePlayer] itself. */
-    fun canRemovePlayer(teamId: String): Boolean {
-        val current = tournament.value ?: return false
-        return (current.groups.flatMap { it.matches } + current.bracketMatches)
-            .none { (it.teamAId == teamId || it.teamBId == teamId) && it.result != null }
-    }
+    fun addGroup(groupName: String) = repository.update { it.withGroupAdded(groupName) }
 
-    /** No-ops instead of removing once [canRemovePlayer] would say no — defense in depth, not
-     *  just relying on the UI having disabled the action. Drops the team, its group membership,
-     *  and any of its still-unplayed matches (group-stage or bracket). */
-    fun removePlayer(teamId: String) {
-        if (!canRemovePlayer(teamId)) return
-        repository.update { t ->
-            t.copy(
-                teams = t.teams.filterNot { it.id == teamId },
-                groups = t.groups.map { g ->
-                    g.copy(
-                        teamIds = g.teamIds - teamId,
-                        matches = g.matches.filterNot { it.teamAId == teamId || it.teamBId == teamId }
-                    )
-                },
-                bracketMatches = t.bracketMatches.filterNot { it.teamAId == teamId || it.teamBId == teamId }
-            )
-        }
-    }
+    fun renamePlayer(teamId: String, newName: String) = repository.update { it.withTeamRenamed(teamId, newName) }
 
-    fun renameGroup(groupId: String, newName: String) {
-        val name = newName.trim()
-        if (name.isBlank()) return
-        repository.update { t ->
-            t.copy(groups = t.groups.map { if (it.id == groupId) it.copy(name = name) else it })
-        }
-    }
+    fun renameGroup(groupId: String, newName: String) = repository.update { it.withGroupRenamed(groupId, newName) }
 
-    /** Only an empty group (no teams) can be removed — one with teams in it would silently
-     *  strand their matches/results, so removing those first (see [removePlayer]) is required. */
-    fun canRemoveGroup(groupId: String): Boolean =
-        tournament.value?.groups?.find { it.id == groupId }?.teamIds?.isEmpty() == true
+    /** For the UI to grey the action out; [removePlayer] checks again itself. */
+    fun canRemovePlayer(teamId: String): Boolean = tournament.value?.canRemoveTeam(teamId) == true
 
-    fun removeGroup(groupId: String) {
-        if (!canRemoveGroup(groupId)) return
-        repository.update { t -> t.copy(groups = t.groups.filterNot { it.id == groupId }) }
-    }
+    fun removePlayer(teamId: String) = repository.update { it.withTeamRemoved(teamId) }
 
-    fun addBracketMatch(teamAId: String, teamBId: String, roundLabel: String) {
-        repository.update { t ->
-            t.copy(
-                bracketMatches = t.bracketMatches + Match(
-                    id = UUID.randomUUID().toString(),
-                    teamAId = teamAId,
-                    teamBId = teamBId,
-                    roundLabel = roundLabel
-                )
-            )
-        }
-    }
+    fun canRemoveGroup(groupId: String): Boolean = tournament.value?.canRemoveGroup(groupId) == true
 
-    fun recordBracketMatchResult(matchId: String, result: MatchResult?) {
-        repository.update { t ->
-            t.copy(bracketMatches = t.bracketMatches.map { m -> if (m.id == matchId) m.copy(result = result) else m })
-        }
-    }
+    fun removeGroup(groupId: String) = repository.update { it.withGroupRemoved(groupId) }
+
+    fun addBracketMatch(teamAId: String, teamBId: String, roundLabel: String) =
+        repository.update { it.withBracketMatchAdded(teamAId, teamBId, roundLabel) }
 
     /**
      * Marks the tournament finished and uploads it to history. The local copy is only cleared once
@@ -375,7 +274,7 @@ class OrganizerViewModel(application: Application) : AndroidViewModel(applicatio
      * tournament is simply cleared.
      */
     fun finishAndUpload(finishInfo: TournamentFinishInfo) {
-        repository.update { it.copy(phase = TournamentPhase.FINISHED) }
+        repository.update { it.withPhase(TournamentPhase.FINISHED) }
         stopHosting()
         if (organizerAccount == null) {
             clearTournament()
