@@ -16,12 +16,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
+import androidx.compose.material3.SecondaryTabRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -53,7 +52,6 @@ import com.patrykandpatrick.vico.core.cartesian.data.LineCartesianLayerModel
  *  match or tournament the point came from. */
 private data class EloPoint(val label: String, val rating: Double, val onOpen: () -> Unit)
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PlayerStatsScreen(
     viewModel: ViewerViewModel,
@@ -148,7 +146,7 @@ fun PlayerStatsScreen(
                 Spacer2()
                 Text(stringResource(R.string.player_elo_over_time), style = MaterialTheme.typography.titleMedium)
                 var granularity by remember { mutableIntStateOf(0) }
-                TabRow(selectedTabIndex = granularity) {
+                SecondaryTabRow(selectedTabIndex = granularity) {
                     Tab(selected = granularity == 0, onClick = { granularity = 0 }, text = { Text(stringResource(R.string.player_by_tournament)) })
                     Tab(selected = granularity == 1, onClick = { granularity = 1 }, text = { Text(stringResource(R.string.player_by_match)) })
                 }

@@ -22,7 +22,8 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
+import androidx.compose.material3.PrimaryTabRow
+import androidx.compose.material3.SecondaryTabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -104,7 +105,7 @@ fun HistoryScreen(
     }
 
     Column(Modifier.fillMaxSize()) {
-        TabRow(selectedTabIndex = tabIndex) {
+        PrimaryTabRow(selectedTabIndex = tabIndex) {
             Tab(selected = tabIndex == 0, onClick = { tabIndex = 0 }, text = { Text(stringResource(R.string.history_tab_tournaments)) })
             Tab(selected = tabIndex == 1, onClick = { tabIndex = 1 }, text = { Text(stringResource(R.string.history_tab_leaderboard)) })
         }
@@ -168,7 +169,7 @@ fun HistoryScreen(
                 ?.takeIf { it.phase != TournamentPhase.FINISHED }
             var leaderboardTab by remember { mutableIntStateOf(if (currentTournament != null) 0 else 1) }
 
-            TabRow(selectedTabIndex = leaderboardTab) {
+            SecondaryTabRow(selectedTabIndex = leaderboardTab) {
                 Tab(
                     selected = leaderboardTab == 0,
                     onClick = { leaderboardTab = 0 },

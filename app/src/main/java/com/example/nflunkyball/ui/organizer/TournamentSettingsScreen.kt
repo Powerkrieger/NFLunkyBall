@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -34,7 +33,6 @@ import com.example.nflunkyball.ui.theme.Spacing
  * and enough room for a destructive action ("Abandon tournament") to not feel like an
  * accidental-tap trap the way a cramped dropdown item would.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TournamentSettingsScreen(
     viewModel: OrganizerViewModel,

@@ -158,7 +158,7 @@ has no viewer→organizer channel.
 | README described the project as "freshly scaffolded, no features yet". | **Fixed** — now has a package map and the two sync transports. |
 | CI only ran `assembleRelease`; unit tests never ran on push. | **Fixed** — `testDebugUnitTest` step added before the build. |
 | `.idea/deploymentTargetSelector.xml` and `.idea/vcs.xml` were untracked but not ignored. | **Fixed** — added to `.gitignore`. |
-| Dependency versions: AGP 9.0.1 with Compose BOM 2024.09.00 and Kotlin 2.0.21. | *Open* — builds fine, but the BOM is a year behind the AGP; bumping it would let you drop several `@OptIn(ExperimentalMaterial3Api)` annotations and pick up `collectAsStateWithLifecycle`. |
+| Dependency versions: AGP 9.0.1 with Compose BOM 2024.09.00 and Kotlin 2.0.21. | **Fixed (v0.10.7)** — Kotlin 2.4.20, Compose BOM 2026.06.01 (Compose 1.11.4 / Material3 1.4.0), lifecycle 2.10.0, navigation 2.9.8, activity 1.13.0, core-ktx 1.18.0. These are the newest versions that still accept compileSdk 36 / AGP 9.0.1 — navigation 2.10, lifecycle 2.11 and core-ktx 1.19 require compileSdk 37 + AGP 9.1 (a toolchain bump, also for CI's platform install). `material-icons-core` is now an explicit dependency (no longer transitive). `TabRow` → `PrimaryTabRow`/`SecondaryTabRow`, new `menuAnchor` overload; all `@OptIn(ExperimentalMaterial3Api)` dropped except the three still required (TopAppBar, ExposedDropdownMenu). Remaining deprecation: `EncryptedSharedPreferences` (androidx.security is deprecated wholesale — a separate migration since it touches stored credentials). |
 
 ---
 
@@ -184,8 +184,8 @@ No user-visible behaviour changed except the two bug fixes in §2. Changes are s
 committed.
 
 **v0.9.3 follow-up:** 1.9, 1.10 and 1.11 fixed. **v0.10.0–v0.10.4:** 1.1 and 1.2 fixed.
-**v0.10.5:** every remaining §3/§4 item except `strings.xml`. **v0.10.6:** `strings.xml` too —
-the only item still open is the Compose BOM bump. Also fixed on the way: `HostingScreen` wasn't scrollable, so in landscape "Continue to
+**v0.10.5:** every remaining §3/§4 item except `strings.xml`. **v0.10.6:** `strings.xml`.
+**v0.10.7:** dependency bump. Nothing from this review is open. Also fixed on the way: `HostingScreen` wasn't scrollable, so in landscape "Continue to
 scoring" was unreachable.
 
 **Verified on a device (Moto G9 Plus, v0.10.5 debug build):** cold start with the custom
