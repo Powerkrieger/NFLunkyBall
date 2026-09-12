@@ -16,8 +16,8 @@ android {
         applicationId = "com.example.nflunkyball"
         minSdk = 24
         targetSdk = 36
-        versionCode = 36
-        versionName = "0.9.3"
+        versionCode = 37
+        versionName = "0.10.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
