@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -28,9 +29,20 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.activity.compose.LocalActivity
+import com.example.nflunkyball.persistence.AppLanguage
 import com.example.nflunkyball.server.AccountSyncStatus
 import com.example.nflunkyball.ui.shared.BackTopBar
 import com.example.nflunkyball.ui.theme.Spacing
+
+/** Language names are shown in their own language, so a user who picked the wrong one can
+ *  still find their way back. */
+@Composable
+private fun AppLanguage.label(): String = when (this) {
+    AppLanguage.SYSTEM -> stringResource(R.string.language_system)
+    AppLanguage.ENGLISH -> "English"
+    AppLanguage.GERMAN -> "Deutsch"
+}
 
 @Composable
 fun SettingsScreen(
@@ -39,6 +51,8 @@ fun SettingsScreen(
     onLinkAccount: () -> Unit
 ) {
     var useBleSync by remember { mutableStateOf(viewModel.useBleSync()) }
+    var language by remember { mutableStateOf(viewModel.language()) }
+    val activity = LocalActivity.current
     var showUnlinkConfirm by remember { mutableStateOf(false) }
     val account = viewModel.account.collectAsState().value
     val syncStatus by viewModel.syncStatus.collectAsState()
@@ -125,6 +139,36 @@ fun SettingsScreen(
                             viewModel.setUseBleSync(it)
                         }
                     )
+                }
+            }
+
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Column(Modifier.padding(Spacing.md)) {
+                    Text(stringResource(R.string.settings_language_title), style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        stringResource(R.string.settings_language_body),
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(top = Spacing.xs)
+                    )
+                    Row(Modifier.padding(top = Spacing.sm), horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                        AppLanguage.entries.forEach { option ->
+                            FilterChip(
+                                selected = language == option,
+                                onClick = {
+                                    if (language == option) return@FilterChip
+                                    language = option
+                                    viewModel.setLanguage(option)
+                                    // Resources are fixed per activity instance (see
+                                    // MainActivity.attachBaseContext) — recreate to apply.
+                                    activity?.recreate()
+                                },
+                                label = { Text(option.label()) }
+                            )
+                        }
+                    }
                 }
             }
         }

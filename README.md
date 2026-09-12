@@ -19,6 +19,8 @@ Single Gradle module (`app`), package `com.example.nflunkyball`:
 | `qr` | Join-code payload and QR rendering. |
 | `ui` | Compose screens (`organizer/`, `viewer/`, `shared/`, `theme/`) and three thin ViewModels (`OrganizerViewModel`, `ViewerViewModel`, `SettingsViewModel`) that delegate to the classes above. `MainActivity` holds the single navigation graph (`Routes`). |
 
+UI copy lives in `res/values/strings.xml` (English) and `values-de/` (German); the language is selectable in Settings and applied in `MainActivity.attachBaseContext`.
+
 Dependencies are hand-wired in `AppContainer` (held by `NfLunkyBallApplication`) — no DI framework.
 Everything below the ViewModels runs on the JVM, so `app/src/test` covers it with fakes
 (`fakes/`) rather than instrumentation.

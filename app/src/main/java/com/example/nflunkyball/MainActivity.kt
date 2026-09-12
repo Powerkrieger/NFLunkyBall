@@ -1,5 +1,6 @@
 package com.example.nflunkyball
 
+import android.content.Context
 import android.content.res.Configuration
 import android.graphics.Color as AndroidColor
 import android.os.Bundle
@@ -25,6 +26,8 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.nflunkyball.model.TournamentPhase
+import com.example.nflunkyball.persistence.AppSettings
+import com.example.nflunkyball.persistence.AppSettingsStore
 import com.example.nflunkyball.ui.HomeScreen
 import com.example.nflunkyball.ui.RulebookScreen
 import com.example.nflunkyball.ui.SettingsScreen
@@ -47,8 +50,24 @@ import com.example.nflunkyball.ui.viewer.JoinScreen
 import com.example.nflunkyball.ui.viewer.PlayerStatsScreen
 import com.example.nflunkyball.ui.viewer.ViewerScoreboardScreen
 import com.example.nflunkyball.ui.viewer.ViewerViewModel
+import java.util.Locale
 
 class MainActivity : ComponentActivity() {
+
+    /** Applies the language chosen in Settings (see [AppSettings.language]) to this activity's
+     *  resources — a plain configuration override, so it works on every API level without the
+     *  AppCompat per-app-locale machinery. `SYSTEM` leaves the device configuration untouched.
+     *  Changing the setting recreates the activity so this runs again. */
+    override fun attachBaseContext(newBase: Context) {
+        val tag = AppSettingsStore(newBase).language().tag
+        if (tag == null) {
+            super.attachBaseContext(newBase)
+            return
+        }
+        val configuration = Configuration(newBase.resources.configuration).apply { setLocale(Locale.forLanguageTag(tag)) }
+        super.attachBaseContext(newBase.createConfigurationContext(configuration))
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 

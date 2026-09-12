@@ -1,6 +1,7 @@
 package com.example.nflunkyball.ui
 
 import androidx.lifecycle.ViewModel
+import com.example.nflunkyball.persistence.AppLanguage
 import com.example.nflunkyball.persistence.AppSettings
 import com.example.nflunkyball.server.AccountManager
 import com.example.nflunkyball.server.AccountSyncStatus
@@ -25,4 +26,8 @@ class SettingsViewModel(
     fun useBleSync(): Boolean = settings.useBleSync()
 
     fun setUseBleSync(enabled: Boolean) = settings.setUseBleSync(enabled)
+
+    fun language(): AppLanguage = settings.language()
+
+    fun setLanguage(language: AppLanguage) = settings.setLanguage(language)
 }

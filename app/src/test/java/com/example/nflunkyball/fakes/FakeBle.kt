@@ -5,6 +5,7 @@ import com.example.nflunkyball.ble.EmojiPacket
 import com.example.nflunkyball.ble.LiveBroadcaster
 import com.example.nflunkyball.ble.LiveReceiver
 import com.example.nflunkyball.model.Tournament
+import com.example.nflunkyball.persistence.AppLanguage
 import com.example.nflunkyball.persistence.AppSettings
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
@@ -12,8 +13,11 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 
 class FakeAppSettings(private var bleSync: Boolean = false) : AppSettings {
+    private var language = AppLanguage.SYSTEM
     override fun useBleSync() = bleSync
     override fun setUseBleSync(enabled: Boolean) { bleSync = enabled }
+    override fun language() = language
+    override fun setLanguage(language: AppLanguage) { this.language = language }
 }
 
 class FakeBroadcaster : LiveBroadcaster {

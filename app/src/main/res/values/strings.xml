@@ -235,6 +235,9 @@
     <string name="stats_mode_all">All</string>
     <string name="stats_mode_singles">Singles</string>
     <string name="stats_mode_teams">Teams</string>
+    <string name="settings_language_title">Language</string>
+    <string name="settings_language_body">System follows your device language and falls back to English where the app isn\'t translated.</string>
+    <string name="language_system">System</string>
 
     <plurals name="result_refused_count">
         <item quantity="one">%1$d refused drink</item>
