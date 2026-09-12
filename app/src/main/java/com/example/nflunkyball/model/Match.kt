@@ -54,5 +54,9 @@ data class Match(
     val teamAId: String,
     val teamBId: String,
     val result: MatchResult? = null,
-    val roundLabel: String? = null
+    val roundLabel: String? = null,
+    /** Position in the order matches were actually played, across groups and bracket alike —
+     *  stamped when a result is first recorded (see [withGroupMatchResult]) and what the
+     *  backend's Elo replay orders by. Null while unplayed. */
+    val sequence: Int? = null
 )

@@ -37,6 +37,7 @@ import com.example.nflunkyball.model.FORFEIT_FLAT_SECONDS
 import com.example.nflunkyball.model.Match
 import com.example.nflunkyball.model.MatchDrinks
 import com.example.nflunkyball.model.MatchResult
+import com.example.nflunkyball.model.PenaltyDrinks
 import com.example.nflunkyball.model.PlayerResult
 import com.example.nflunkyball.model.Team
 import com.example.nflunkyball.ui.theme.Spacing
@@ -96,6 +97,18 @@ fun MatchResultDialog(
         }
     }
 
+    // Penalty drinks per player (any side): a count, and the drink if it wasn't their own.
+    val penaltyCounts = remember {
+        mutableStateMapOf<String, Int>().also { map ->
+            existingDrinks?.penaltiesByPlayer?.forEach { (player, penalty) -> map[player] = penalty.count }
+        }
+    }
+    val penaltyDrinks = remember {
+        mutableStateMapOf<String, String>().also { map ->
+            existingDrinks?.penaltiesByPlayer?.forEach { (player, penalty) -> penalty.drink?.let { map[player] = it } }
+        }
+    }
+
     val allLosersTimed = losers.all { secondsText[it]?.toIntOrNull() != null }
 
     AlertDialog(
@@ -145,6 +158,20 @@ fun MatchResultDialog(
                         onValueChange = { drinks[player] = it },
                         knownDrinks = knownDrinks
                     )
+                    val penalties = penaltyCounts[player] ?: 0
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(stringResource(R.string.result_penalties, penalties), style = MaterialTheme.typography.bodySmall)
+                        TextButton(onClick = { penaltyCounts[player] = (penalties - 1).coerceAtLeast(0) }, enabled = penalties > 0) { Text("−") }
+                        TextButton(onClick = { penaltyCounts[player] = penalties + 1 }) { Text("+") }
+                    }
+                    if (penalties > 0) {
+                        DrinkField(
+                            label = stringResource(R.string.result_penalty_drink_label, player),
+                            value = penaltyDrinks[player] ?: "",
+                            onValueChange = { penaltyDrinks[player] = it },
+                            knownDrinks = knownDrinks
+                        )
+                    }
                     Spacer(Modifier.height(Spacing.xs))
                 }
                 // A third dialog action doesn't fit AlertDialog's confirm/dismiss slots, so it
@@ -169,7 +196,10 @@ fun MatchResultDialog(
                     val matchDrinks = MatchDrinks(
                         teamA = byPlayer[membersA.first()],
                         teamB = byPlayer[membersB.first()],
-                        byPlayer = byPlayer
+                        byPlayer = byPlayer,
+                        penaltiesByPlayer = penaltyCounts.filterValues { it > 0 }.mapValues { (player, count) ->
+                            PenaltyDrinks(count, penaltyDrinks[player]?.takeIf { it.isNotBlank() })
+                        }
                     )
                     onConfirm(result, matchDrinks)
                 },

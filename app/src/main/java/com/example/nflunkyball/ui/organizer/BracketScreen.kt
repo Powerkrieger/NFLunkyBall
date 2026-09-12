@@ -11,6 +11,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -26,9 +28,12 @@ import androidx.compose.ui.Modifier
 import com.example.nflunkyball.model.Match
 import com.example.nflunkyball.model.Team
 import com.example.nflunkyball.model.TournamentFinishInfo
+import com.example.nflunkyball.model.standings
+import com.example.nflunkyball.model.suggestedFinalStandings
 import com.example.nflunkyball.ui.shared.DropdownField
 import com.example.nflunkyball.ui.shared.MatchList
 import com.example.nflunkyball.ui.shared.MatchResultDialog
+import com.example.nflunkyball.ui.shared.StandingsTable
 import com.example.nflunkyball.ui.theme.Spacing
 
 @Composable
@@ -36,13 +41,15 @@ fun BracketScreen(
     viewModel: OrganizerViewModel,
     onFinish: (TournamentFinishInfo) -> Unit,
     onOpenSettings: () -> Unit,
-    onLinkAccount: () -> Unit
+    onLinkAccount: () -> Unit,
+    onManageGroups: () -> Unit
 ) {
     val tournament by viewModel.tournament.collectAsState()
     val current = tournament ?: return
     val account by viewModel.organizerAccount.collectAsState()
     val teamNames = current.teams.associate { it.id to it.name }
     var pendingMatch by remember { mutableStateOf<Match?>(null) }
+    var pendingGroupMatch by remember { mutableStateOf<Pair<String, Match>?>(null) } // groupId to match
     var showAddMatch by remember { mutableStateOf(false) }
     var showUnlinkedWarning by remember { mutableStateOf(false) }
     var showFinishDialog by remember { mutableStateOf(false) }
@@ -57,6 +64,21 @@ fun BracketScreen(
                     .padding(Spacing.md)
                     .verticalScroll(rememberScrollState())
             ) {
+                // Groups played during the bracket (a consolation group, say) are scored here,
+                // plus any group-stage group with matches still open when the bracket started.
+                current.groups.filter { g -> g.knockoutStage || g.matches.any { it.result == null } }.forEach { group ->
+                    Text(group.name, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = Spacing.md))
+                    StandingsTable(standings = group.standings(), teamNames = teamNames, modifier = Modifier.padding(top = Spacing.sm))
+                    MatchList(
+                        matches = group.matches,
+                        teamNames = teamNames,
+                        onRecordResult = { match -> pendingGroupMatch = group.id to match },
+                        modifier = Modifier.padding(top = Spacing.sm)
+                    )
+                }
+                if (current.bracketMatches.isNotEmpty() || current.groups.any { it.knockoutStage }) {
+                    Text(stringResource(R.string.bracket_matches_heading), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = Spacing.md))
+                }
                 MatchList(
                     matches = current.bracketMatches,
                     teamNames = teamNames,
@@ -65,6 +87,9 @@ fun BracketScreen(
                 )
                 Button(onClick = { showAddMatch = true }, modifier = Modifier.padding(top = Spacing.md)) {
                     Text(stringResource(R.string.bracket_add_match))
+                }
+                OutlinedButton(onClick = onManageGroups, modifier = Modifier.padding(top = Spacing.sm)) {
+                    Text(stringResource(R.string.bracket_add_group))
                 }
                 Button(
                     onClick = {
@@ -109,8 +134,29 @@ fun BracketScreen(
 
     if (showFinishDialog) {
         FinishTournamentDialog(
+            teamNames = teamNames,
+            suggestedStandings = current.suggestedFinalStandings(),
             onDismiss = { showFinishDialog = false },
             onConfirm = { info -> showFinishDialog = false; onFinish(info) }
+        )
+    }
+
+    pendingGroupMatch?.let { (groupId, match) ->
+        MatchResultDialog(
+            match = match,
+            teams = current.teams.associateBy { it.id },
+            knownDrinks = viewModel.knownDrinks(),
+            existingDrinks = viewModel.drinksFor(match.id),
+            onDismiss = { pendingGroupMatch = null },
+            onConfirm = { result, drinks ->
+                viewModel.recordGroupMatchResult(groupId, match.id, result)
+                viewModel.recordDrinks(match.id, drinks)
+                pendingGroupMatch = null
+            },
+            onClear = {
+                viewModel.recordGroupMatchResult(groupId, match.id, null)
+                pendingGroupMatch = null
+            }
         )
     }
 

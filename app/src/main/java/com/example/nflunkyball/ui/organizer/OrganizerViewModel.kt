@@ -11,6 +11,7 @@ import com.example.nflunkyball.model.TournamentFinishInfo
 import com.example.nflunkyball.model.TournamentPhase
 import com.example.nflunkyball.model.canRemoveGroup
 import com.example.nflunkyball.model.canRemoveTeam
+import com.example.nflunkyball.model.canRemoveTeamFromGroup
 import com.example.nflunkyball.model.newTournament
 import com.example.nflunkyball.model.withBracketMatchAdded
 import com.example.nflunkyball.model.withBracketMatchResult
@@ -18,9 +19,12 @@ import com.example.nflunkyball.model.withGroupAdded
 import com.example.nflunkyball.model.withGroupMatchResult
 import com.example.nflunkyball.model.withGroupRemoved
 import com.example.nflunkyball.model.withGroupRenamed
+import com.example.nflunkyball.model.withGroupRounds
 import com.example.nflunkyball.model.withPhase
 import com.example.nflunkyball.model.withTeamAdded
+import com.example.nflunkyball.model.withTeamAddedToGroup
 import com.example.nflunkyball.model.withTeamRemoved
+import com.example.nflunkyball.model.withTeamRemovedFromGroup
 import com.example.nflunkyball.model.withTeamRenamed
 import com.example.nflunkyball.persistence.AppSettings
 import com.example.nflunkyball.persistence.FinishInfoStore
@@ -133,7 +137,21 @@ class OrganizerViewModel(
 
     fun addPlayer(groupId: String, playerName: String) = repository.update { it.withTeamAdded(groupId, playerName) }
 
-    fun addGroup(groupName: String) = repository.update { it.withGroupAdded(groupName) }
+    /** A group started during the bracket is a knockout-stage group (scored from the bracket
+     *  screen); one started during the group stage is just another group. */
+    fun addGroup(groupName: String) = repository.update {
+        it.withGroupAdded(groupName, knockoutStage = it.phase == TournamentPhase.BRACKET)
+    }
+
+    fun setGroupRounds(groupId: String, rounds: Int) = repository.update { it.withGroupRounds(groupId, rounds) }
+
+    fun addTeamToGroup(groupId: String, teamId: String) = repository.update { it.withTeamAddedToGroup(groupId, teamId) }
+
+    fun canRemoveTeamFromGroup(groupId: String, teamId: String): Boolean =
+        tournament.value?.canRemoveTeamFromGroup(groupId, teamId) == true
+
+    fun removeTeamFromGroup(groupId: String, teamId: String) =
+        repository.update { it.withTeamRemovedFromGroup(groupId, teamId) }
 
     fun renamePlayer(teamId: String, newName: String) = repository.update { it.withTeamRenamed(teamId, newName) }
 
@@ -182,7 +200,9 @@ class OrganizerViewModel(
     /** Distinct previously-entered drinks (any player), for autocomplete suggestions when
      *  recording a new one. */
     fun knownDrinks(): List<String> =
-        drinkStore.all().values.flatMap { listOfNotNull(it.teamA, it.teamB) + it.byPlayer.values }.distinct().sorted()
+        drinkStore.all().values
+            .flatMap { listOfNotNull(it.teamA, it.teamB) + it.byPlayer.values + it.penaltiesByPlayer.values.mapNotNull { p -> p.drink } }
+            .distinct().sorted()
 
     /** See [AccountManager.link]. */
     suspend fun linkAccount(inviteCode: String): LinkOutcome = accountManager.link(inviteCode)

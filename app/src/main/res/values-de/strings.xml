@@ -265,4 +265,17 @@
         <item quantity="one"> (inkl. %1$d verweigertes Getränk)</item>
         <item quantity="other"> (inkl. %1$d verweigerte Getränke)</item>
     </plurals>
+    <string name="bracket_matches_heading">K.-o.-Spiele</string>
+    <string name="bracket_add_group">Gruppe hinzufügen (z. B. Trostrunde)</string>
+    <string name="finish_placement">Endplatzierung</string>
+    <string name="finish_placement_hint">Beste zuerst — daraus ergeben sich die Punkte der Legacy-Rangliste. Zeilen verschieben, um den Vorschlag zu korrigieren.</string>
+    <string name="finish_move_up">Nach oben</string>
+    <string name="finish_move_down">Nach unten</string>
+    <string name="group_rounds">Runden: %1$d</string>
+    <string name="group_rounds_locked">gesperrt — Ergebnisse eingetragen</string>
+    <string name="group_knockout_stage">während der K.-o.-Phase</string>
+    <string name="group_add_existing_team">+ vorhandenes Team</string>
+    <string name="group_add_existing_team_title">Zu %1$s hinzufügen</string>
+    <string name="result_penalties">Strafgetränke: %1$d</string>
+    <string name="result_penalty_drink_label">Strafgetränk von %1$s (falls anders)</string>
 </resources>

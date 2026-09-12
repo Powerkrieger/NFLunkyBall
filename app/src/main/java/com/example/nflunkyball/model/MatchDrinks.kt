@@ -14,5 +14,11 @@ import kotlinx.serialization.Serializable
 data class MatchDrinks(
     val teamA: String? = null,
     val teamB: String? = null,
-    val byPlayer: Map<String, String> = emptyMap()
+    val byPlayer: Map<String, String> = emptyMap(),
+    /** Penalty drinks handed out during the match, per player (winners included). */
+    val penaltiesByPlayer: Map<String, PenaltyDrinks> = emptyMap()
 )
+
+/** [drink] only when the penalty drinks were something other than the player's own drink. */
+@Serializable
+data class PenaltyDrinks(val count: Int, val drink: String? = null)

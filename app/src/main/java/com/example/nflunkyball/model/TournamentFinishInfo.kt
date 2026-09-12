@@ -12,5 +12,9 @@ data class TournamentFinishInfo(
     val dateMillis: Long,
     val location: String,
     val referees: String,
-    val comment: String
+    val comment: String,
+    /** Team ids in final placement order, best first — what the legacy points leaderboard scores
+     *  (winning is worth as many points as there were teams). Prefilled from
+     *  [suggestedFinalStandings], then the organizer's call. Empty = not decided. */
+    val finalStandings: List<String> = emptyList()
 )

@@ -3,7 +3,17 @@ package com.example.nflunkyball.ui.organizer
 import androidx.compose.ui.res.stringResource
 import com.example.nflunkyball.R
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Icon
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.runtime.toMutableStateList
+import androidx.compose.ui.Alignment
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -28,9 +38,13 @@ import java.util.Locale
 
 @Composable
 fun FinishTournamentDialog(
+    teamNames: Map<String, String>,
+    suggestedStandings: List<String>,
     onDismiss: () -> Unit,
     onConfirm: (TournamentFinishInfo) -> Unit
 ) {
+    // Final placement, best first — starts from the app's guess, the organizer moves rows.
+    val standings = remember { suggestedStandings.toMutableStateList() }
     val dateState = rememberDatePickerState(initialSelectedDateMillis = System.currentTimeMillis())
     var showDatePicker by remember { mutableStateOf(false) }
     var location by remember { mutableStateOf("") }
@@ -49,7 +63,7 @@ fun FinishTournamentDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.finish_title)) },
         text = {
-            Column {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
                 val dateMillis = dateState.selectedDateMillis ?: System.currentTimeMillis()
                 val formatted = remember(dateMillis) {
                     SimpleDateFormat("yyyy-MM-dd", Locale.US).format(dateMillis)
@@ -78,6 +92,21 @@ fun FinishTournamentDialog(
                     label = { Text(stringResource(R.string.finish_comment)) },
                     modifier = Modifier.fillMaxWidth()
                 )
+                Spacer(Modifier.height(Spacing.md))
+                Text(stringResource(R.string.finish_placement), style = MaterialTheme.typography.labelMedium)
+                Text(stringResource(R.string.finish_placement_hint), style = MaterialTheme.typography.bodySmall)
+                standings.forEachIndexed { index, teamId ->
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                        Text("${index + 1}.", modifier = Modifier.padding(end = Spacing.sm))
+                        Text(teamNames[teamId] ?: teamId, modifier = Modifier.weight(1f))
+                        IconButton(onClick = { standings.add(index - 1, standings.removeAt(index)) }, enabled = index > 0) {
+                            Icon(Icons.Default.KeyboardArrowUp, contentDescription = stringResource(R.string.finish_move_up))
+                        }
+                        IconButton(onClick = { standings.add(index + 1, standings.removeAt(index)) }, enabled = index < standings.lastIndex) {
+                            Icon(Icons.Default.KeyboardArrowDown, contentDescription = stringResource(R.string.finish_move_down))
+                        }
+                    }
+                }
                 Text(
                     stringResource(R.string.finish_note),
                     style = MaterialTheme.typography.bodySmall,
@@ -92,7 +121,8 @@ fun FinishTournamentDialog(
                         dateMillis = dateState.selectedDateMillis ?: System.currentTimeMillis(),
                         location = location,
                         referees = referees,
-                        comment = comment
+                        comment = comment,
+                        finalStandings = standings.toList()
                     )
                 )
             }) { Text(stringResource(R.string.finish_action)) }

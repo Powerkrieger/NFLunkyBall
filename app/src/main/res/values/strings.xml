@@ -274,4 +274,17 @@
         <item quantity="one"> (incl. %1$d refused drink)</item>
         <item quantity="other"> (incl. %1$d refused drinks)</item>
     </plurals>
+    <string name="bracket_matches_heading">Bracket matches</string>
+    <string name="bracket_add_group">Add a group (e.g. consolation round)</string>
+    <string name="finish_placement">Final placement</string>
+    <string name="finish_placement_hint">Best first — this is what the legacy points leaderboard scores. Move rows to correct the guess.</string>
+    <string name="finish_move_up">Move up</string>
+    <string name="finish_move_down">Move down</string>
+    <string name="group_rounds">Rounds: %1$d</string>
+    <string name="group_rounds_locked">locked — results recorded</string>
+    <string name="group_knockout_stage">played during the bracket</string>
+    <string name="group_add_existing_team">+ existing team</string>
+    <string name="group_add_existing_team_title">Add to %1$s</string>
+    <string name="result_penalties">Penalty drinks: %1$d</string>
+    <string name="result_penalty_drink_label">%1$s\'s penalty drink (if different)</string>
 </resources>

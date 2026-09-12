@@ -9,6 +9,7 @@ import com.example.nflunkyball.model.Tournament
 import com.example.nflunkyball.model.TournamentFinishInfo
 import com.example.nflunkyball.model.TournamentPhase
 import com.example.nflunkyball.model.MatchDrinks
+import com.example.nflunkyball.model.PenaltyDrinks
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -148,5 +149,47 @@ class UploadPayloadTest {
         assertEquals("Joost's garage", payload.location)
         assertNull(payload.referees)
         assertNull(payload.comment)
+    }
+
+    @Test
+    fun `carries play order, group format, final standings and penalty drinks`() {
+        val squads = Tournament(
+            id = "t2",
+            name = "Squad Cup",
+            teams = listOf(Team("x", "X", listOf("Anna", "Ben")), Team("y", "Y", listOf("Cid", "Dee"))),
+            groups = listOf(
+                Group(
+                    id = "g", name = "G", teamIds = listOf("x", "y"), rounds = 2, knockoutStage = true,
+                    matches = listOf(
+                        Match(
+                            id = "m1", teamAId = "x", teamBId = "y", sequence = 2,
+                            result = MatchResult.ofLosers("x", listOf(PlayerResult("Cid", 40), PlayerResult("Dee", 305, 1)))
+                        )
+                    )
+                )
+            ),
+            phase = TournamentPhase.FINISHED,
+            squadSize = 2
+        )
+        val drinks = MatchDrinks(
+            byPlayer = mapOf("Cid" to "Radler", "Anna" to "Helles"),
+            penaltiesByPlayer = mapOf("Cid" to PenaltyDrinks(2, "Schnaps"), "Anna" to PenaltyDrinks(1))
+        )
+        val info = TournamentFinishInfo(0L, "", "", "", finalStandings = listOf("x", "y"))
+
+        val payload = squads.toUploadPayload(mapOf("m1" to drinks), info)
+
+        assertEquals(listOf("x", "y"), payload.finalStandings)
+        assertEquals(2, payload.groups[0].rounds)
+        assertEquals(true, payload.groups[0].knockoutStage)
+        val match = payload.groups[0].matches[0]
+        assertEquals(2, match.sequence)
+        val result = match.result!!
+        assertEquals(listOf(
+            UploadPlayerResult("Cid", 40, 0, "Radler", penaltyDrinks = 2, penaltyDrink = "Schnaps"),
+            UploadPlayerResult("Dee", 305, 1, null)
+        ), result.losers)
+        assertEquals(mapOf("Anna" to "Helles"), result.winnerDrinks)
+        assertEquals(mapOf("Anna" to UploadPenalty(1, null)), result.winnerPenalties)
     }
 }

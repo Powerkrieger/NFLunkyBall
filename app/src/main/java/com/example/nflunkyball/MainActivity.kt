@@ -275,7 +275,8 @@ private fun NfLunkyBallApp() {
                     navController.popBackStack(route = Routes.HOME, inclusive = false)
                 },
                 onOpenSettings = { navController.navigate(Routes.TOURNAMENT_SETTINGS) },
-                onLinkAccount = { navController.navigate(Routes.LINK_ACCOUNT) }
+                onLinkAccount = { navController.navigate(Routes.LINK_ACCOUNT) },
+                onManageGroups = { navController.navigate(Routes.MANAGE_GROUPS) }
             )
         }
         composable(Routes.TOURNAMENT_SETTINGS) {

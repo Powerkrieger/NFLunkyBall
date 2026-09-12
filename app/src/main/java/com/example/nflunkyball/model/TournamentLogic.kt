@@ -3,20 +3,28 @@ package com.example.nflunkyball.model
 import java.util.UUID
 import kotlin.math.pow
 
-/** Every team in the group plays every other team once. */
-fun Group.generateRoundRobinMatches(): List<Match> {
-    val matches = mutableListOf<Match>()
-    for (i in teamIds.indices) {
-        for (j in i + 1 until teamIds.size) {
-            matches += Match(
-                id = UUID.randomUUID().toString(),
-                teamAId = teamIds[i],
-                teamBId = teamIds[j]
-            )
+/** Every team in the group plays every other team once per round ([Group.rounds]); the
+ *  home/away order flips between rounds. */
+fun Group.generateRoundRobinMatches(): List<Match> = pairingsFor(teamIds)
+
+/** The matches [newTeamId] adds to this group: one against every team already in it, per round. */
+fun Group.pairingsFor(newTeamId: String): List<Match> =
+    (1..rounds).flatMap { round ->
+        teamIds.map { existing ->
+            val (a, b) = if (round % 2 == 1) existing to newTeamId else newTeamId to existing
+            Match(id = UUID.randomUUID().toString(), teamAId = a, teamBId = b)
         }
     }
-    return matches
-}
+
+private fun Group.pairingsFor(ids: List<String>): List<Match> =
+    (1..rounds).flatMap { round ->
+        ids.indices.flatMap { i ->
+            (i + 1 until ids.size).map { j ->
+                val (a, b) = if (round % 2 == 1) ids[i] to ids[j] else ids[j] to ids[i]
+                Match(id = UUID.randomUUID().toString(), teamAId = a, teamBId = b)
+            }
+        }
+    }
 
 data class TeamStanding(
     val teamId: String,
@@ -55,6 +63,37 @@ fun Group.standings(): List<TeamStanding> {
             else -> 0
         }
     }
+}
+
+/**
+ * A starting point for the organizer's final placement at finish time (see
+ * [TournamentFinishInfo.finalStandings]): every team, best first — anyone who reached the
+ * bracket above anyone who didn't, then by bracket record (wins desc, losses asc), then by
+ * knockout-group record, then by group-stage standing and record, then team order. The
+ * organizer reorders the rest; the app doesn't try to read placement matches by name.
+ */
+fun Tournament.suggestedFinalStandings(): List<String> {
+    fun record(matches: List<Match>, teamId: String): Pair<Int, Int> {
+        val mine = matches.filter { it.result != null && (it.teamAId == teamId || it.teamBId == teamId) }
+        val wins = mine.count { it.result?.winnerId == teamId }
+        return wins to (mine.size - wins)
+    }
+    val bracket = bracketMatches
+    val knockoutGroups = groups.filter { it.knockoutStage }.flatMap { it.matches }
+    val groupRank = groups.filterNot { it.knockoutStage }
+        .flatMap { g -> g.standings().mapIndexed { i, s -> s.teamId to i } }
+        .toMap()
+    val stage = groups.filterNot { it.knockoutStage }.flatMap { it.matches }
+    return teams.map { it.id }.sortedWith(
+        compareByDescending<String> { record(bracket, it) != 0 to 0 }
+            .thenByDescending { record(bracket, it).first }
+            .thenBy { record(bracket, it).second }
+            .thenByDescending { record(knockoutGroups, it).first }
+            .thenBy { record(knockoutGroups, it).second }
+            .thenBy { groupRank[it] ?: Int.MAX_VALUE }
+            .thenByDescending { record(stage, it).first }
+            .thenBy { record(stage, it).second }
+    )
 }
 
 /** Same starting rating/K-factor as the backend's persisted Elo (`app/stats.py`'s

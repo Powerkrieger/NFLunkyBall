@@ -3,6 +3,7 @@ package com.example.nflunkyball.server
 import com.example.nflunkyball.model.Group
 import com.example.nflunkyball.model.Match
 import com.example.nflunkyball.model.MatchDrinks
+import com.example.nflunkyball.model.PenaltyDrinks
 import com.example.nflunkyball.model.Team
 import com.example.nflunkyball.model.Tournament
 import com.example.nflunkyball.model.TournamentFinishInfo
@@ -34,7 +35,9 @@ data class UploadTournament(
     val date: String? = null,
     val location: String? = null,
     val referees: String? = null,
-    val comment: String? = null
+    val comment: String? = null,
+    /** Team ids, best first (see [TournamentFinishInfo.finalStandings]). */
+    val finalStandings: List<String> = emptyList()
 )
 
 @Serializable
@@ -42,7 +45,9 @@ data class UploadGroup(
     val id: String,
     val name: String,
     val teamIds: List<String>,
-    val matches: List<UploadMatch> = emptyList()
+    val matches: List<UploadMatch> = emptyList(),
+    val rounds: Int = 1,
+    val knockoutStage: Boolean = false
 )
 
 @Serializable
@@ -51,7 +56,8 @@ data class UploadMatch(
     val teamAId: String,
     val teamBId: String,
     val result: UploadMatchResult? = null,
-    val roundLabel: String? = null
+    val roundLabel: String? = null,
+    val sequence: Int? = null
 )
 
 /** One losing player's counter plus what they drank — the upload-only shape of [PlayerResult]. */
@@ -60,8 +66,14 @@ data class UploadPlayerResult(
     val player: String,
     val seconds: Int,
     val forfeitedDrinks: Int = 0,
-    val drink: String? = null
+    val drink: String? = null,
+    val penaltyDrinks: Int = 0,
+    val penaltyDrink: String? = null
 )
+
+/** A winning player's penalty drinks (losers carry theirs in [UploadPlayerResult]). */
+@Serializable
+data class UploadPenalty(val drinks: Int, val drink: String? = null)
 
 @Serializable
 data class UploadMatchResult(
@@ -72,7 +84,8 @@ data class UploadMatchResult(
     val drinkA: String? = null,
     val drinkB: String? = null,
     val losers: List<UploadPlayerResult> = emptyList(),
-    val winnerDrinks: Map<String, String> = emptyMap()
+    val winnerDrinks: Map<String, String> = emptyMap(),
+    val winnerPenalties: Map<String, UploadPenalty> = emptyMap()
 )
 
 fun Tournament.toUploadPayload(
@@ -91,27 +104,40 @@ fun Tournament.toUploadPayload(
             val winningTeam = teamsById[if (winnerIsA) teamAId else teamBId]
             val losingDrink = if (winnerIsA) drinks?.teamB else drinks?.teamA
             val winningDrink = if (winnerIsA) drinks?.teamA else drinks?.teamB
+            val penalties: Map<String, PenaltyDrinks> = drinks?.penaltiesByPlayer.orEmpty()
             val losers = result.loserResults(losingTeam?.name ?: "").map { entry ->
-                UploadPlayerResult(entry.player, entry.seconds, entry.forfeitedDrinks, drinks?.byPlayer?.get(entry.player) ?: losingDrink)
+                val penalty = penalties[entry.player]
+                UploadPlayerResult(
+                    entry.player, entry.seconds, entry.forfeitedDrinks,
+                    drinks?.byPlayer?.get(entry.player) ?: losingDrink,
+                    penaltyDrinks = penalty?.count ?: 0,
+                    penaltyDrink = penalty?.drink
+                )
             }
-            val winnerDrinks = winningTeam?.memberNames.orEmpty()
+            val winners = winningTeam?.memberNames.orEmpty()
+            val winnerDrinks = winners
                 .mapNotNull { player -> (drinks?.byPlayer?.get(player) ?: winningDrink)?.let { player to it } }
                 .toMap()
-            UploadMatchResult(result.winnerId, result.winnerScore, drinks?.teamA, drinks?.teamB, losers, winnerDrinks)
+            val winnerPenalties = winners
+                .mapNotNull { player -> penalties[player]?.let { player to UploadPenalty(it.count, it.drink) } }
+                .toMap()
+            UploadMatchResult(result.winnerId, result.winnerScore, drinks?.teamA, drinks?.teamB, losers, winnerDrinks, winnerPenalties)
         },
-        roundLabel = roundLabel
+        roundLabel = roundLabel,
+        sequence = sequence
     )
     return UploadTournament(
         id = id,
         name = name,
         teams = teams,
-        groups = groups.map { UploadGroup(it.id, it.name, it.teamIds, it.matches.map { m -> m.toUpload() }) },
+        groups = groups.map { UploadGroup(it.id, it.name, it.teamIds, it.matches.map { m -> m.toUpload() }, it.rounds, it.knockoutStage) },
         bracketMatches = bracketMatches.map { it.toUpload() },
         phase = phase,
         squadSize = squadSize,
         date = finishInfo?.let { Instant.ofEpochMilli(it.dateMillis).toString() },
         location = finishInfo?.location?.trim()?.ifBlank { null },
         referees = finishInfo?.referees?.trim()?.ifBlank { null },
-        comment = finishInfo?.comment?.trim()?.ifBlank { null }
+        comment = finishInfo?.comment?.trim()?.ifBlank { null },
+        finalStandings = finishInfo?.finalStandings.orEmpty()
     )
 }
