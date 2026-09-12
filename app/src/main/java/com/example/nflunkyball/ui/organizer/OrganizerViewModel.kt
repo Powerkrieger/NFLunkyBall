@@ -31,18 +31,15 @@ import com.example.nflunkyball.persistence.AppSettings
 import com.example.nflunkyball.persistence.FinishInfoStore
 import com.example.nflunkyball.persistence.MatchDrinkStore
 import com.example.nflunkyball.persistence.TournamentRepository
+import com.example.nflunkyball.server.AccountManager
+import com.example.nflunkyball.server.AccountSyncStatus
+import com.example.nflunkyball.server.ArchiveUploader
 import com.example.nflunkyball.server.CompetitorStats
 import com.example.nflunkyball.server.CredentialsStore
-import com.example.nflunkyball.server.Ed25519
-import com.example.nflunkyball.server.InvitePayloadCodec
 import com.example.nflunkyball.server.OrganizerAccount
 import com.example.nflunkyball.server.ServerApiFactory
 import com.example.nflunkyball.server.ServerResult
 import com.example.nflunkyball.server.UploadSigner
-import com.example.nflunkyball.server.UploadTournament
-import com.example.nflunkyball.server.toUploadPayload
-import kotlin.io.encoding.Base64
-import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -52,11 +49,6 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
-
-/** Whether the currently linked account can actually reach the server and sync, as opposed to
- *  merely having credentials stored locally — see [OrganizerViewModel.checkAccountSyncStatus]
- *  and [SettingsScreen]'s "Organizer account" section, which surfaces this. */
-enum class AccountSyncStatus { CHECKING, CAN_SYNC, REVOKED, UNKNOWN }
 
 /** Dependencies come from [com.example.nflunkyball.AppContainer]; every one has a plain-JVM
  *  substitute so this class is unit-testable. [broadcaster] is null on a device without
@@ -71,7 +63,11 @@ class OrganizerViewModel(
     private val serverApi: ServerApiFactory
 ) : ViewModel() {
 
-    private val uploadJson = Json { encodeDefaults = true }
+    private val liveJson = Json { encodeDefaults = true }
+    private val accountManager = AccountManager(credentialsStore, serverApi, viewModelScope)
+    private val uploader = ArchiveUploader(
+        repository, drinkStore, finishInfoStore, account = { accountManager.account.value }, serverApi, viewModelScope
+    )
 
     val tournament: StateFlow<Tournament?> = repository.tournament
 
@@ -92,27 +88,12 @@ class OrganizerViewModel(
      *  stacking another collector — which would emit every reaction N times. */
     private var emojiBridgeJob: Job? = null
 
-    var organizerAccount by mutableStateOf(credentialsStore.loadAccount())
-        private set
-
-    var readPassword by mutableStateOf(credentialsStore.loadReadPassword())
-        private set
-
-    /** Null until [checkAccountSyncStatus] has been called (or when there's no linked account
-     *  to check at all). */
-    private val _accountSyncStatus = MutableStateFlow<AccountSyncStatus?>(null)
-    val accountSyncStatus: StateFlow<AccountSyncStatus?> = _accountSyncStatus
-
-    /** Outcome of the last archive upload attempt for the current tournament, or null if none
-     *  has been made yet — shown on My tournaments while a finished tournament is still waiting
-     *  to be uploaded (see [finishAndUpload]). */
-    var uploadStatus by mutableStateOf<String?>(null)
-        private set
-
-    /** True while a finished tournament is still on this device because its upload hasn't
-     *  succeeded yet — it stays in My tournaments with retry/discard until it has. */
-    val hasPendingUpload: Boolean
-        get() = tournament.value?.phase == TournamentPhase.FINISHED
+    // Account + archive upload — see AccountManager / ArchiveUploader for the rules.
+    val organizerAccount: StateFlow<OrganizerAccount?> = accountManager.account
+    val readPassword: StateFlow<String?> = accountManager.readPassword
+    val accountSyncStatus: StateFlow<AccountSyncStatus?> = accountManager.syncStatus
+    val uploadStatus: StateFlow<String?> = uploader.uploadStatus
+    val hasPendingUpload: Boolean get() = uploader.hasPendingUpload
 
     /** Sorted by Elo desc (ties broken by name) so the SetupScreen suggestion chips read as a
      *  rough skill ranking rather than an alphabetical list. */
@@ -122,24 +103,7 @@ class OrganizerViewModel(
     private val _emojiEvents = MutableSharedFlow<String>(extraBufferCapacity = 32)
     val emojiEvents: SharedFlow<String> = _emojiEvents
 
-    /** Actually asks the server whether the linked account can sync (not revoked), rather than
-     *  just trusting that credentials exist locally — an admin revoking it from the other end
-     *  leaves no local trace otherwise (see [AccountSyncStatus]). */
-    fun checkAccountSyncStatus() {
-        val account = organizerAccount
-        val password = readPassword
-        if (account == null || password == null) {
-            _accountSyncStatus.value = null
-            return
-        }
-        _accountSyncStatus.value = AccountSyncStatus.CHECKING
-        viewModelScope.launch {
-            _accountSyncStatus.value = when (val result = serverApi(account.serverUrl).getAccountStatus(account.accountId, password)) {
-                is ServerResult.Success -> if (result.value.revoked) AccountSyncStatus.REVOKED else AccountSyncStatus.CAN_SYNC
-                is ServerResult.Failure -> AccountSyncStatus.UNKNOWN
-            }
-        }
-    }
+    fun checkAccountSyncStatus() = accountManager.checkSyncStatus()
 
     /** Read fresh each time rather than cached at construction — this ViewModel outlives a
      *  single visit to the Settings screen, so a toggle flipped there mid-session must be seen
@@ -152,8 +116,8 @@ class OrganizerViewModel(
      *  existing ones instead of retyping — also how a returning organizer confirms their
      *  account is actually registered with the group before starting a new tournament. */
     fun loadKnownCompetitors() {
-        val account = organizerAccount ?: return
-        val password = readPassword ?: return
+        val account = organizerAccount.value ?: return
+        val password = readPassword.value ?: return
         viewModelScope.launch {
             when (val result = serverApi(account.serverUrl).listCompetitors(password)) {
                 is ServerResult.Success ->
@@ -210,7 +174,7 @@ class OrganizerViewModel(
      *  surfaces that state instead of silently doing nothing. Called again once linking
      *  completes to actually start syncing. */
     private fun startServerSync() {
-        val account = organizerAccount
+        val account = organizerAccount.value
         if (account == null) {
             stopServerSync()
             _serverSyncStatus.value = "Not linked — link an organizer account to sync"
@@ -227,7 +191,7 @@ class OrganizerViewModel(
 
     private suspend fun pushLiveState(account: OrganizerAccount, current: Tournament) {
         _serverSyncStatus.value = "Syncing…"
-        val bodyJson = uploadJson.encodeToString(Tournament.serializer(), current)
+        val bodyJson = liveJson.encodeToString(Tournament.serializer(), current)
         val signed = UploadSigner.sign(account.privateKeySeed, current.id, bodyJson)
         val result = serverApi(account.serverUrl)
             .pushLiveTournament(current.id, account.accountId, signed.timestamp, signed.signatureBase64, bodyJson)
@@ -267,54 +231,27 @@ class OrganizerViewModel(
     fun addBracketMatch(teamAId: String, teamBId: String, roundLabel: String) =
         repository.update { it.withBracketMatchAdded(teamAId, teamBId, roundLabel) }
 
-    /**
-     * Marks the tournament finished and uploads it to history. The local copy is only cleared once
-     * the server has confirmed the upload — on failure (offline, revoked account, killed
-     * mid-upload) it stays put, [uploadStatus] carries the error, and My tournaments offers
-     * [retryUpload] / [discardFinishedTournament]. With no account linked there's nothing to
-     * upload to (the organizer explicitly chose "finish without saving" to get here), so the
-     * tournament is simply cleared.
-     */
+    /** Finishes and uploads; the local copy is only cleared once the server confirms — see
+     *  [ArchiveUploader]. Hosting stops either way. */
     fun finishAndUpload(finishInfo: TournamentFinishInfo) {
-        repository.update { it.withPhase(TournamentPhase.FINISHED) }
         stopHosting()
-        if (organizerAccount == null) {
-            clearTournament()
-            return
-        }
-        finishInfoStore.set(finishInfo)
-        uploadToHistory(finishInfo)
+        uploader.finishAndUpload(finishInfo)
     }
 
-    /** Re-attempts the upload of a finished tournament using the finish info saved with it. */
-    fun retryUpload() {
-        if (!hasPendingUpload) return
-        // A tournament finished by an older version (or whose finish-info file was lost) has no
-        // saved info: upload it with just today's date rather than blocking on it.
-        val info = finishInfoStore.get() ?: TournamentFinishInfo(System.currentTimeMillis(), "", "", "")
-        uploadToHistory(info)
-    }
+    fun retryUpload() = uploader.retry()
 
-    /** Gives up on uploading a finished tournament and drops it from this device. */
-    fun discardFinishedTournament() {
-        if (!hasPendingUpload) return
-        clearTournament()
-    }
+    fun discardFinishedTournament() = uploader.discard()
 
-    /** Called once the organizer is done with a finished tournament (after upload), or when
-     *  abandoning an in-progress one from the settings menu, so the next "Host a tournament"
+    /** Abandons an in-progress tournament (settings menu) so the next "Host a tournament"
      *  starts fresh instead of resuming a dead one. */
     fun clearTournament() {
         stopHosting()
-        repository.clear()
-        drinkStore.clear()
-        finishInfoStore.clear()
-        uploadStatus = null
+        uploader.clearLocal()
     }
 
     /** Recorded locally only (see [MatchDrinkStore]) — never touches [repository], so it's never
      *  part of what BLE broadcasting or live sync serialize. Only reaches the server via
-     *  [uploadToHistory]. Each team can be drinking something different, so both are recorded
+     *  [ArchiveUploader]. Each team can be drinking something different, so both are recorded
      *  independently; a match with neither entered isn't stored at all. */
     fun recordDrinks(matchId: String, drinks: MatchDrinks) {
         drinkStore.set(matchId, drinks)
@@ -327,96 +264,19 @@ class OrganizerViewModel(
     fun knownDrinks(): List<String> =
         drinkStore.all().values.flatMap { listOfNotNull(it.teamA, it.teamB) + it.byPlayer.values }.distinct().sorted()
 
-    /** [inviteCode] is the whole code an admin generated (bundles the server URL + token) —
-     *  see InvitePayload for why the app never hardcodes a server address itself. */
-    @OptIn(ExperimentalEncodingApi::class)
-    fun linkAccount(
-        inviteCode: String,
-        onResult: (Boolean, String) -> Unit
-    ) {
-        val invite = InvitePayloadCodec.decode(inviteCode)
-        if (invite == null) {
-            onResult(false, "That doesn't look like a valid invite code")
-            return
-        }
-        viewModelScope.launch {
-            val keyPair = Ed25519.generateKeyPair()
-            val publicKeyB64 = Base64.encode(keyPair.publicKeyBytes)
-            when (val result = serverApi(invite.server).register(invite.token, publicKeyB64)) {
-                is ServerResult.Success -> {
-                    val accountId = result.value.accountId
-                    val displayName = result.value.displayName
-                    if (accountId != null && displayName != null) {
-                        val account = OrganizerAccount(
-                            accountId = accountId,
-                            displayName = displayName,
-                            serverUrl = invite.server,
-                            privateKeySeed = keyPair.privateKeySeed,
-                            publicKeyBytes = keyPair.publicKeyBytes
-                        )
-                        credentialsStore.saveAccount(account)
-                        credentialsStore.saveReadPassword(result.value.readPassword)
-                        organizerAccount = account
-                        readPassword = result.value.readPassword
-                        onResult(true, "Linked as $displayName")
-                    } else {
-                        // A viewer invite: no Account/keypair, just standing read access — same
-                        // two calls ViewerViewModel.join makes when a tournament's QR embeds them.
-                        credentialsStore.saveReadPassword(result.value.readPassword)
-                        credentialsStore.saveViewerServerUrl(invite.server)
-                        readPassword = result.value.readPassword
-                        onResult(true, "Logged in as viewer")
-                    }
-                }
-                is ServerResult.Failure -> onResult(false, result.message)
-            }
-        }
-    }
+    /** See [AccountManager.link]; the message is user-facing either way. */
+    suspend fun linkAccount(inviteCode: String): Result<String> = accountManager.link(inviteCode)
 
-    /** Forgets this device's organizer identity — local credentials only, nothing server-side
-     *  (an admin revoking/deleting the account is a separate, deliberate action). Only touches
-     *  the account, never [repository]/[tournament]: an in-progress tournament keeps hosting
-     *  over BLE untouched, and simply loses server sync (see [startServerSync]) until relinked.
-     *  [readPassword] deliberately isn't cleared here — it unlocks history/leaderboard viewing
-     *  (see [ServerCredentialsStore.clearAccount]'s doc), which isn't specific to being an
-     *  organizer, so it stays usable even while unlinked. */
+    /** See [AccountManager.unlink]. An in-progress tournament keeps hosting over BLE untouched
+     *  and simply loses server sync until relinked. */
     fun unlinkAccount() {
         stopServerSync()
-        credentialsStore.clearAccount()
-        organizerAccount = null
+        accountManager.unlink()
         knownCompetitors = emptyList()
-        _accountSyncStatus.value = null
-    }
-
-    private fun uploadToHistory(finishInfo: TournamentFinishInfo) {
-        val account = organizerAccount ?: run {
-            uploadStatus = "Not linked — link an organizer account to upload"
-            return
-        }
-        val current = tournament.value ?: return
-        if (uploadStatus == UPLOADING) return
-        viewModelScope.launch {
-            uploadStatus = UPLOADING
-            // The one and only place drink choices/finish metadata ever leave this device — see
-            // MatchDrinkStore and FinishTournamentDialog.
-            val payload = current.toUploadPayload(drinkStore.all(), finishInfo)
-            val bodyJson = uploadJson.encodeToString(UploadTournament.serializer(), payload)
-            val signed = UploadSigner.sign(account.privateKeySeed, current.id, bodyJson)
-            val result = serverApi(account.serverUrl)
-                .uploadTournament(account.accountId, signed.timestamp, signed.signatureBase64, bodyJson)
-            when (result) {
-                is ServerResult.Success -> clearTournament()
-                is ServerResult.Failure -> uploadStatus = "Upload failed: ${result.message}"
-            }
-        }
     }
 
     override fun onCleared() {
         super.onCleared()
         stopHosting()
-    }
-
-    private companion object {
-        const val UPLOADING = "Uploading…"
     }
 }

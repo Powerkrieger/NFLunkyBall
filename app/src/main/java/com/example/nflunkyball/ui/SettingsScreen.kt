@@ -27,7 +27,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import com.example.nflunkyball.ui.organizer.AccountSyncStatus
+import com.example.nflunkyball.server.AccountSyncStatus
 import com.example.nflunkyball.ui.organizer.OrganizerViewModel
 import com.example.nflunkyball.ui.shared.BackTopBar
 import com.example.nflunkyball.ui.theme.Spacing
@@ -41,7 +41,7 @@ fun SettingsScreen(
 ) {
     var useBleSync by remember { mutableStateOf(organizerViewModel.useBleSync()) }
     var showUnlinkConfirm by remember { mutableStateOf(false) }
-    val account = organizerViewModel.organizerAccount
+    val account = organizerViewModel.organizerAccount.collectAsState().value
     val syncStatus by organizerViewModel.accountSyncStatus.collectAsState()
 
     // Keyed on the account id (not just "is one linked") so unlinking and linking a different

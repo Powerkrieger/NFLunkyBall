@@ -121,7 +121,7 @@ private fun NfLunkyBallApp() {
     // obtained — never sees a redirect flash through the login screen. The ViewModel already
     // loaded both credentials from the same store at construction.
     val isAlreadyLinked = remember {
-        organizerViewModel.organizerAccount != null || organizerViewModel.readPassword != null
+        organizerViewModel.organizerAccount.value != null || organizerViewModel.readPassword.value != null
     }
 
     NavHost(navController = navController, startDestination = if (isAlreadyLinked) Routes.HOME else Routes.LOGIN) {
@@ -284,10 +284,11 @@ private fun NfLunkyBallApp() {
         }
         composable(Routes.HISTORY) {
             val hostedTournament by organizerViewModel.tournament.collectAsState()
+            val uploadStatus by organizerViewModel.uploadStatus.collectAsState()
             HistoryScreen(
                 viewModel = viewerViewModel,
                 hostedTournament = hostedTournament,
-                hostedUploadStatus = organizerViewModel.uploadStatus,
+                hostedUploadStatus = uploadStatus,
                 onRetryUpload = { organizerViewModel.retryUpload() },
                 onDiscardHosted = { organizerViewModel.discardFinishedTournament() },
                 onOpenTournament = { id -> navController.navigate(Routes.savedTournament(id)) },

@@ -44,6 +44,8 @@ fun TournamentSettingsScreen(
 ) {
     val tournament by viewModel.tournament.collectAsState()
     val current = tournament ?: return
+    val account by viewModel.organizerAccount.collectAsState()
+    val readPassword by viewModel.readPassword.collectAsState()
 
     var showRoomCode by remember { mutableStateOf(false) }
     var showAbandonConfirm by remember { mutableStateOf(false) }
@@ -63,7 +65,7 @@ fun TournamentSettingsScreen(
             // Always available, not just while unlinked — an existing link can stop working
             // (account revoked, credentials lost) with no local sign other than sync quietly
             // failing, so re-entering a fresh invite token needs to work as a recovery path too.
-            SettingsRow(if (viewModel.organizerAccount == null) "Link organizer account" else "Add invite token") {
+            SettingsRow(if (account == null) "Link organizer account" else "Add invite token") {
                 onLinkAccount()
             }
             SettingsRow("Abandon tournament", destructive = true) { showAbandonConfirm = true }
@@ -72,8 +74,7 @@ fun TournamentSettingsScreen(
 
     if (showRoomCode) {
         val roomId = RoomCode.forTournament(current.id)
-        val account = viewModel.organizerAccount
-        val payload = JoinPayload(room = RoomCode.encode(roomId), server = account?.serverUrl, pw = viewModel.readPassword, tid = current.id)
+        val payload = JoinPayload(room = RoomCode.encode(roomId), server = account?.serverUrl, pw = readPassword, tid = current.id)
         AlertDialog(
             onDismissRequest = { showRoomCode = false },
             title = { Text("Share this to let people watch") },

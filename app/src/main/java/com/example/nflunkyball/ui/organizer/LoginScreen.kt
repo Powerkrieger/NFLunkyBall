@@ -15,16 +15,18 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.example.nflunkyball.server.InvitePayloadCodec
 import com.example.nflunkyball.ui.theme.Spacing
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
+import kotlinx.coroutines.launch
 
 /**
  * One code redemption flow for both roles — the server decides whether a code grants an
- * organizer identity or just standing viewer read access (see OrganizerViewModel.linkAccount),
+ * organizer identity or just standing viewer read access (see AccountManager.link),
  * so this screen never needs to know which kind of code it's handling ahead of time. Reused both
  * as the app's required first screen (no group access on this device yet) and from Settings for
  * an explicit re-link/switch-role later.
@@ -39,6 +41,8 @@ fun LoginScreen(
 ) {
     var inviteCode by remember { mutableStateOf("") }
     var status by remember { mutableStateOf<String?>(null) }
+    var linking by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
 
     // Mirrors the viewer's join-QR flow (JoinScreen) — the admin page can render an invite as a
     // QR code too, so scanning beats retyping a long code by hand.
@@ -74,12 +78,15 @@ fun LoginScreen(
         status?.let { Text(it, modifier = Modifier.padding(top = Spacing.sm)) }
         Button(
             onClick = {
-                viewModel.linkAccount(inviteCode) { success, message ->
-                    status = message
-                    if (success) onDone()
+                linking = true
+                scope.launch {
+                    val result = viewModel.linkAccount(inviteCode)
+                    linking = false
+                    status = result.fold({ it }, { it.message })
+                    if (result.isSuccess) onDone()
                 }
             },
-            enabled = inviteCode.isNotBlank(),
+            enabled = inviteCode.isNotBlank() && !linking,
             modifier = Modifier.fillMaxWidth().padding(top = Spacing.md)
         ) { Text("Log in") }
         onJoinTournament?.let {

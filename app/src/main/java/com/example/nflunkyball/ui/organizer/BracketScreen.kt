@@ -40,6 +40,7 @@ fun BracketScreen(
 ) {
     val tournament by viewModel.tournament.collectAsState()
     val current = tournament ?: return
+    val account by viewModel.organizerAccount.collectAsState()
     val teamNames = current.teams.associate { it.id to it.name }
     var pendingMatch by remember { mutableStateOf<Match?>(null) }
     var showAddMatch by remember { mutableStateOf(false) }
@@ -70,7 +71,7 @@ fun BracketScreen(
                         // Finishing clears the local copy right after (see MainActivity's onFinish) —
                         // without a linked account nothing was ever uploaded, so that would silently
                         // lose the whole tournament unless the organizer explicitly says that's fine.
-                        if (viewModel.organizerAccount == null) showUnlinkedWarning = true else showFinishDialog = true
+                        if (account == null) showUnlinkedWarning = true else showFinishDialog = true
                     },
                     modifier = Modifier.fillMaxWidth().padding(top = Spacing.lg, bottom = Spacing.lg)
                 ) { Text("Finish Tournament") }
