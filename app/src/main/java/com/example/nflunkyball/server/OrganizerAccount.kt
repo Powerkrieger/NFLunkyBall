@@ -35,12 +35,19 @@ interface CredentialsStore {
     fun clearAccount()
 }
 
-/** [CredentialsStore] on EncryptedSharedPreferences. */
-class ServerCredentialsStore(context: Context) : CredentialsStore {
+/**
+ * The pre-v0.11 [CredentialsStore] on Jetpack `EncryptedSharedPreferences` (deprecated along
+ * with the whole androidx.security library). Kept only so [LegacyCredentialsMigration] can read
+ * existing installs' credentials once and move them to [KeystoreCredentialsStore]; delete this
+ * class and the `androidx.security:security-crypto` dependency together once every install has
+ * been through a v0.11.x start.
+ */
+@Suppress("DEPRECATION")
+class LegacyServerCredentialsStore(context: Context) : CredentialsStore {
 
     private val prefs = EncryptedSharedPreferences.create(
         context,
-        "server_credentials",
+        PREFS_NAME,
         MasterKey.Builder(context).setKeyScheme(MasterKey.KeyScheme.AES256_GCM).build(),
         EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
         EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
@@ -90,13 +97,14 @@ class ServerCredentialsStore(context: Context) : CredentialsStore {
             .apply()
     }
 
-    private companion object {
-        const val KEY_ACCOUNT_ID = "account_id"
-        const val KEY_DISPLAY_NAME = "display_name"
-        const val KEY_SERVER_URL = "server_url"
-        const val KEY_PRIVATE_KEY = "private_key_seed"
-        const val KEY_PUBLIC_KEY = "public_key"
-        const val KEY_READ_PASSWORD = "read_password"
-        const val KEY_VIEWER_SERVER_URL = "viewer_server_url"
+    companion object {
+        const val PREFS_NAME = "server_credentials"
+        private const val KEY_ACCOUNT_ID = "account_id"
+        private const val KEY_DISPLAY_NAME = "display_name"
+        private const val KEY_SERVER_URL = "server_url"
+        private const val KEY_PRIVATE_KEY = "private_key_seed"
+        private const val KEY_PUBLIC_KEY = "public_key"
+        private const val KEY_READ_PASSWORD = "read_password"
+        private const val KEY_VIEWER_SERVER_URL = "viewer_server_url"
     }
 }

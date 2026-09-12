@@ -17,6 +17,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -42,7 +43,9 @@ fun LoginScreen(
     // hatch to just watch a different tournament doesn't make sense there, only on first run.
     onJoinTournament: (() -> Unit)? = null
 ) {
-    var inviteCode by remember { mutableStateOf("") }
+    // Saveable: launching the QR scanner rotates the device on some phones, and losing a
+    // half-typed 100-character code to that recreation is maddening.
+    var inviteCode by rememberSaveable { mutableStateOf("") }
     var status by remember { mutableStateOf<String?>(null) }
     var linking by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()

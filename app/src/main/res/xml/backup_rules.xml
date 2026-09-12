@@ -1,13 +1,8 @@
-<?xml version="1.0" encoding="utf-8"?><!--
-   Sample backup rules file; uncomment and customize as necessary.
-   See https://developer.android.com/guide/topics/data/autobackup
-   for details.
-   Note: This file is ignored for devices older than API 31
-   See https://developer.android.com/about/versions/12/backup-restore
--->
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Credentials are encrypted under an Android Keystore key that never leaves this device, so
+     a restored copy would be undecryptable noise — keep both the current and the legacy prefs
+     file out of Auto Backup (API < 31; see data_extraction_rules.xml for API 31+). -->
 <full-backup-content>
-    <!--
-   <include domain="sharedpref" path="."/>
-   <exclude domain="sharedpref" path="device.xml"/>
--->
+    <exclude domain="sharedpref" path="credentials.xml" />
+    <exclude domain="sharedpref" path="server_credentials.xml" />
 </full-backup-content>

@@ -19,7 +19,8 @@ import com.example.nflunkyball.server.AccountManager
 import com.example.nflunkyball.server.CredentialsStore
 import com.example.nflunkyball.server.KtorServerApi
 import com.example.nflunkyball.server.ServerApiFactory
-import com.example.nflunkyball.server.ServerCredentialsStore
+import com.example.nflunkyball.server.KeystoreCredentialsStore
+import com.example.nflunkyball.server.LegacyCredentialsMigration
 import com.example.nflunkyball.ui.SettingsViewModel
 import com.example.nflunkyball.ui.organizer.OrganizerViewModel
 import com.example.nflunkyball.ui.viewer.ViewerViewModel
@@ -40,7 +41,9 @@ class AppContainer(application: Application) {
     val drinkStore = MatchDrinkStore(application)
     val finishInfoStore = FinishInfoStore(application)
     val settings: AppSettings = AppSettingsStore(application)
-    val credentials: CredentialsStore = ServerCredentialsStore(application)
+    val credentials: CredentialsStore = KeystoreCredentialsStore(application).also {
+        LegacyCredentialsMigration.migrateIfNeeded(application, it)
+    }
     val serverApi: ServerApiFactory = ::KtorServerApi
 
     /** Process-lifetime scope for the one piece of state shared by several ViewModels. */
