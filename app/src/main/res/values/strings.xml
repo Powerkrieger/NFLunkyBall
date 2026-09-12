@@ -87,7 +87,7 @@
     <string name="hosting_continue">Continue to scoring</string>
     <string name="login_bad_qr">That QR code doesn\'t look like an NFLunkyBall invite code.</string>
     <string name="login_title">Log in</string>
-    <string name="login_body">Ask whoever runs the group\'s history server for an invite code — it\'s a one-time code that also tells the app where the server lives. Whether it logs you in as an organizer or just a viewer depends on which kind of code it is.</string>
+    <string name="login_body">Ask whoever runs the group\'s history server for an invite code — it also tells the app where the server lives. Whether it logs you in as an organizer (one-time code) or just a viewer (a shared code everyone can use) depends on which kind of code it is.</string>
     <string name="login_invite_code">Invite code</string>
     <string name="login_scan">Scan QR code instead</string>
     <string name="login_just_watching">Just watching one tournament? Scan its code instead</string>

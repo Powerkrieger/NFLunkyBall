@@ -84,7 +84,7 @@
     <string name="hosting_continue">Weiter zur Wertung</string>
     <string name="login_bad_qr">Dieser QR-Code sieht nicht nach einem NFLunkyBall-Einladungscode aus.</string>
     <string name="login_title">Anmelden</string>
-    <string name="login_body">Frag denjenigen, der den Historie-Server der Gruppe betreibt, nach einem Einladungscode — er gilt einmalig und sagt der App auch, wo der Server liegt. Ob du damit als Veranstalter oder nur als Zuschauer angemeldet wirst, hängt von der Art des Codes ab.</string>
+    <string name="login_body">Frag denjenigen, der den Historie-Server der Gruppe betreibt, nach einem Einladungscode — er sagt der App auch, wo der Server liegt. Ob du damit als Veranstalter (einmaliger Code) oder nur als Zuschauer (gemeinsamer Code für alle) angemeldet wirst, hängt von der Art des Codes ab.</string>
     <string name="login_invite_code">Einladungscode</string>
     <string name="login_scan">Stattdessen QR-Code scannen</string>
     <string name="login_just_watching">Nur ein Turnier anschauen? Stattdessen dessen Code scannen</string>
