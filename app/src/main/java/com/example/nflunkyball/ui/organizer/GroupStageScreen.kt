@@ -40,36 +40,36 @@ fun GroupStageScreen(
     Scaffold(
         topBar = { OrganizerTopBar(current.name, viewModel, onOpenSettings) }
     ) { padding ->
-    Column(
-        Modifier
-            .fillMaxSize()
-            .padding(padding)
-            .padding(Spacing.md)
-            .verticalScroll(rememberScrollState())
-    ) {
-        current.groups.forEach { group ->
-            Text(
-                group.name,
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(top = Spacing.lg)
-            )
-            StandingsTable(
-                standings = group.standings(),
-                teamNames = teamNames,
-                modifier = Modifier.padding(top = Spacing.sm)
-            )
-            MatchList(
-                matches = group.matches,
-                teamNames = teamNames,
-                onRecordResult = { match -> pendingMatch = group.id to match },
-                modifier = Modifier.padding(top = Spacing.sm)
-            )
+        Column(
+            Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(Spacing.md)
+                .verticalScroll(rememberScrollState())
+        ) {
+            current.groups.forEach { group ->
+                Text(
+                    group.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.padding(top = Spacing.lg)
+                )
+                StandingsTable(
+                    standings = group.standings(),
+                    teamNames = teamNames,
+                    modifier = Modifier.padding(top = Spacing.sm)
+                )
+                MatchList(
+                    matches = group.matches,
+                    teamNames = teamNames,
+                    onRecordResult = { match -> pendingMatch = group.id to match },
+                    modifier = Modifier.padding(top = Spacing.sm)
+                )
+            }
+            Button(
+                onClick = onAdvanceToBracket,
+                modifier = Modifier.fillMaxWidth().padding(top = Spacing.lg, bottom = Spacing.lg)
+            ) { Text("Advance to Bracket") }
         }
-        Button(
-            onClick = onAdvanceToBracket,
-            modifier = Modifier.fillMaxWidth().padding(top = Spacing.lg, bottom = Spacing.lg)
-        ) { Text("Advance to Bracket") }
-    }
     }
 
     pendingMatch?.let { (groupId, match) ->

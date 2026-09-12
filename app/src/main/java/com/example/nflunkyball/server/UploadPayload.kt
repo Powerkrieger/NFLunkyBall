@@ -2,11 +2,11 @@ package com.example.nflunkyball.server
 
 import com.example.nflunkyball.model.Group
 import com.example.nflunkyball.model.Match
+import com.example.nflunkyball.model.MatchDrinks
 import com.example.nflunkyball.model.Team
 import com.example.nflunkyball.model.Tournament
 import com.example.nflunkyball.model.TournamentFinishInfo
 import com.example.nflunkyball.model.TournamentPhase
-import com.example.nflunkyball.persistence.MatchDrinks
 import kotlinx.serialization.Serializable
 import java.time.Instant
 

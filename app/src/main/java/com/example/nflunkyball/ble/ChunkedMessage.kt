@@ -13,7 +13,9 @@ object ChunkedMessage {
         val pieces = if (payload.isEmpty()) {
             listOf(ByteArray(0))
         } else {
-            payload.toList().chunked(maxChunkPayloadBytes).map { it.toByteArray() }
+            (payload.indices step maxChunkPayloadBytes).map { from ->
+                payload.copyOfRange(from, minOf(from + maxChunkPayloadBytes, payload.size))
+            }
         }
         require(pieces.size <= BleConstants.MAX_CHUNK_COUNT) { "Payload too large to broadcast in chunks" }
         val count = pieces.size

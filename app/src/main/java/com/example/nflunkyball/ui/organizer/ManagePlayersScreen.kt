@@ -9,16 +9,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -26,7 +22,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -38,6 +33,8 @@ import androidx.compose.ui.Modifier
 import com.example.nflunkyball.model.Group
 import com.example.nflunkyball.model.Team
 import com.example.nflunkyball.ui.shared.RenameDialog
+import com.example.nflunkyball.ui.shared.BackTopBar
+import com.example.nflunkyball.ui.shared.DropdownField
 import com.example.nflunkyball.ui.theme.Spacing
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -54,14 +51,7 @@ fun ManagePlayersScreen(viewModel: OrganizerViewModel, onBack: () -> Unit) {
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("Manage players") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                }
-            )
+            BackTopBar(title = "Manage players", onBack = onBack)
         }
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding).padding(Spacing.md)) {
@@ -83,9 +73,11 @@ fun ManagePlayersScreen(viewModel: OrganizerViewModel, onBack: () -> Unit) {
                     modifier = Modifier.fillMaxWidth()
                 )
                 if (current.groups.size > 1) {
-                    GroupDropdownField(
-                        groups = current.groups,
-                        selectedId = newPlayerGroupId,
+                    DropdownField(
+                        label = "Group",
+                        options = current.groups.map { it.id to it.name },
+                        selectedLabel = current.groups.firstOrNull { it.id == newPlayerGroupId }?.name
+                            ?: current.groups.first().name,
                         onSelect = { newPlayerGroupId = it },
                         modifier = Modifier.fillMaxWidth().padding(top = Spacing.sm)
                     )
@@ -152,36 +144,5 @@ fun ManagePlayersScreen(viewModel: OrganizerViewModel, onBack: () -> Unit) {
                 renamingTeam = null
             }
         )
-    }
-}
-
-/** Exposed dropdown (a real dropdown-styled field with a trailing arrow) rather than a plain
- *  text-button-triggered menu — the latter (still used in [BracketScreen]'s team picker) gave no
- *  visual hint it was tappable at all. */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun GroupDropdownField(
-    groups: List<Group>,
-    selectedId: String,
-    onSelect: (String) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    var expanded by remember { mutableStateOf(false) }
-    val selectedName = groups.firstOrNull { it.id == selectedId }?.name ?: groups.first().name
-
-    ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }, modifier = modifier) {
-        OutlinedTextField(
-            value = selectedName,
-            onValueChange = {},
-            readOnly = true,
-            label = { Text("Group") },
-            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-            modifier = Modifier.menuAnchor().fillMaxWidth()
-        )
-        ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            groups.forEach { group ->
-                DropdownMenuItem(text = { Text(group.name) }, onClick = { onSelect(group.id); expanded = false })
-            }
-        }
     }
 }

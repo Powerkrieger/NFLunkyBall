@@ -32,10 +32,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import com.example.nflunkyball.model.FORFEIT_FLAT_SECONDS
 import com.example.nflunkyball.model.Match
+import com.example.nflunkyball.model.MatchDrinks
 import com.example.nflunkyball.model.MatchResult
 import com.example.nflunkyball.model.PlayerResult
 import com.example.nflunkyball.model.Team
-import com.example.nflunkyball.persistence.MatchDrinks
 import com.example.nflunkyball.ui.theme.Spacing
 import kotlinx.coroutines.delay
 

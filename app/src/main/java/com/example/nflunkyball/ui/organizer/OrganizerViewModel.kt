@@ -3,18 +3,17 @@ package com.example.nflunkyball.ui.organizer
 import android.app.Application
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothManager
-import android.util.Base64
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.nflunkyball.ble.BleCapability
 import com.example.nflunkyball.ble.EmojiPalette
 import com.example.nflunkyball.ble.RoomCode
 import com.example.nflunkyball.ble.TournamentBroadcaster
 import com.example.nflunkyball.model.Group
 import com.example.nflunkyball.model.Match
+import com.example.nflunkyball.model.MatchDrinks
 import com.example.nflunkyball.model.MatchResult
 import com.example.nflunkyball.model.Team
 import com.example.nflunkyball.model.Tournament
@@ -23,7 +22,6 @@ import com.example.nflunkyball.model.TournamentPhase
 import com.example.nflunkyball.model.generateRoundRobinMatches
 import com.example.nflunkyball.persistence.AppSettingsStore
 import com.example.nflunkyball.persistence.MatchDrinkStore
-import com.example.nflunkyball.persistence.MatchDrinks
 import com.example.nflunkyball.persistence.TournamentRepository
 import com.example.nflunkyball.server.CompetitorStats
 import com.example.nflunkyball.server.Ed25519
@@ -32,10 +30,12 @@ import com.example.nflunkyball.server.OrganizerAccount
 import com.example.nflunkyball.server.ServerCredentialsStore
 import com.example.nflunkyball.server.ServerApi
 import com.example.nflunkyball.server.ServerResult
+import com.example.nflunkyball.server.UploadSigner
 import com.example.nflunkyball.server.UploadTournament
 import com.example.nflunkyball.server.toUploadPayload
-import java.security.MessageDigest
 import java.util.UUID
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -75,6 +75,12 @@ class OrganizerViewModel(application: Application) : AndroidViewModel(applicatio
 
     private var serverSyncJob: Job? = null
 
+    /** Bridges [TournamentBroadcaster.emojiEvents] into [emojiEvents] while hosting over BLE.
+     *  Tracked so a repeat [startHosting] (HostingScreen is re-entered every time it's shown,
+     *  and linking an account mid-tournament calls it again) replaces the bridge instead of
+     *  stacking another collector — which would emit every reaction N times. */
+    private var emojiBridgeJob: Job? = null
+
     var organizerAccount by mutableStateOf(credentialsStore.loadAccount())
         private set
 
@@ -96,8 +102,6 @@ class OrganizerViewModel(application: Application) : AndroidViewModel(applicatio
 
     private val _emojiEvents = MutableSharedFlow<String>(extraBufferCapacity = 32)
     val emojiEvents: SharedFlow<String> = _emojiEvents
-
-    fun canHost(): Boolean = BleCapability.canAdvertise(getApplication())
 
     /** Actually asks the server whether the linked account can sync (not revoked), rather than
      *  just trusting that credentials exist locally — an admin revoking it from the other end
@@ -165,7 +169,8 @@ class OrganizerViewModel(application: Application) : AndroidViewModel(applicatio
             val adapter = bluetoothAdapter ?: return
             val id = tournament.value?.id?.let { RoomCode.forTournament(it) } ?: return
             broadcaster?.start(id, repository.tournament.filterNotNull(), viewModelScope)
-            viewModelScope.launch {
+            emojiBridgeJob?.cancel()
+            emojiBridgeJob = viewModelScope.launch {
                 broadcaster?.emojiEvents?.collect { packet ->
                     _emojiEvents.emit(EmojiPalette.emojiFor(packet.emojiCode))
                 }
@@ -177,6 +182,8 @@ class OrganizerViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun stopHosting() {
         broadcaster?.stop()
+        emojiBridgeJob?.cancel()
+        emojiBridgeJob = null
         stopServerSync()
     }
 
@@ -213,12 +220,9 @@ class OrganizerViewModel(application: Application) : AndroidViewModel(applicatio
     private suspend fun pushLiveState(account: OrganizerAccount, current: Tournament) {
         _serverSyncStatus.value = "Syncing…"
         val bodyJson = uploadJson.encodeToString(Tournament.serializer(), current)
-        val timestamp = System.currentTimeMillis() / 1000
-        val message = "${current.id}|$timestamp|${sha256Hex(bodyJson)}"
-        val signature = Ed25519.sign(account.privateKeySeed, message.toByteArray())
-        val signatureB64 = Base64.encodeToString(signature, Base64.NO_WRAP)
+        val signed = UploadSigner.sign(account.privateKeySeed, current.id, bodyJson)
         val result = ServerApi(account.serverUrl)
-            .pushLiveTournament(current.id, account.accountId, timestamp, signatureB64, bodyJson)
+            .pushLiveTournament(current.id, account.accountId, signed.timestamp, signed.signatureBase64, bodyJson)
         _serverSyncStatus.value = when (result) {
             is ServerResult.Success -> "Synced"
             is ServerResult.Failure -> "Sync failed: ${result.message}"
@@ -382,6 +386,7 @@ class OrganizerViewModel(application: Application) : AndroidViewModel(applicatio
 
     /** [inviteCode] is the whole code an admin generated (bundles the server URL + token) —
      *  see InvitePayload for why the app never hardcodes a server address itself. */
+    @OptIn(ExperimentalEncodingApi::class)
     fun linkAccount(
         inviteCode: String,
         onResult: (Boolean, String) -> Unit
@@ -393,7 +398,7 @@ class OrganizerViewModel(application: Application) : AndroidViewModel(applicatio
         }
         viewModelScope.launch {
             val keyPair = Ed25519.generateKeyPair()
-            val publicKeyB64 = Base64.encodeToString(keyPair.publicKeyBytes, Base64.NO_WRAP)
+            val publicKeyB64 = Base64.encode(keyPair.publicKeyBytes)
             when (val result = ServerApi(invite.server).register(invite.token, publicKeyB64)) {
                 is ServerResult.Success -> {
                     val accountId = result.value.accountId
@@ -449,12 +454,9 @@ class OrganizerViewModel(application: Application) : AndroidViewModel(applicatio
             // MatchDrinkStore and FinishTournamentDialog.
             val payload = current.toUploadPayload(drinkStore.all(), finishInfo)
             val bodyJson = uploadJson.encodeToString(UploadTournament.serializer(), payload)
-            val timestamp = System.currentTimeMillis() / 1000
-            val message = "${current.id}|$timestamp|${sha256Hex(bodyJson)}"
-            val signature = Ed25519.sign(account.privateKeySeed, message.toByteArray())
-            val signatureB64 = Base64.encodeToString(signature, Base64.NO_WRAP)
+            val signed = UploadSigner.sign(account.privateKeySeed, current.id, bodyJson)
             val result = ServerApi(account.serverUrl)
-                .uploadTournament(account.accountId, timestamp, signatureB64, bodyJson)
+                .uploadTournament(account.accountId, signed.timestamp, signed.signatureBase64, bodyJson)
             uploadStatus = when (result) {
                 is ServerResult.Success -> "Uploaded"
                 is ServerResult.Failure -> "Failed: ${result.message}"
@@ -462,12 +464,8 @@ class OrganizerViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    private fun sha256Hex(text: String): String =
-        MessageDigest.getInstance("SHA-256").digest(text.toByteArray())
-            .joinToString("") { "%02x".format(it) }
-
     override fun onCleared() {
-        broadcaster?.stop()
-        serverSyncJob?.cancel()
+        super.onCleared()
+        stopHosting()
     }
 }

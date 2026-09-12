@@ -32,23 +32,25 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import com.example.nflunkyball.ble.BleCapability
-import com.example.nflunkyball.model.ELO_STARTING_RATING
 import com.example.nflunkyball.model.ProvisionalStanding
 import com.example.nflunkyball.model.Tournament
 import com.example.nflunkyball.model.TournamentPhase
 import com.example.nflunkyball.model.provisionalLeaderboard
-import com.example.nflunkyball.model.provisionalPlayerStandings
 import com.example.nflunkyball.persistence.SavedTournament
 import com.example.nflunkyball.server.CompetitorStats
 import com.example.nflunkyball.server.StatsMode
-import com.example.nflunkyball.ui.organizer.OrganizerViewModel
+import com.example.nflunkyball.server.withLiveStandings
 import com.example.nflunkyball.ui.theme.Spacing
 import java.util.Locale
 
+/** [hostedTournament] is the organizer side's in-progress tournament, if this device is hosting
+ *  one. TournamentRepository (behind OrganizerViewModel) is a separate single-slot store from the
+ *  viewer's saved-tournaments list, so it wouldn't otherwise show up here at all — the caller
+ *  passes it in explicitly rather than this screen reaching into the organizer ViewModel. */
 @Composable
 fun HistoryScreen(
     viewModel: ViewerViewModel,
-    organizerViewModel: OrganizerViewModel,
+    hostedTournament: Tournament?,
     onOpenTournament: (String) -> Unit,
     onReconnected: () -> Unit,
     onResumeHosting: () -> Unit,
@@ -56,10 +58,6 @@ fun HistoryScreen(
 ) {
     LaunchedEffect(Unit) { viewModel.loadHistory() }
     val saved by viewModel.savedTournaments.collectAsState()
-    // TournamentRepository (behind OrganizerViewModel) is a separate single-slot store from the
-    // viewer's saved-tournaments list above, so a tournament this device is hosting wouldn't
-    // otherwise show up here at all — surfaced explicitly instead.
-    val hostedTournament by organizerViewModel.tournament.collectAsState()
     // The viewer's currently-watched live tournament (BLE or server sync) — folded into the
     // Leaderboard tab below so it reflects games in progress, not just archived results.
     val watchedTournament by viewModel.tournament.collectAsState()
@@ -155,7 +153,8 @@ fun HistoryScreen(
                 }
             } else {
                 val leaderboard = remember(viewModel.competitors, hostedTournament, watchedTournament) {
-                    mergeLiveStandings(viewModel.competitors, listOf(hostedTournament, watchedTournament))
+                    viewModel.competitors
+                        .withLiveStandings(listOf(hostedTournament, watchedTournament))
                         .sortedByDescending { it.elo }
                 }
                 LazyColumn(
@@ -170,8 +169,8 @@ fun HistoryScreen(
                         )
                     }
                     items(leaderboard) { c ->
-                        // c.id is -1 for a live-only team not yet in the backend's Competitor
-                        // table (see mergeLiveStandings) — nothing to open a stats page for yet.
+                        // c.id is -1 for a live-only player not yet in the backend's Competitor
+                        // table (see withLiveStandings) — nothing to open a stats page for yet.
                         CompetitorRow(c, onClick = { if (c.id >= 0) onOpenPlayer(c.id) })
                     }
                 }
@@ -228,37 +227,6 @@ private fun SavedTournamentRow(entry: SavedTournament, onClick: () -> Unit) {
             )
         }
     }
-}
-
-/**
- * Overlays each still-in-progress (non-FINISHED) tournament's own provisional standings on top
- * of the backend's persisted, archived-only stats, matched by team/competitor name — so a
- * currently-watched or currently-hosted tournament's results show up immediately instead of only
- * after the organizer uploads it to history. Purely a display-time approximation: it's fine for
- * this to shift as the organizer edits live results (see TournamentLogic.provisionalStandings).
- */
-private fun mergeLiveStandings(
-    serverStats: List<CompetitorStats>,
-    liveTournaments: List<Tournament?>
-): List<CompetitorStats> {
-    val byNameLower = serverStats.associateBy { it.name.lowercase() }.toMutableMap()
-    liveTournaments.filterNotNull()
-        .filter { it.phase != TournamentPhase.FINISHED }
-        .forEach { tournament ->
-            // Per player, not per team: a squad's members each carry the result on their own
-            // persisted rating, exactly as the backend will once the tournament is uploaded.
-            tournament.provisionalPlayerStandings().forEach { (player, delta) ->
-                val key = player.lowercase()
-                val current = byNameLower[key]
-                    ?: CompetitorStats(id = -1, name = player, wins = 0, losses = 0, elo = ELO_STARTING_RATING)
-                byNameLower[key] = current.copy(
-                    wins = current.wins + delta.winDelta,
-                    losses = current.losses + delta.lossDelta,
-                    elo = current.elo + delta.eloDelta
-                )
-            }
-        }
-    return byNameLower.values.toList()
 }
 
 @Composable

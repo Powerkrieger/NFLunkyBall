@@ -24,14 +24,14 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 
+private const val TAG = "TournamentBroadcaster"
+
 /**
  * Organizer role: continuously broadcasts the current [Tournament] state as a room, and
  * listens for viewers' emoji reactions. Connectionless in both directions — see
  * `ble/` package docs / the project plan for why (needs to scale to ~20 simultaneous viewers,
  * past Bluetooth Classic's ~7-connection piconet limit).
  */
-private const val TAG = "TournamentBroadcaster"
-
 class TournamentBroadcaster(private val adapter: BluetoothAdapter, private val context: Context) {
 
     // encodeDefaults=false (the kotlinx default) — every default-valued field omitted from the

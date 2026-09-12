@@ -7,7 +7,7 @@ data class StateChunkPacket(
     val chunkCount: Int,
     val data: ByteArray,
     /**
-     * Distinguishes the legacy 12B-chunk stream from the (much shorter) extended-advertising
+     * Distinguishes the legacy small-chunk stream ([BleConstants.MAX_CHUNK_PAYLOAD_BYTES]) from the (much shorter) extended-advertising
      * stream — both broadcast the same tournament state in parallel so every receiver, capable
      * of decoding extended manufacturer data or not, gets a working path. Never mix chunkIndex
      * values from the two: they're reassembled completely independently on the receive side.

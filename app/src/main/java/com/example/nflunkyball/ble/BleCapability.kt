@@ -3,6 +3,7 @@ package com.example.nflunkyball.ble
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothManager
 import android.content.Context
+import android.os.Build
 
 object BleCapability {
 
@@ -11,10 +12,6 @@ object BleCapability {
 
     /** False both when there's no Bluetooth hardware at all and when it's just turned off. */
     fun isBluetoothEnabled(context: Context): Boolean =
-        bluetoothAdapter(context)?.isEnabled == true
-
-    /** Scanning (viewing scores) works on effectively every device with Bluetooth enabled. */
-    fun canScan(context: Context): Boolean =
         bluetoothAdapter(context)?.isEnabled == true
 
     /** Hosting a tournament or sending an emoji requires BLE peripheral/advertising support. */
@@ -35,7 +32,7 @@ object BleCapability {
     fun supportsExtendedAdvertising(context: Context): Boolean {
         val adapter = bluetoothAdapter(context) ?: return false
         return adapter.isEnabled &&
-            android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O &&
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
             adapter.isLeExtendedAdvertisingSupported
     }
 

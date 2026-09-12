@@ -8,7 +8,7 @@ import com.example.nflunkyball.model.Team
 import com.example.nflunkyball.model.Tournament
 import com.example.nflunkyball.model.TournamentFinishInfo
 import com.example.nflunkyball.model.TournamentPhase
-import com.example.nflunkyball.persistence.MatchDrinks
+import com.example.nflunkyball.model.MatchDrinks
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull

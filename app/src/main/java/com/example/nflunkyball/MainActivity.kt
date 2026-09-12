@@ -19,13 +19,11 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.nflunkyball.model.TournamentPhase
-import com.example.nflunkyball.server.ServerCredentialsStore
 import com.example.nflunkyball.ui.HomeScreen
 import com.example.nflunkyball.ui.RulebookScreen
 import com.example.nflunkyball.ui.SettingsScreen
@@ -79,6 +77,37 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+/** Every destination in the single nav graph below. Parametrised routes come in pairs: the
+ *  pattern registered with `composable(...)` and a builder producing the concrete path. */
+private object Routes {
+    const val LOGIN = "login"
+    const val HOME = "home"
+    const val RULEBOOK = "rulebook"
+    const val SETTINGS = "settings"
+    const val LINK_ACCOUNT = "organizer/link_account"
+    const val SETUP = "organizer/setup"
+    const val HOSTING = "organizer/hosting"
+    const val GROUP_STAGE = "organizer/group_stage"
+    const val BRACKET = "organizer/bracket"
+    const val TOURNAMENT_SETTINGS = "organizer/tournament_settings"
+    const val MANAGE_PLAYERS = "organizer/manage_players"
+    const val MANAGE_GROUPS = "organizer/manage_groups"
+    const val JOIN = "viewer/join"
+    const val SCOREBOARD = "viewer/scoreboard"
+    const val HISTORY = "viewer/history"
+
+    const val ARG_ID = "id"
+    const val SAVED_TOURNAMENT = "viewer/history/{$ARG_ID}"
+    const val SERVER_TOURNAMENT = "viewer/tournament/{$ARG_ID}"
+    const val PLAYER = "viewer/player/{$ARG_ID}"
+    const val MATCH = "viewer/match/{$ARG_ID}"
+
+    fun savedTournament(savedId: String) = "viewer/history/$savedId"
+    fun serverTournament(serverId: Int) = "viewer/tournament/$serverId"
+    fun player(competitorId: Int) = "viewer/player/$competitorId"
+    fun match(matchId: Int) = "viewer/match/$matchId"
+}
+
 @Composable
 private fun NfLunkyBallApp() {
     val navController = rememberNavController()
@@ -87,34 +116,33 @@ private fun NfLunkyBallApp() {
 
     // Evaluated once at composition (a device's link state doesn't change without an explicit
     // navigation afterward), so an already-linked device — organizer or viewer, however that was
-    // obtained — never sees a redirect flash through the login screen.
-    val context = LocalContext.current
+    // obtained — never sees a redirect flash through the login screen. The ViewModel already
+    // loaded both credentials from the same store at construction.
     val isAlreadyLinked = remember {
-        val credentialsStore = ServerCredentialsStore(context)
-        credentialsStore.loadAccount() != null || credentialsStore.loadReadPassword() != null
+        organizerViewModel.organizerAccount != null || organizerViewModel.readPassword != null
     }
 
-    NavHost(navController = navController, startDestination = if (isAlreadyLinked) "home" else "login") {
-        composable("login") {
+    NavHost(navController = navController, startDestination = if (isAlreadyLinked) Routes.HOME else Routes.LOGIN) {
+        composable(Routes.LOGIN) {
             LoginScreen(
                 viewModel = organizerViewModel,
                 onDone = {
-                    navController.navigate("home") {
-                        popUpTo("login") { inclusive = true }
+                    navController.navigate(Routes.HOME) {
+                        popUpTo(Routes.LOGIN) { inclusive = true }
                     }
                 },
                 onJoinTournament = {
                     // Rewrite the back stack to Home first (same two-call shape used elsewhere in
                     // this graph, e.g. SetupScreen's onStart) so backing out of Join/Scoreboard
                     // lands on Home instead of exiting the app or bouncing back to Login.
-                    navController.navigate("home") {
-                        popUpTo("login") { inclusive = true }
+                    navController.navigate(Routes.HOME) {
+                        popUpTo(Routes.LOGIN) { inclusive = true }
                     }
-                    navController.navigate("viewer/join")
+                    navController.navigate(Routes.JOIN)
                 }
             )
         }
-        composable("home") {
+        composable(Routes.HOME) {
             val hostedTournament by organizerViewModel.tournament.collectAsState()
             val watchedTournament by viewerViewModel.tournament.collectAsState()
             HomeScreen(
@@ -132,24 +160,24 @@ private fun NfLunkyBallApp() {
                 // prerequisite for hosting — see SettingsScreen's "Organizer account" section
                 // for linking independent of any tournament; unlinked hosting just means no
                 // server sync/history/known-players until one's linked.
-                onHost = { navController.navigate("organizer/setup") },
-                onJoin = { navController.navigate("viewer/join") },
-                onMyTournaments = { navController.navigate("viewer/history") },
-                onRulebook = { navController.navigate("rulebook") },
-                onSettings = { navController.navigate("settings") }
+                onHost = { navController.navigate(Routes.SETUP) },
+                onJoin = { navController.navigate(Routes.JOIN) },
+                onMyTournaments = { navController.navigate(Routes.HISTORY) },
+                onRulebook = { navController.navigate(Routes.RULEBOOK) },
+                onSettings = { navController.navigate(Routes.SETTINGS) }
             )
         }
-        composable("rulebook") {
+        composable(Routes.RULEBOOK) {
             RulebookScreen(onBack = { navController.popBackStack() })
         }
-        composable("settings") {
+        composable(Routes.SETTINGS) {
             SettingsScreen(
                 organizerViewModel = organizerViewModel,
                 onBack = { navController.popBackStack() },
-                onLinkAccount = { navController.navigate("organizer/link_account") }
+                onLinkAccount = { navController.navigate(Routes.LINK_ACCOUNT) }
             )
         }
-        composable("organizer/link_account") {
+        composable(Routes.LINK_ACCOUNT) {
             LoginScreen(
                 viewModel = organizerViewModel,
                 onDone = {
@@ -163,12 +191,12 @@ private fun NfLunkyBallApp() {
                 }
             )
         }
-        composable("organizer/setup") {
+        composable(Routes.SETUP) {
             SetupScreen(
                 viewModel = organizerViewModel,
                 onNavigateToMyTournaments = {
-                    navController.navigate("viewer/history") {
-                        popUpTo("organizer/setup") { inclusive = true }
+                    navController.navigate(Routes.HISTORY) {
+                        popUpTo(Routes.SETUP) { inclusive = true }
                     }
                 }
             ) { name, teams, groups, squadSize ->
@@ -179,138 +207,139 @@ private fun NfLunkyBallApp() {
                 // this creation flow. Two navigate() calls on purpose: the first swaps out
                 // organizer/setup for viewer/history, the second then pushes hosting on top of
                 // that, same shape as reaching hosting via My Tournaments' "Hosting · ..." row.
-                navController.navigate("viewer/history") {
-                    popUpTo("organizer/setup") { inclusive = true }
+                navController.navigate(Routes.HISTORY) {
+                    popUpTo(Routes.SETUP) { inclusive = true }
                 }
-                navController.navigate("organizer/hosting")
+                navController.navigate(Routes.HOSTING)
             }
         }
-        composable("organizer/hosting") {
+        composable(Routes.HOSTING) {
             HostingScreen(
                 viewModel = organizerViewModel,
                 onContinue = {
                     // Resuming a tournament that already reached the bracket phase should land
                     // back on BracketScreen, not restart at GroupStageScreen.
                     val destination = if (organizerViewModel.tournament.value?.phase == TournamentPhase.BRACKET) {
-                        "organizer/bracket"
+                        Routes.BRACKET
                     } else {
-                        "organizer/group_stage"
+                        Routes.GROUP_STAGE
                     }
                     navController.navigate(destination)
                 },
-                onLinkAccount = { navController.navigate("organizer/link_account") }
+                onLinkAccount = { navController.navigate(Routes.LINK_ACCOUNT) }
             )
         }
-        composable("organizer/group_stage") {
+        composable(Routes.GROUP_STAGE) {
             GroupStageScreen(
                 viewModel = organizerViewModel,
                 onAdvanceToBracket = {
                     organizerViewModel.advanceToBracket()
-                    navController.navigate("organizer/bracket")
+                    navController.navigate(Routes.BRACKET)
                 },
-                onOpenSettings = { navController.navigate("organizer/tournament_settings") }
+                onOpenSettings = { navController.navigate(Routes.TOURNAMENT_SETTINGS) }
             )
         }
-        composable("organizer/bracket") {
+        composable(Routes.BRACKET) {
             BracketScreen(
                 viewModel = organizerViewModel,
                 onFinish = { finishInfo ->
                     organizerViewModel.finishTournament()
                     organizerViewModel.uploadToHistory(finishInfo)
                     organizerViewModel.clearTournament()
-                    navController.popBackStack(route = "home", inclusive = false)
+                    navController.popBackStack(route = Routes.HOME, inclusive = false)
                 },
-                onOpenSettings = { navController.navigate("organizer/tournament_settings") },
-                onLinkAccount = { navController.navigate("organizer/link_account") }
+                onOpenSettings = { navController.navigate(Routes.TOURNAMENT_SETTINGS) },
+                onLinkAccount = { navController.navigate(Routes.LINK_ACCOUNT) }
             )
         }
-        composable("organizer/tournament_settings") {
+        composable(Routes.TOURNAMENT_SETTINGS) {
             TournamentSettingsScreen(
                 viewModel = organizerViewModel,
                 onBack = { navController.popBackStack() },
-                onAbandoned = { navController.popBackStack(route = "home", inclusive = false) },
-                onLinkAccount = { navController.navigate("organizer/link_account") },
-                onManagePlayers = { navController.navigate("organizer/manage_players") },
-                onManageGroups = { navController.navigate("organizer/manage_groups") }
+                onAbandoned = { navController.popBackStack(route = Routes.HOME, inclusive = false) },
+                onLinkAccount = { navController.navigate(Routes.LINK_ACCOUNT) },
+                onManagePlayers = { navController.navigate(Routes.MANAGE_PLAYERS) },
+                onManageGroups = { navController.navigate(Routes.MANAGE_GROUPS) }
             )
         }
-        composable("organizer/manage_players") {
+        composable(Routes.MANAGE_PLAYERS) {
             ManagePlayersScreen(viewModel = organizerViewModel, onBack = { navController.popBackStack() })
         }
-        composable("organizer/manage_groups") {
+        composable(Routes.MANAGE_GROUPS) {
             ManageGroupsScreen(viewModel = organizerViewModel, onBack = { navController.popBackStack() })
         }
-        composable("viewer/join") {
-            JoinScreen(viewModel = viewerViewModel, onJoined = { navController.navigate("viewer/scoreboard") })
+        composable(Routes.JOIN) {
+            JoinScreen(viewModel = viewerViewModel, onJoined = { navController.navigate(Routes.SCOREBOARD) })
         }
-        composable("viewer/scoreboard") {
+        composable(Routes.SCOREBOARD) {
             ViewerScoreboardScreen(
                 viewModel = viewerViewModel,
-                onOpenHistory = { navController.navigate("viewer/history") }
+                onOpenHistory = { navController.navigate(Routes.HISTORY) }
             )
         }
-        composable("viewer/history") {
+        composable(Routes.HISTORY) {
+            val hostedTournament by organizerViewModel.tournament.collectAsState()
             HistoryScreen(
                 viewModel = viewerViewModel,
-                organizerViewModel = organizerViewModel,
-                onOpenTournament = { id -> navController.navigate("viewer/history/$id") },
+                hostedTournament = hostedTournament,
+                onOpenTournament = { id -> navController.navigate(Routes.savedTournament(id)) },
                 onReconnected = {
-                    navController.navigate("viewer/scoreboard") {
-                        popUpTo("viewer/history") { inclusive = true }
+                    navController.navigate(Routes.SCOREBOARD) {
+                        popUpTo(Routes.HISTORY) { inclusive = true }
                     }
                 },
-                onResumeHosting = { navController.navigate("organizer/hosting") },
-                onOpenPlayer = { id -> navController.navigate("viewer/player/$id") }
+                onResumeHosting = { navController.navigate(Routes.HOSTING) },
+                onOpenPlayer = { id -> navController.navigate(Routes.player(id)) }
             )
         }
-        composable("viewer/history/{id}") { backStackEntry ->
-            val id = backStackEntry.arguments?.getString("id")
+        composable(Routes.SAVED_TOURNAMENT) { backStackEntry ->
+            val id = backStackEntry.arguments?.getString(Routes.ARG_ID)
             if (id != null) {
                 HistoryTournamentDetailScreen(
                     viewModel = viewerViewModel,
                     savedId = id,
                     serverId = null,
-                    onOpenMatch = { matchId -> navController.navigate("viewer/match/$matchId") },
-                    onOpenPlayer = { playerId -> navController.navigate("viewer/player/$playerId") }
+                    onOpenMatch = { matchId -> navController.navigate(Routes.match(matchId)) },
+                    onOpenPlayer = { playerId -> navController.navigate(Routes.player(playerId)) }
                 )
             }
         }
         // Same screen as above, addressed by backend id — how a player's Elo history or a match
         // page links to a tournament the viewer never saved locally.
-        composable("viewer/tournament/{id}") { backStackEntry ->
-            val id = backStackEntry.arguments?.getString("id")?.toIntOrNull()
+        composable(Routes.SERVER_TOURNAMENT) { backStackEntry ->
+            val id = backStackEntry.arguments?.getString(Routes.ARG_ID)?.toIntOrNull()
             if (id != null) {
                 HistoryTournamentDetailScreen(
                     viewModel = viewerViewModel,
                     savedId = null,
                     serverId = id,
-                    onOpenMatch = { matchId -> navController.navigate("viewer/match/$matchId") },
-                    onOpenPlayer = { playerId -> navController.navigate("viewer/player/$playerId") }
+                    onOpenMatch = { matchId -> navController.navigate(Routes.match(matchId)) },
+                    onOpenPlayer = { playerId -> navController.navigate(Routes.player(playerId)) }
                 )
             }
         }
-        composable("viewer/player/{id}") { backStackEntry ->
-            val id = backStackEntry.arguments?.getString("id")?.toIntOrNull()
+        composable(Routes.PLAYER) { backStackEntry ->
+            val id = backStackEntry.arguments?.getString(Routes.ARG_ID)?.toIntOrNull()
             if (id != null) {
                 PlayerStatsScreen(
                     viewModel = viewerViewModel,
                     competitorId = id,
                     onBack = { navController.popBackStack() },
-                    onOpenPlayer = { playerId -> navController.navigate("viewer/player/$playerId") },
-                    onOpenMatch = { matchId -> navController.navigate("viewer/match/$matchId") },
-                    onOpenTournament = { tournamentId -> navController.navigate("viewer/tournament/$tournamentId") }
+                    onOpenPlayer = { playerId -> navController.navigate(Routes.player(playerId)) },
+                    onOpenMatch = { matchId -> navController.navigate(Routes.match(matchId)) },
+                    onOpenTournament = { tournamentId -> navController.navigate(Routes.serverTournament(tournamentId)) }
                 )
             }
         }
-        composable("viewer/match/{id}") { backStackEntry ->
-            val id = backStackEntry.arguments?.getString("id")?.toIntOrNull()
+        composable(Routes.MATCH) { backStackEntry ->
+            val id = backStackEntry.arguments?.getString(Routes.ARG_ID)?.toIntOrNull()
             if (id != null) {
                 MatchDetailScreen(
                     viewModel = viewerViewModel,
                     matchId = id,
                     onBack = { navController.popBackStack() },
-                    onOpenPlayer = { playerId -> navController.navigate("viewer/player/$playerId") },
-                    onOpenTournament = { tournamentId -> navController.navigate("viewer/tournament/$tournamentId") }
+                    onOpenPlayer = { playerId -> navController.navigate(Routes.player(playerId)) },
+                    onOpenTournament = { tournamentId -> navController.navigate(Routes.serverTournament(tournamentId)) }
                 )
             }
         }

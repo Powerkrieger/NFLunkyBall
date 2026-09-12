@@ -10,17 +10,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -31,6 +26,7 @@ import androidx.compose.ui.Modifier
 import com.example.nflunkyball.server.MatchDetail
 import com.example.nflunkyball.server.MatchPlayer
 import com.example.nflunkyball.server.ServerResult
+import com.example.nflunkyball.ui.shared.BackTopBar
 import com.example.nflunkyball.ui.theme.Spacing
 import java.util.Locale
 
@@ -58,14 +54,7 @@ fun MatchDetailScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text(detail?.let { "${it.teamAName} vs ${it.teamBName}" } ?: "Match") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                }
-            )
+            BackTopBar(title = detail?.let { "${it.teamAName} vs ${it.teamBName}" } ?: "Match", onBack = onBack)
         }
     ) { padding ->
         Column(

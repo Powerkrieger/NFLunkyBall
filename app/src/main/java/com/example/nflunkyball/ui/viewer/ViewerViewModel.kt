@@ -198,36 +198,44 @@ class ViewerViewModel(application: Application) : AndroidViewModel(application) 
     fun decodeCachedTournament(cachedJson: String): Tournament? =
         runCatching { fetchJson.decodeFromString(Tournament.serializer(), cachedJson) }.getOrNull()
 
-    // Falls back to the organizer account's own server, if this device has one linked — an
-    // organizer who's never separately joined a tournament as a viewer (e.g. just wants to check
-    // the Leaderboard) otherwise had no server URL on record at all, silently breaking history/
-    // leaderboard loading for them despite already being fully linked to the group.
-    private fun resolveServerUrl(): String? =
-        joinPayload?.server ?: credentialsStore.loadViewerServerUrl() ?: credentialsStore.loadAccount()?.serverUrl
+    /** Everything a read-only backend call needs — null when this device has no way to reach a
+     *  server yet (never joined via QR, never linked, never redeemed a viewer invite). */
+    private class ReadAccess(val api: ServerApi, val password: String)
+
+    // Server URL falls back to the organizer account's own server, if this device has one
+    // linked — an organizer who's never separately joined a tournament as a viewer (e.g. just
+    // wants to check the Leaderboard) otherwise had no server URL on record at all, silently
+    // breaking history/leaderboard loading for them despite being fully linked to the group.
+    // The password likewise prefers the live join code's over the stored one.
+    private fun readAccess(): ReadAccess? {
+        val server = joinPayload?.server
+            ?: credentialsStore.loadViewerServerUrl()
+            ?: credentialsStore.loadAccount()?.serverUrl
+            ?: return null
+        val password = joinPayload?.pw ?: credentialsStore.loadReadPassword() ?: return null
+        return ReadAccess(ServerApi(server), password)
+    }
 
     fun sendEmoji(emoji: String) {
         val roomId = joinPayload?.let { RoomCode.decode(it.room) } ?: return
         viewModelScope.launch { receiver?.sendEmoji(roomId, EmojiPalette.codeFor(emoji)) }
     }
 
-    fun historyAvailable(): Boolean =
-        (joinPayload?.pw ?: credentialsStore.loadReadPassword()) != null && resolveServerUrl() != null
+    fun historyAvailable(): Boolean = readAccess() != null
 
     fun loadHistory() {
-        val server = resolveServerUrl() ?: return
-        val password = joinPayload?.pw ?: credentialsStore.loadReadPassword() ?: return
-        val api = ServerApi(server)
+        val access = readAccess() ?: return
         viewModelScope.launch {
             historyStatus = "Loading…"
-            when (val result = api.listTournaments(password)) {
+            when (val result = access.api.listTournaments(access.password)) {
                 is ServerResult.Success -> {
                     historyTournaments = result.value
                     historyStatus = null
-                    result.value.forEach { summary -> cacheFinishedTournament(api, password, summary) }
+                    result.value.forEach { summary -> cacheFinishedTournament(access.api, access.password, summary) }
                 }
                 is ServerResult.Failure -> historyStatus = result.message
             }
-            when (val result = api.listCompetitors(password, statsMode)) {
+            when (val result = access.api.listCompetitors(access.password, statsMode)) {
                 is ServerResult.Success -> competitors = result.value
                 is ServerResult.Failure -> Unit
             }
@@ -235,15 +243,14 @@ class ViewerViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun loadPlayerStats(competitorId: Int) {
-        val server = resolveServerUrl() ?: return
-        val password = joinPayload?.pw ?: credentialsStore.loadReadPassword() ?: return
+        val access = readAccess() ?: return
         // Drop the previous player's stats up front so switching players can't show the old
         // data under the new route (or hide a load failure behind it).
         playerStats = null
         playerStatsStatus = "Loading…"
         lastPlayerStatsId = competitorId
         viewModelScope.launch {
-            when (val result = ServerApi(server).getCompetitorStats(competitorId, password, statsMode)) {
+            when (val result = access.api.getCompetitorStats(competitorId, access.password, statsMode)) {
                 is ServerResult.Success -> {
                     playerStats = result.value
                     playerStatsStatus = null
@@ -298,10 +305,8 @@ class ViewerViewModel(application: Application) : AndroidViewModel(application) 
     private suspend fun <T> withReadAccess(
         call: suspend (ServerApi, String) -> ServerResult<T>
     ): ServerResult<T> {
-        val server = resolveServerUrl() ?: return ServerResult.Failure("No server address available")
-        val password = joinPayload?.pw ?: credentialsStore.loadReadPassword()
-            ?: return ServerResult.Failure("No read password available")
-        return call(ServerApi(server), password)
+        val access = readAccess() ?: return ServerResult.Failure("No server access — join a tournament or log in first")
+        return call(access.api, access.password)
     }
 
     override fun onCleared() {

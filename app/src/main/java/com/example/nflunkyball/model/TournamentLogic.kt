@@ -1,6 +1,7 @@
 package com.example.nflunkyball.model
 
 import java.util.UUID
+import kotlin.math.pow
 
 /** Every team in the group plays every other team once. */
 fun Group.generateRoundRobinMatches(): List<Match> {
@@ -88,7 +89,7 @@ fun Tournament.provisionalPlayerStandings(): Map<String, ProvisionalStanding> {
         val sideB = membersByTeamId[match.teamBId] ?: continue
         val ratingA = sideA.map { ratings[it] ?: ELO_STARTING_RATING }.average()
         val ratingB = sideB.map { ratings[it] ?: ELO_STARTING_RATING }.average()
-        val expectedA = 1.0 / (1.0 + Math.pow(10.0, (ratingB - ratingA) / 400.0))
+        val expectedA = 1.0 / (1.0 + 10.0.pow((ratingB - ratingA) / 400.0))
         val winnerIsA = result.winnerId == match.teamAId
         val delta = ELO_K_FACTOR * ((if (winnerIsA) 1.0 else 0.0) - expectedA)
         sideA.forEach { ratings[it] = (ratings[it] ?: ELO_STARTING_RATING) + delta }

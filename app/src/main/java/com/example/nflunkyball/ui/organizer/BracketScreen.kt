@@ -8,10 +8,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -26,6 +23,7 @@ import androidx.compose.ui.Modifier
 import com.example.nflunkyball.model.Match
 import com.example.nflunkyball.model.Team
 import com.example.nflunkyball.model.TournamentFinishInfo
+import com.example.nflunkyball.ui.shared.DropdownField
 import com.example.nflunkyball.ui.shared.MatchList
 import com.example.nflunkyball.ui.shared.MatchResultDialog
 import com.example.nflunkyball.ui.theme.Spacing
@@ -49,32 +47,32 @@ fun BracketScreen(
     Scaffold(
         topBar = { OrganizerTopBar("${current.name} — Bracket", viewModel, onOpenSettings) }
     ) { padding ->
-    Column(
-        Modifier
-            .fillMaxSize()
-            .padding(padding)
-            .padding(Spacing.md)
-            .verticalScroll(rememberScrollState())
-    ) {
-        MatchList(
-            matches = current.bracketMatches,
-            teamNames = teamNames,
-            onRecordResult = { match -> pendingMatch = match },
-            modifier = Modifier.padding(top = Spacing.sm)
-        )
-        Button(onClick = { showAddMatch = true }, modifier = Modifier.padding(top = Spacing.md)) {
-            Text("Add bracket match")
+        Column(
+            Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(Spacing.md)
+                .verticalScroll(rememberScrollState())
+        ) {
+            MatchList(
+                matches = current.bracketMatches,
+                teamNames = teamNames,
+                onRecordResult = { match -> pendingMatch = match },
+                modifier = Modifier.padding(top = Spacing.sm)
+            )
+            Button(onClick = { showAddMatch = true }, modifier = Modifier.padding(top = Spacing.md)) {
+                Text("Add bracket match")
+            }
+            Button(
+                onClick = {
+                    // Finishing clears the local copy right after (see MainActivity's onFinish) —
+                    // without a linked account nothing was ever uploaded, so that would silently
+                    // lose the whole tournament unless the organizer explicitly says that's fine.
+                    if (viewModel.organizerAccount == null) showUnlinkedWarning = true else showFinishDialog = true
+                },
+                modifier = Modifier.fillMaxWidth().padding(top = Spacing.lg, bottom = Spacing.lg)
+            ) { Text("Finish Tournament") }
         }
-        Button(
-            onClick = {
-                // Finishing clears the local copy right after (see MainActivity's onFinish) —
-                // without a linked account nothing was ever uploaded, so that would silently
-                // lose the whole tournament unless the organizer explicitly says that's fine.
-                if (viewModel.organizerAccount == null) showUnlinkedWarning = true else showFinishDialog = true
-            },
-            modifier = Modifier.fillMaxWidth().padding(top = Spacing.lg, bottom = Spacing.lg)
-        ) { Text("Finish Tournament") }
-    }
     }
 
     if (showUnlinkedWarning) {
@@ -157,14 +155,17 @@ private fun AddBracketMatchDialog(
         onDismissRequest = onDismiss,
         title = { Text("Add bracket match") },
         text = {
+            val options = teams.map { it.id to it.name }
+            fun nameOf(id: String) = teams.firstOrNull { it.id == id }?.name ?: ""
             Column {
-                TeamPicker(teams, teamAId, label = "Team A") { teamAId = it }
-                TeamPicker(
-                    teams,
-                    teamBId,
+                DropdownField(label = "Team A", options = options, selectedLabel = nameOf(teamAId), onSelect = { teamAId = it })
+                DropdownField(
                     label = "Team B",
+                    options = options,
+                    selectedLabel = nameOf(teamBId),
+                    onSelect = { teamBId = it },
                     modifier = Modifier.padding(top = Spacing.sm)
-                ) { teamBId = it }
+                )
                 OutlinedTextField(
                     value = roundLabel,
                     onValueChange = { roundLabel = it },
@@ -181,36 +182,4 @@ private fun AddBracketMatchDialog(
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
     )
-}
-
-/** Exposed dropdown (real trailing-arrow field, not a plain unstyled button) — see
- *  [ManagePlayersScreen]'s equivalent group picker for why the previous TextButton-triggered
- *  menu here gave no visual hint it was tappable at all. */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun TeamPicker(
-    teams: List<Team>,
-    selectedId: String,
-    label: String,
-    modifier: Modifier = Modifier,
-    onSelect: (String) -> Unit
-) {
-    var expanded by remember { mutableStateOf(false) }
-    val selectedName = teams.firstOrNull { it.id == selectedId }?.name ?: ""
-
-    ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }, modifier = modifier) {
-        OutlinedTextField(
-            value = selectedName,
-            onValueChange = {},
-            readOnly = true,
-            label = { Text(label) },
-            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-            modifier = Modifier.menuAnchor().fillMaxWidth()
-        )
-        ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            teams.forEach { team ->
-                DropdownMenuItem(text = { Text(team.name) }, onClick = { onSelect(team.id); expanded = false })
-            }
-        }
-    }
 }

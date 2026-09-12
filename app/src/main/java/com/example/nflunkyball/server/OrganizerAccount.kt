@@ -79,10 +79,6 @@ class ServerCredentialsStore(context: Context) {
             .apply()
     }
 
-    fun clear() {
-        prefs.edit().clear().apply()
-    }
-
     private companion object {
         const val KEY_ACCOUNT_ID = "account_id"
         const val KEY_DISPLAY_NAME = "display_name"
