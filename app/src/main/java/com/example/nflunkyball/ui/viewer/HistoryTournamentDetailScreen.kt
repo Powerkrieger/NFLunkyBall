@@ -1,5 +1,6 @@
 package com.example.nflunkyball.ui.viewer
 
+import androidx.compose.runtime.getValue
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,20 +15,16 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import com.example.nflunkyball.model.Match
 import com.example.nflunkyball.model.Tournament
 import com.example.nflunkyball.model.standings
-import com.example.nflunkyball.server.ServerResult
 import com.example.nflunkyball.server.TournamentDetail
 import com.example.nflunkyball.ui.shared.MatchList
 import com.example.nflunkyball.ui.shared.StandingsTable
+import com.example.nflunkyball.ui.LoadState
 import com.example.nflunkyball.ui.theme.Spacing
 
 /**
@@ -45,41 +42,15 @@ fun HistoryTournamentDetailScreen(
     onOpenMatch: (Int) -> Unit,
     onOpenPlayer: (Int) -> Unit
 ) {
-    val saved by viewModel.savedTournaments.collectAsState()
-    val entry = saved.find { savedId != null && it.id == savedId } ?: saved.find { serverId != null && it.serverId == serverId }
-    val resolvedServerId = serverId ?: entry?.serverId
-    var detail by remember { mutableStateOf<TournamentDetail?>(null) }
-    var cached by remember { mutableStateOf<Tournament?>(null) }
-    var error by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(savedId, serverId) { viewModel.loadTournamentDetail(savedId, serverId) }
+    val state by viewModel.tournamentDetail.collectAsState()
 
-    LaunchedEffect(savedId, resolvedServerId, entry?.cachedTournamentJson) {
-        detail = null
-        cached = null
-        error = null
-        if (resolvedServerId != null) {
-            when (val result = viewModel.fetchTournamentDetail(resolvedServerId)) {
-                is ServerResult.Success -> { detail = result.value; return@LaunchedEffect }
-                is ServerResult.Failure -> error = result.message
-            }
-        }
-        val cachedJson = entry?.cachedTournamentJson
-        when {
-            cachedJson != null -> {
-                cached = viewModel.decodeCachedTournament(cachedJson)
-                if (cached != null) error = null else error = "Couldn't read this tournament's saved data"
-            }
-            error == null -> error = "This tournament isn't available yet"
-        }
-    }
-
-    val current = detail?.tournament ?: cached
-    when {
-        current == null && error != null ->
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text(error!!) }
-        current == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+    when (val current = state) {
+        is LoadState.Loaded -> TournamentBody(current.value.tournament, current.value.detail, onOpenMatch, onOpenPlayer)
+        is LoadState.Failed -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text(current.message) }
+        LoadState.Idle, LoadState.Loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             CircularProgressIndicator()
         }
-        else -> TournamentBody(current, detail, onOpenMatch, onOpenPlayer)
     }
 }
 

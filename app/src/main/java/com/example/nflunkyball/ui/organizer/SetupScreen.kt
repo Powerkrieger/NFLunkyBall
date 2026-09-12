@@ -39,8 +39,8 @@ import com.example.nflunkyball.model.Team
 import com.example.nflunkyball.model.TournamentPhase
 import com.example.nflunkyball.model.assignGroupsBySeeding
 import com.example.nflunkyball.model.assignGroupsRandomly
+import com.example.nflunkyball.ui.shared.format1
 import com.example.nflunkyball.ui.theme.Spacing
-import java.util.Locale
 import java.util.UUID
 
 
@@ -66,6 +66,7 @@ fun SetupScreen(
     }
 
     LaunchedEffect(Unit) { viewModel.loadKnownCompetitors() }
+    val knownCompetitors by viewModel.knownCompetitors.collectAsState()
 
     val focusManager = LocalFocusManager.current
     var tournamentName by remember { mutableStateOf("") }
@@ -196,7 +197,7 @@ fun SetupScreen(
         }
 
         // Already sorted by Elo desc (see OrganizerViewModel.loadKnownCompetitors).
-        val suggestions = viewModel.knownCompetitors.filter { it.name.lowercase() !in takenNames }
+        val suggestions = knownCompetitors.filter { it.name.lowercase() !in takenNames }
         if (suggestions.isNotEmpty()) {
             Text(
                 "Known players",
@@ -207,7 +208,7 @@ fun SetupScreen(
                 items(suggestions) { competitor ->
                     SuggestionChip(
                         onClick = { addPlayer(competitor.name) },
-                        label = { Text("${competitor.name} (${String.format(Locale.US, "%.1f", competitor.elo)})") },
+                        label = { Text("${competitor.name} (${competitor.elo.format1()})") },
                         modifier = Modifier.padding(end = Spacing.sm)
                     )
                 }
@@ -218,7 +219,7 @@ fun SetupScreen(
             Row(Modifier.padding(top = Spacing.sm)) {
                 TextButton(
                     onClick = {
-                        val eloByName = viewModel.knownCompetitors.associateBy { it.name.lowercase() }
+                        val eloByName = knownCompetitors.associateBy { it.name.lowercase() }
                         // A squad seeds by its members' mean Elo — the same side rating the
                         // backend uses to rate a team match.
                         val seeds = teams.map { team ->

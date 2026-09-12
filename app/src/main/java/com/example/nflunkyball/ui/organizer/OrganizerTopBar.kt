@@ -12,6 +12,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import com.example.nflunkyball.sync.SyncState
 
 /**
  * The organizer's top bar during scoring, shared by [GroupStageScreen] and [BracketScreen] —
@@ -19,6 +20,17 @@ import androidx.compose.runtime.getValue
  * page, not a popup — it has its own actions like "Abandon tournament" that deserve more room
  * and a confirm step than a dropdown gives them) via the three-dot icon.
  */
+/** The one-line status text for server-mode sync, shared by the top bar and HostingScreen;
+ *  null when there's nothing to say (BLE mode / not hosting). */
+fun SyncState.label(): String? = when (this) {
+    SyncState.Off -> null
+    SyncState.NotLinked -> "Not linked — link an organizer account to sync"
+    SyncState.Starting -> "Starting sync…"
+    SyncState.Syncing -> "Syncing…"
+    SyncState.Synced -> "Synced"
+    is SyncState.Failed -> "Sync failed: $message"
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun OrganizerTopBar(
@@ -38,7 +50,7 @@ fun OrganizerTopBar(
                         Text("Broadcasting v$broadcastVersion", style = MaterialTheme.typography.labelSmall)
                     }
                 } else {
-                    serverSyncStatus?.let { Text(it, style = MaterialTheme.typography.labelSmall) }
+                    serverSyncStatus.label()?.let { Text(it, style = MaterialTheme.typography.labelSmall) }
                 }
             }
         },

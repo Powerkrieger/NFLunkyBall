@@ -1,9 +1,9 @@
 package com.example.nflunkyball.persistence
 
+import com.example.nflunkyball.model.AppJson
 import android.content.Context
 import com.example.nflunkyball.model.TournamentFinishInfo
 import java.io.File
-import kotlinx.serialization.json.Json
 
 /**
  * The finish-dialog answers for the organizer's current tournament, held only between "Finish"
@@ -16,7 +16,7 @@ class FinishInfoStore(dir: File) {
     constructor(context: Context) : this(context.filesDir)
 
     private val file = JsonFile(File(dir, "finish_info.json"))
-    private val json = Json { ignoreUnknownKeys = true }
+    private val json = AppJson.lenient
 
     private var cache: TournamentFinishInfo? = load()
 

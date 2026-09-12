@@ -1,5 +1,7 @@
 package com.example.nflunkyball.ui.viewer
 
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.getValue
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -20,15 +22,17 @@ import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.example.nflunkyball.server.OpponentSummary
 import com.example.nflunkyball.server.SimilarPlayer
 import com.example.nflunkyball.ui.shared.BackTopBar
+import com.example.nflunkyball.ui.shared.format1
+import com.example.nflunkyball.ui.LoadState
+import com.example.nflunkyball.ui.valueOrNull
+import androidx.compose.runtime.collectAsState
 import com.example.nflunkyball.ui.theme.Spacing
 import com.patrykandpatrick.vico.compose.cartesian.CartesianChartHost
 import com.patrykandpatrick.vico.compose.cartesian.axis.rememberBottom
@@ -41,7 +45,6 @@ import com.patrykandpatrick.vico.core.cartesian.axis.HorizontalAxis
 import com.patrykandpatrick.vico.core.cartesian.axis.VerticalAxis
 import com.patrykandpatrick.vico.core.cartesian.data.CartesianChartModelProducer
 import com.patrykandpatrick.vico.core.cartesian.data.LineCartesianLayerModel
-import java.util.Locale
 
 /** One point on the Elo chart, whichever granularity it came from. [onOpen] navigates to the
  *  match or tournament the point came from. */
@@ -58,8 +61,9 @@ fun PlayerStatsScreen(
     onOpenTournament: (Int) -> Unit
 ) {
     LaunchedEffect(competitorId) { viewModel.loadPlayerStats(competitorId) }
-    val stats = viewModel.playerStats
-    val status = viewModel.playerStatsStatus
+    val state by viewModel.playerStats.collectAsState()
+    val stats = state.valueOrNull
+    val statsMode by viewModel.statsMode.collectAsState()
 
     Scaffold(
         topBar = {
@@ -70,17 +74,17 @@ fun PlayerStatsScreen(
             Modifier.fillMaxSize().padding(padding).padding(Spacing.md).verticalScroll(rememberScrollState())
         ) {
             StatsModeSelector(
-                selected = viewModel.statsMode,
+                selected = statsMode,
                 onSelect = viewModel::selectStatsMode,
                 modifier = Modifier.padding(bottom = Spacing.sm)
             )
             if (stats == null) {
-                Text(status ?: "Loading…", style = MaterialTheme.typography.bodyMedium)
+                Text((state as? LoadState.Failed)?.message ?: "Loading…", style = MaterialTheme.typography.bodyMedium)
                 return@Column
             }
 
             Text(
-                "${stats.wins}W ${stats.losses}L · Elo ${"%.1f".format(Locale.US, stats.elo)}",
+                "${stats.wins}W ${stats.losses}L · Elo ${stats.elo.format1()}",
                 style = MaterialTheme.typography.titleMedium
             )
             if (stats.wins + stats.losses == 0) {
@@ -99,10 +103,10 @@ fun PlayerStatsScreen(
             // beer-finishing time, credited as the winner's score — see the backend's
             // player_detail_stats doc) viewed from either side of this player's matches.
             stats.avgSecondsWhenLost?.let {
-                Text("When they lose, they average ${"%.1f".format(Locale.US, it)}s to finish their drink")
+                Text("When they lose, they average ${it.format1()}s to finish their drink")
             }
             stats.avgSecondsOpponentsWhenWon?.let {
-                Text("When they win, their opponent averages ${"%.1f".format(Locale.US, it)}s to finish theirs")
+                Text("When they win, their opponent averages ${it.format1()}s to finish theirs")
             }
             stats.forfeitRate?.let {
                 Text("Forfeit rate (when losing): ${(it * 100).toInt()}%")
@@ -149,7 +153,7 @@ fun PlayerStatsScreen(
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Text(point.label, color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f))
-                            Text("%.1f".format(Locale.US, point.rating))
+                            Text(point.rating.format1())
                         }
                         HorizontalDivider()
                     }

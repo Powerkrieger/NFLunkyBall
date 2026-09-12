@@ -1,11 +1,11 @@
 package com.example.nflunkyball.persistence
 
+import com.example.nflunkyball.model.AppJson
 import android.content.Context
 import com.example.nflunkyball.model.MatchDrinks
 import java.io.File
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
 
 /**
  * What each match's teams drank, recorded by the organizer — deliberately kept out of the
@@ -19,7 +19,7 @@ class MatchDrinkStore(dir: File) {
     constructor(context: Context) : this(context.filesDir)
 
     private val file = JsonFile(File(dir, "match_drinks.json"))
-    private val json = Json { ignoreUnknownKeys = true }
+    private val json = AppJson.lenient
 
     private var cache: MutableMap<String, MatchDrinks> = load()
 

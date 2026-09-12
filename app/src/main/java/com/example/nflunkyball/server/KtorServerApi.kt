@@ -1,5 +1,6 @@
 package com.example.nflunkyball.server
 
+import com.example.nflunkyball.model.AppJson
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.engine.cio.CIO
@@ -34,7 +35,7 @@ class KtorServerApi(private val baseUrl: String) : ServerApi {
          *  code), and a new CIO client per instance would leak its thread pool each time. */
         val sharedClient: HttpClient by lazy {
             HttpClient(CIO) {
-                install(ContentNegotiation) { json(Json { ignoreUnknownKeys = true }) }
+                install(ContentNegotiation) { json(AppJson.lenient) }
             }
         }
     }

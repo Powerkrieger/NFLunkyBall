@@ -135,9 +135,9 @@ has no viewer→organizer channel.
 | Back-arrow `TopAppBar` copy-pasted in 7 screens. | **Fixed** — `ui/shared/BackTopBar`. |
 | `TeamPicker` (BracketScreen) and `GroupDropdownField` (ManagePlayersScreen) were the same `ExposedDropdownMenuBox` widget. | **Fixed** — `ui/shared/DropdownField`; stale comment claiming BracketScreen still used a text-button menu removed with it. |
 | Four copies of "resolve server URL, then read password" in `ViewerViewModel` (`historyAvailable`, `loadHistory`, `loadPlayerStats`, `withReadAccess`). | **Fixed** — single private `readAccess()` returning `(api, password)` or null. |
-| `Json { … }` configured ad hoc in 8 places (`ignoreUnknownKeys`, `encodeDefaults` vary). | *Open* — a small `AppJson` object with two named configs (`wire`, `persisted`) would make the intent explicit. Low risk, low value; skipped to keep this pass focused. |
-| `String.format(Locale.US, "%.1f", …)` for Elo appears ~10 times across viewer screens. | *Open* — a `Double.formatElo()` helper in `ui/shared` would do. |
-| Detail screens (`HistoryTournamentDetailScreen`, `MatchDetailScreen`) fetch into local `remember` state via `suspend` VM functions, while `PlayerStatsScreen` uses VM-held state. | *Open* — pick one; the VM-held pattern survives configuration changes, the local one doesn't. |
+| `Json { … }` configured ad hoc in 12 places. | **Fixed (v0.10.5)** — `model/AppJson` with two named configs: `lenient` (disk/wire) and `compact` (BLE). |
+| `String.format(Locale.US, "%.1f", …)` for Elo in 9 places. | **Fixed (v0.10.5)** — `ui/shared/Format.kt`: `Double.format1()` / `formatSigned1()`. |
+| Detail screens fetched into local `remember` state while `PlayerStatsScreen` used VM state. | **Fixed (v0.10.5)** — all four loads (`history`, `playerStats`, `tournamentDetail`, `matchDetail`) live in `ViewerViewModel` as `StateFlow<LoadState<T>>`; the stats-mode lens reloads the open match too. |
 
 ---
 
@@ -151,9 +151,9 @@ has no viewer→organizer channel.
 | `PacketCodec` comment referred to a "12B" legacy chunk; the constant has been 18 for a while. | **Fixed** — references the constant instead. |
 | `Math.pow` in Kotlin code. | **Fixed** — `kotlin.math.pow`. |
 | `BleCapability` used fully-qualified `android.os.Build…` inline. | **Fixed** — imported. |
-| Mixed state-holder idioms: ViewModels expose some state as `StateFlow` and some as Compose `mutableStateOf`. | *Open* — works, but pick one. `StateFlow` + `collectAsStateWithLifecycle` is the AndroidX recommendation. |
-| User-facing status modelled as raw `String?` (`uploadStatus`, `serverSyncStatus`, `historyStatus`, `playerStatsStatus`) — mixes "loading", "ok" and error text in one field and bakes copy into the VM. | *Open* — a small sealed `LoadState` would let screens render consistently and make the strings localisable. |
-| Every UI string is hard-coded in Kotlin; `strings.xml` holds only `app_name`. `RulebookScreen` is in German, everything else English. | *Open* — fine for a single-language hobby app; worth a `strings.xml` pass before any translation. |
+| Mixed state-holder idioms: ViewModels exposed some state as `StateFlow` and some as Compose `mutableStateOf`. | **Fixed (v0.10.5)** — ViewModels expose `StateFlow` only; screens `collectAsState()`. |
+| User-facing status modelled as raw `String?`. | **Fixed (v0.10.5)** — `ui/LoadState<T>` (Idle/Loading/Loaded/Failed), `server/UploadState`, `sync/SyncState`; the display text lives in the screens (`SyncState.label()`, `PendingUploadRow`). |
+| Every UI string is hard-coded in Kotlin (~330 literals); `strings.xml` holds only `app_name`. `RulebookScreen` is in German, everything else English. | *Open* — the one cosmetic item deliberately left: it's a large mechanical diff whose only payoff is translation, and it touches every screen. Do it when a second language is actually wanted. |
 | `applicationId` / `namespace` are still `com.example.nflunkyball`. | *Open* — changing the application id makes existing installs a different app; only do it if you ever publish. |
 | README described the project as "freshly scaffolded, no features yet". | **Fixed** — now has a package map and the two sync transports. |
 | CI only ran `assembleRelease`; unit tests never ran on push. | **Fixed** — `testDebugUnitTest` step added before the build. |
@@ -183,11 +183,15 @@ has no viewer→organizer channel.
 No user-visible behaviour changed except the two bug fixes in §2. Changes are staged but not
 committed.
 
-**v0.9.3 follow-up:** 1.9, 1.10 and 1.11 fixed. **v0.10.x:** 1.1 and 1.2 fixed. Remaining open
-items are the cosmetic ones in §3/§4 (`AppJson`, `formatElo`, detail-screen state pattern,
-`StateFlow` vs `mutableStateOf`, sealed load state, `strings.xml`).
+**v0.9.3 follow-up:** 1.9, 1.10 and 1.11 fixed. **v0.10.0–v0.10.4:** 1.1 and 1.2 fixed.
+**v0.10.5:** every remaining §3/§4 item except `strings.xml` (see its row) and the dependency
+bump. Also fixed on the way: `HostingScreen` wasn't scrollable, so in landscape "Continue to
+scoring" was unreachable.
 
-On-device verification still needed (nothing since v0.9.2 has been run on a phone): cold start
-of v0.10.1+ (custom `Application` + ViewModel factory), retry/discard row after a failed upload
-(airplane mode on finish), reactions on the organizer's scoring screens in BLE mode, and the
-"two edits" BLE propagation test after the sync extraction in v0.10.3.
+**Verified on a device (Moto G9 Plus, v0.10.5 debug build):** cold start with the custom
+`Application`/factory, Settings BLE toggle persisting, hosting over BLE (broadcast v1→v4 across
+an app restart and two result edits — the host side of the "two edits" test), resume from
+"My tournaments" after a kill, "Finish without saving" clearing the tournament, and old
+`viewer_tournaments.json` data from a previous install decoding through `JsonFile`/`AppJson`.
+**Still unverified** (need an account or a second phone): the retry/discard row after a failed
+upload, reactions arriving on the organizer's screens, and BLE reception on a viewer.

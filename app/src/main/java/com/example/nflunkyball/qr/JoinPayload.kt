@@ -1,7 +1,7 @@
 package com.example.nflunkyball.qr
 
+import com.example.nflunkyball.model.AppJson
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
 
 /**
  * What the organizer's QR code (or manually-typed fallback) carries. [room] is always present
@@ -20,7 +20,7 @@ data class JoinPayload(
 )
 
 object JoinPayloadCodec {
-    private val json = Json { ignoreUnknownKeys = true }
+    private val json = AppJson.lenient
 
     fun encode(payload: JoinPayload): String = json.encodeToString(JoinPayload.serializer(), payload)
 

@@ -1,8 +1,5 @@
 package com.example.nflunkyball.ui.organizer
 
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.nflunkyball.ble.LiveBroadcaster
@@ -35,8 +32,11 @@ import com.example.nflunkyball.server.CompetitorStats
 import com.example.nflunkyball.server.OrganizerAccount
 import com.example.nflunkyball.server.ServerApiFactory
 import com.example.nflunkyball.server.ServerResult
+import com.example.nflunkyball.server.UploadState
 import com.example.nflunkyball.sync.LiveSyncHost
+import com.example.nflunkyball.sync.SyncState
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.launch
@@ -63,19 +63,19 @@ class OrganizerViewModel(
 
     // Live sync — see LiveSyncHost. BLE mode moves broadcastVersion, server mode serverSyncStatus.
     val broadcastVersion: StateFlow<Int?> = liveSync.broadcastVersion
-    val serverSyncStatus: StateFlow<String?> = liveSync.serverSyncStatus
+    val serverSyncStatus: StateFlow<SyncState> = liveSync.serverSyncStatus
     val emojiEvents: SharedFlow<String> = liveSync.emojiEvents
 
     // Account + archive upload — see AccountManager / ArchiveUploader for the rules.
     val organizerAccount: StateFlow<OrganizerAccount?> = accountManager.account
     val readPassword: StateFlow<String?> = accountManager.readPassword
-    val uploadStatus: StateFlow<String?> = uploader.uploadStatus
+    val uploadStatus: StateFlow<UploadState> = uploader.uploadStatus
     val hasPendingUpload: Boolean get() = uploader.hasPendingUpload
 
     /** Sorted by Elo desc (ties broken by name) so the SetupScreen suggestion chips read as a
      *  rough skill ranking rather than an alphabetical list. */
-    var knownCompetitors by mutableStateOf<List<CompetitorStats>>(emptyList())
-        private set
+    private val _knownCompetitors = MutableStateFlow<List<CompetitorStats>>(emptyList())
+    val knownCompetitors: StateFlow<List<CompetitorStats>> = _knownCompetitors
 
     /** Read fresh each time rather than cached at construction — this ViewModel outlives a
      *  single visit to the Settings screen, so a toggle flipped there mid-session must be seen
@@ -87,7 +87,7 @@ class OrganizerViewModel(
      *  account is actually registered with the group before starting a new tournament. */
     init {
         // Known-player suggestions are the linked group's data; drop them when the link goes.
-        viewModelScope.launch { accountManager.account.collect { if (it == null) knownCompetitors = emptyList() } }
+        viewModelScope.launch { accountManager.account.collect { if (it == null) _knownCompetitors.value = emptyList() } }
     }
 
     fun loadKnownCompetitors() {
@@ -96,7 +96,7 @@ class OrganizerViewModel(
         viewModelScope.launch {
             when (val result = serverApi(account.serverUrl).listCompetitors(password)) {
                 is ServerResult.Success ->
-                    knownCompetitors = result.value.sortedWith(compareByDescending<CompetitorStats> { it.elo }.thenBy { it.name })
+                    _knownCompetitors.value = result.value.sortedWith(compareByDescending<CompetitorStats> { it.elo }.thenBy { it.name })
                 is ServerResult.Failure -> Unit
             }
         }

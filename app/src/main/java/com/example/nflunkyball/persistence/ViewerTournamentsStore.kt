@@ -1,5 +1,6 @@
 package com.example.nflunkyball.persistence
 
+import com.example.nflunkyball.model.AppJson
 import android.content.Context
 import com.example.nflunkyball.model.TournamentPhase
 import com.example.nflunkyball.qr.JoinPayload
@@ -8,7 +9,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
-import kotlinx.serialization.json.Json
 
 /**
  * One tournament a viewer knows about, either because they joined it live over BLE ([joinPayload]
@@ -50,7 +50,7 @@ class ViewerTournamentsStore(dir: File) {
     constructor(context: Context) : this(context.filesDir)
 
     private val file = JsonFile(File(dir, "viewer_tournaments.json"))
-    private val json = Json { encodeDefaults = true; ignoreUnknownKeys = true }
+    private val json = AppJson.lenient
     private val listSerializer = ListSerializer(SavedTournament.serializer())
 
     private val _tournaments = MutableStateFlow(load())

@@ -1,18 +1,18 @@
 package com.example.nflunkyball.persistence
 
+import com.example.nflunkyball.model.AppJson
 import android.content.Context
 import com.example.nflunkyball.model.Tournament
 import java.io.File
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.serialization.json.Json
 
 /** Organizer-side persistence: the in-progress tournament survives the app being killed. */
 class TournamentRepository(dir: File) {
     constructor(context: Context) : this(context.filesDir)
 
     private val file = JsonFile(File(dir, "tournament.json"))
-    private val json = Json { encodeDefaults = true }
+    private val json = AppJson.lenient
 
     private val _tournament = MutableStateFlow(load())
     val tournament: StateFlow<Tournament?> = _tournament

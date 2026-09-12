@@ -1,5 +1,6 @@
 package com.example.nflunkyball.sync
 
+import com.example.nflunkyball.model.AppJson
 import com.example.nflunkyball.ble.EmojiPalette
 import com.example.nflunkyball.ble.LiveBroadcaster
 import com.example.nflunkyball.ble.RoomCode
@@ -18,7 +19,18 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
-import kotlinx.serialization.json.Json
+
+/** Server-mode sync status — see [LiveSyncHost.serverSyncStatus]. */
+sealed interface SyncState {
+    /** Not hosting, or hosting over BLE (which reports via [LiveSyncHost.broadcastVersion]). */
+    data object Off : SyncState
+    /** Hosting in server mode with no organizer account to sign pushes with. */
+    data object NotLinked : SyncState
+    data object Starting : SyncState
+    data object Syncing : SyncState
+    data object Synced : SyncState
+    data class Failed(val message: String) : SyncState
+}
 
 /**
  * Organizer side of live sync: pushes every new tournament state to viewers over whichever
@@ -33,14 +45,14 @@ class LiveSyncHost(
     private val serverApi: ServerApiFactory,
     private val scope: CoroutineScope
 ) {
-    private val liveJson = Json { encodeDefaults = true }
+    private val liveJson = AppJson.lenient
 
     /** The version currently on air, or null while hosting is off — BLE mode only. */
     val broadcastVersion: StateFlow<Int?> = broadcaster?.broadcastVersion ?: MutableStateFlow(null)
 
-    /** Server-mode counterpart to [broadcastVersion] — null until the first push attempt. */
-    private val _serverSyncStatus = MutableStateFlow<String?>(null)
-    val serverSyncStatus: StateFlow<String?> = _serverSyncStatus
+    /** Server-mode counterpart to [broadcastVersion]. */
+    private val _serverSyncStatus = MutableStateFlow<SyncState>(SyncState.Off)
+    val serverSyncStatus: StateFlow<SyncState> = _serverSyncStatus
 
     private val _emojiEvents = MutableSharedFlow<String>(extraBufferCapacity = 32)
     val emojiEvents: SharedFlow<String> = _emojiEvents
@@ -78,7 +90,7 @@ class LiveSyncHost(
     private fun stopServerSync() {
         serverSyncJob?.cancel()
         serverSyncJob = null
-        _serverSyncStatus.value = null
+        _serverSyncStatus.value = SyncState.Off
     }
 
     private fun stopBle() {
@@ -97,24 +109,24 @@ class LiveSyncHost(
         serverSyncJob = scope.launch {
             account.collectLatest { current ->
                 if (current == null) {
-                    _serverSyncStatus.value = "Not linked — link an organizer account to sync"
+                    _serverSyncStatus.value = SyncState.NotLinked
                     return@collectLatest
                 }
-                _serverSyncStatus.value = "Starting sync…"
+                _serverSyncStatus.value = SyncState.Starting
                 tournamentUpdates.collectLatest { tournament -> pushLiveState(current, tournament) }
             }
         }
     }
 
     private suspend fun pushLiveState(account: OrganizerAccount, current: Tournament) {
-        _serverSyncStatus.value = "Syncing…"
+        _serverSyncStatus.value = SyncState.Syncing
         val bodyJson = liveJson.encodeToString(Tournament.serializer(), current)
         val signed = UploadSigner.sign(account.privateKeySeed, current.id, bodyJson)
         val result = serverApi(account.serverUrl)
             .pushLiveTournament(current.id, account.accountId, signed.timestamp, signed.signatureBase64, bodyJson)
         _serverSyncStatus.value = when (result) {
-            is ServerResult.Success -> "Synced"
-            is ServerResult.Failure -> "Sync failed: ${result.message}"
+            is ServerResult.Success -> SyncState.Synced
+            is ServerResult.Failure -> SyncState.Failed(result.message)
         }
     }
 }

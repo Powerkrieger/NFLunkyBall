@@ -1,5 +1,6 @@
 package com.example.nflunkyball.sync
 
+import com.example.nflunkyball.model.AppJson
 import com.example.nflunkyball.ble.ChunkProgress
 import com.example.nflunkyball.ble.EmojiPalette
 import com.example.nflunkyball.ble.LiveReceiver
@@ -16,7 +17,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlinx.serialization.json.Json
 
 /** How often a server-mode viewer re-fetches live state — no push channel, so this trades
  *  freshness for simplicity; BLE mode (the fallback for offline venues) is still near-instant. */
@@ -34,7 +34,7 @@ class LiveSyncViewer(
     private val serverApi: ServerApiFactory,
     private val scope: CoroutineScope
 ) {
-    private val json = Json { ignoreUnknownKeys = true }
+    private val json = AppJson.lenient
 
     private val _tournament = MutableStateFlow<Tournament?>(null)
     val tournament: StateFlow<Tournament?> = _tournament

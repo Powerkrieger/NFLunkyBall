@@ -1,5 +1,6 @@
 package com.example.nflunkyball.server
 
+import com.example.nflunkyball.model.AppJson
 import com.example.nflunkyball.model.Tournament
 import com.example.nflunkyball.model.TournamentFinishInfo
 import com.example.nflunkyball.model.TournamentPhase
@@ -11,7 +12,16 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
-import kotlinx.serialization.json.Json
+
+/** Where the current tournament's archive upload stands — see [ArchiveUploader.uploadStatus]. */
+sealed interface UploadState {
+    /** No upload attempted for the current tournament (or none pending). */
+    data object Idle : UploadState
+    data object Uploading : UploadState
+    /** Finished, but this device has no organizer account to upload with. */
+    data object NotLinked : UploadState
+    data class Failed(val message: String) : UploadState
+}
 
 /**
  * Ends a tournament and gets it into the history server. The local copy (tournament, drinks,
@@ -28,11 +38,10 @@ class ArchiveUploader(
     private val serverApi: ServerApiFactory,
     private val scope: CoroutineScope
 ) {
-    private val uploadJson = Json { encodeDefaults = true }
+    private val uploadJson = AppJson.lenient
 
-    /** Outcome of the last upload attempt for the current tournament, or null if none yet. */
-    private val _uploadStatus = MutableStateFlow<String?>(null)
-    val uploadStatus: StateFlow<String?> = _uploadStatus
+    private val _uploadStatus = MutableStateFlow<UploadState>(UploadState.Idle)
+    val uploadStatus: StateFlow<UploadState> = _uploadStatus
 
     /** True while a finished tournament is still on this device because its upload hasn't
      *  succeeded yet — it stays in My tournaments with retry/discard until it has. */
@@ -72,18 +81,18 @@ class ArchiveUploader(
         repository.clear()
         drinkStore.clear()
         finishInfoStore.clear()
-        _uploadStatus.value = null
+        _uploadStatus.value = UploadState.Idle
     }
 
     private fun upload(finishInfo: TournamentFinishInfo) {
         val account = account() ?: run {
-            _uploadStatus.value = "Not linked — link an organizer account to upload"
+            _uploadStatus.value = UploadState.NotLinked
             return
         }
         val current = repository.tournament.value ?: return
-        if (_uploadStatus.value == UPLOADING) return
+        if (_uploadStatus.value == UploadState.Uploading) return
         // Set before launching so a second tap on Retry can't queue a duplicate upload.
-        _uploadStatus.value = UPLOADING
+        _uploadStatus.value = UploadState.Uploading
         scope.launch {
             val payload = current.toUploadPayload(drinkStore.all(), finishInfo)
             val bodyJson = uploadJson.encodeToString(UploadTournament.serializer(), payload)
@@ -92,12 +101,8 @@ class ArchiveUploader(
                 .uploadTournament(account.accountId, signed.timestamp, signed.signatureBase64, bodyJson)
             when (result) {
                 is ServerResult.Success -> clearLocal()
-                is ServerResult.Failure -> _uploadStatus.value = "Upload failed: ${result.message}"
+                is ServerResult.Failure -> _uploadStatus.value = UploadState.Failed(result.message)
             }
         }
-    }
-
-    private companion object {
-        const val UPLOADING = "Uploading…"
     }
 }

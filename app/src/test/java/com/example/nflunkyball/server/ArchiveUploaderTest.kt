@@ -60,13 +60,13 @@ class ArchiveUploaderTest {
         uploader.finishAndUpload(info)
         assertEquals(TournamentPhase.FINISHED, repository.tournament.value?.phase)
         assertTrue(uploader.hasPendingUpload)
-        assertEquals("Uploading…", uploader.uploadStatus.value)
+        assertEquals(UploadState.Uploading, uploader.uploadStatus.value)
         advanceUntilIdle()
 
         assertNull(repository.tournament.value)
         assertTrue(drinks.all().isEmpty())
         assertNull(finishInfo.get())
-        assertNull(uploader.uploadStatus.value)
+        assertEquals(UploadState.Idle, uploader.uploadStatus.value)
         assertFalse(uploader.hasPendingUpload)
 
         // The payload is the drinks-augmented UploadTournament with the finish metadata, signed
@@ -88,7 +88,7 @@ class ArchiveUploaderTest {
         uploader.finishAndUpload(info)
         advanceUntilIdle()
 
-        assertEquals("Upload failed: offline", uploader.uploadStatus.value)
+        assertEquals(UploadState.Failed("offline"), uploader.uploadStatus.value)
         assertTrue(uploader.hasPendingUpload)
         assertEquals(TournamentPhase.FINISHED, repository.tournament.value?.phase)
         assertEquals(1, drinks.all().size)
@@ -133,7 +133,7 @@ class ArchiveUploaderTest {
         uploader.discard()
         assertNull(repository.tournament.value)
         assertTrue(drinks.all().isEmpty())
-        assertNull(uploader.uploadStatus.value)
+        assertEquals(UploadState.Idle, uploader.uploadStatus.value)
     }
 
     @Test

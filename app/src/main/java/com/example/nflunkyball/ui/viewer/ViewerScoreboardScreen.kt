@@ -40,7 +40,7 @@ fun ViewerScoreboardScreen(viewModel: ViewerViewModel, onOpenHistory: () -> Unit
     var showInvite by remember { mutableStateOf(false) }
 
     if (showInvite) {
-        val payload = viewModel.joinPayload
+        val payload = viewModel.joinPayload.collectAsState().value
         AlertDialog(
             onDismissRequest = { showInvite = false },
             title = { Text("Invite others") },

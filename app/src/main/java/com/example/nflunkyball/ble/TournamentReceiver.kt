@@ -1,5 +1,6 @@
 package com.example.nflunkyball.ble
 
+import com.example.nflunkyball.model.AppJson
 import android.annotation.SuppressLint
 import android.bluetooth.BluetoothAdapter
 import android.util.Log
@@ -12,7 +13,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.launch
-import kotlinx.serialization.json.Json
 
 private const val TAG = "TournamentReceiver"
 
@@ -33,7 +33,7 @@ interface LiveReceiver {
  */
 class TournamentReceiver(private val adapter: BluetoothAdapter) : LiveReceiver {
 
-    private val json = Json { ignoreUnknownKeys = true }
+    private val json = AppJson.compact
 
     private val _tournament = MutableStateFlow<Tournament?>(null)
     override val tournament: StateFlow<Tournament?> = _tournament

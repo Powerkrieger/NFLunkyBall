@@ -1,5 +1,6 @@
 package com.example.nflunkyball.persistence
 
+import com.example.nflunkyball.model.AppJson
 import com.example.nflunkyball.ble.RoomCode
 import com.example.nflunkyball.model.Tournament
 import com.example.nflunkyball.model.TournamentPhase
@@ -12,7 +13,6 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
-import kotlinx.serialization.json.Json
 
 /**
  * The rules for what lands in a viewer's saved-tournament list ([ViewerTournamentsStore]) and
@@ -21,7 +21,7 @@ import kotlinx.serialization.json.Json
  * ([cacheFromServer]). Pure JVM apart from the file store, so it's covered by ViewerLibraryTest.
  */
 class ViewerLibrary(private val store: ViewerTournamentsStore, private val now: () -> Long = System::currentTimeMillis) {
-    private val json = Json { ignoreUnknownKeys = true }
+    private val json = AppJson.lenient
 
     val tournaments: StateFlow<List<SavedTournament>> = store.tournaments
 

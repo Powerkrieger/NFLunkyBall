@@ -1,5 +1,6 @@
 package com.example.nflunkyball.ui.viewer
 
+import androidx.compose.runtime.getValue
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -18,17 +19,15 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import com.example.nflunkyball.server.MatchDetail
 import com.example.nflunkyball.server.MatchPlayer
-import com.example.nflunkyball.server.ServerResult
 import com.example.nflunkyball.ui.shared.BackTopBar
+import com.example.nflunkyball.ui.shared.format1
+import com.example.nflunkyball.ui.shared.formatSigned1
+import com.example.nflunkyball.ui.LoadState
+import com.example.nflunkyball.ui.valueOrNull
+import androidx.compose.runtime.collectAsState
 import com.example.nflunkyball.ui.theme.Spacing
-import java.util.Locale
 
 /** One archived match: both sides player by player, with every player and the tournament as links. */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -40,17 +39,11 @@ fun MatchDetailScreen(
     onOpenPlayer: (Int) -> Unit,
     onOpenTournament: (Int) -> Unit
 ) {
-    var detail by remember { mutableStateOf<MatchDetail?>(null) }
-    var error by remember { mutableStateOf<String?>(null) }
-
-    LaunchedEffect(matchId, viewModel.statsMode) {
-        detail = null
-        error = null
-        when (val result = viewModel.fetchMatchDetail(matchId)) {
-            is ServerResult.Success -> detail = result.value
-            is ServerResult.Failure -> error = result.message
-        }
-    }
+    // The stats-mode lens is re-applied by the ViewModel itself (selectStatsMode reloads the
+    // last match), so only the id triggers a load here.
+    LaunchedEffect(matchId) { viewModel.loadMatchDetail(matchId) }
+    val state by viewModel.matchDetail.collectAsState()
+    val detail = state.valueOrNull
 
     Scaffold(
         topBar = {
@@ -62,7 +55,7 @@ fun MatchDetailScreen(
         ) {
             val match = detail
             if (match == null) {
-                Text(error ?: "Loading…", style = MaterialTheme.typography.bodyMedium)
+                Text((state as? LoadState.Failed)?.message ?: "Loading…", style = MaterialTheme.typography.bodyMedium)
                 return@Column
             }
 
@@ -142,11 +135,8 @@ private fun SideCard(name: String, players: List<MatchPlayer>, won: Boolean, onO
                     val before = player.eloBefore
                     val after = player.eloAfter
                     if (before != null && after != null) {
-                        val delta = after - before
-                        val sign = if (delta >= 0) "+" else ""
                         Text(
-                            "Elo ${"%.1f".format(Locale.US, before)} → ${"%.1f".format(Locale.US, after)} " +
-                                "($sign${"%.1f".format(Locale.US, delta)})",
+                            "Elo ${before.format1()} → ${after.format1()} (${(after - before).formatSigned1()})",
                             style = MaterialTheme.typography.bodySmall
                         )
                     }

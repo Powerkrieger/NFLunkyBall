@@ -1,5 +1,7 @@
 package com.example.nflunkyball.ui.viewer
 
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.getValue
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -23,11 +25,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -40,8 +40,11 @@ import com.example.nflunkyball.persistence.SavedTournament
 import com.example.nflunkyball.server.CompetitorStats
 import com.example.nflunkyball.server.StatsMode
 import com.example.nflunkyball.server.withLiveStandings
+import com.example.nflunkyball.ui.shared.format1
+import com.example.nflunkyball.ui.shared.formatSigned1
+import com.example.nflunkyball.server.UploadState
+import com.example.nflunkyball.ui.LoadState
 import com.example.nflunkyball.ui.theme.Spacing
-import java.util.Locale
 
 /** [hostedTournament] is the organizer side's own tournament, if this device is hosting one.
  *  TournamentRepository (behind OrganizerViewModel) is a separate single-slot store from the
@@ -55,7 +58,7 @@ import java.util.Locale
 fun HistoryScreen(
     viewModel: ViewerViewModel,
     hostedTournament: Tournament?,
-    hostedUploadStatus: String?,
+    hostedUploadStatus: UploadState,
     onRetryUpload: () -> Unit,
     onDiscardHosted: () -> Unit,
     onOpenTournament: (String) -> Unit,
@@ -68,6 +71,9 @@ fun HistoryScreen(
     // The viewer's currently-watched live tournament (BLE or server sync) — folded into the
     // Leaderboard tab below so it reflects games in progress, not just archived results.
     val watchedTournament by viewModel.tournament.collectAsState()
+    val history by viewModel.history.collectAsState()
+    val competitors by viewModel.competitors.collectAsState()
+    val statsMode by viewModel.statsMode.collectAsState()
     var tabIndex by remember { mutableIntStateOf(0) }
     var showBluetoothOff by remember { mutableStateOf(false) }
     var showDiscardConfirm by remember { mutableStateOf(false) }
@@ -99,7 +105,11 @@ fun HistoryScreen(
             Tab(selected = tabIndex == 0, onClick = { tabIndex = 0 }, text = { Text("Tournaments") })
             Tab(selected = tabIndex == 1, onClick = { tabIndex = 1 }, text = { Text("Leaderboard") })
         }
-        viewModel.historyStatus?.let { Text(it, modifier = Modifier.padding(Spacing.md)) }
+        when (val h = history) {
+            LoadState.Loading -> Text("Loading…", modifier = Modifier.padding(Spacing.md))
+            is LoadState.Failed -> Text(h.message, modifier = Modifier.padding(Spacing.md))
+            LoadState.Idle, is LoadState.Loaded<*> -> Unit
+        }
         if (tabIndex == 0) {
             if (saved.isEmpty() && hostedTournament == null) {
                 Box(Modifier.fillMaxSize().padding(Spacing.md), contentAlignment = Alignment.TopCenter) {
@@ -181,8 +191,8 @@ fun HistoryScreen(
                     }
                 }
             } else {
-                val leaderboard = remember(viewModel.competitors, hostedTournament, watchedTournament) {
-                    viewModel.competitors
+                val leaderboard = remember(competitors, hostedTournament, watchedTournament) {
+                    competitors
                         .withLiveStandings(listOf(hostedTournament, watchedTournament))
                         .sortedByDescending { it.elo }
                 }
@@ -192,7 +202,7 @@ fun HistoryScreen(
                 ) {
                     item {
                         StatsModeSelector(
-                            selected = viewModel.statsMode,
+                            selected = statsMode,
                             onSelect = viewModel::selectStatsMode,
                             modifier = Modifier.padding(bottom = Spacing.sm)
                         )
@@ -243,7 +253,13 @@ private fun HostedTournamentRow(name: String, phase: TournamentPhase, onClick: (
 
 /** A finished tournament still on this device because its upload hasn't gone through. */
 @Composable
-private fun PendingUploadRow(name: String, status: String?, onRetry: () -> Unit, onDiscard: () -> Unit) {
+private fun PendingUploadRow(name: String, status: UploadState, onRetry: () -> Unit, onDiscard: () -> Unit) {
+    val statusText = when (status) {
+        UploadState.Idle -> null
+        UploadState.Uploading -> "Uploading…"
+        UploadState.NotLinked -> "Not linked — link an organizer account to upload"
+        is UploadState.Failed -> "Upload failed: ${status.message}"
+    }
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
@@ -254,11 +270,11 @@ private fun PendingUploadRow(name: String, status: String?, onRetry: () -> Unit,
         Column(Modifier.fillMaxWidth().padding(horizontal = Spacing.md, vertical = Spacing.sm)) {
             Text(name, style = MaterialTheme.typography.titleMedium)
             Text(
-                "Finished · not uploaded yet" + (status?.let { " · $it" } ?: ""),
+                "Finished · not uploaded yet" + (statusText?.let { " · $it" } ?: ""),
                 style = MaterialTheme.typography.bodySmall
             )
             Row(Modifier.padding(top = Spacing.xs), horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                TextButton(onClick = onRetry) { Text("Retry upload") }
+                TextButton(onClick = onRetry, enabled = status != UploadState.Uploading) { Text("Retry upload") }
                 TextButton(onClick = onDiscard) { Text("Discard") }
             }
         }
@@ -289,8 +305,7 @@ private fun TournamentStandingRow(teamName: String, standing: ProvisionalStandin
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
         Text(teamName)
-        val sign = if (standing.eloDelta >= 0) "+" else ""
-        Text("${standing.winDelta}W ${standing.lossDelta}L · $sign${String.format(Locale.US, "%.1f", standing.eloDelta)} elo")
+        Text("${standing.winDelta}W ${standing.lossDelta}L · ${standing.eloDelta.formatSigned1()} elo")
     }
     HorizontalDivider()
 }
@@ -302,7 +317,7 @@ private fun CompetitorRow(c: CompetitorStats, onClick: () -> Unit) {
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
         Text(c.name)
-        Text("${String.format(Locale.US, "%.1f", c.elo)} · ${c.wins}W ${c.losses}L")
+        Text("${c.elo.format1()} · ${c.wins}W ${c.losses}L")
     }
     HorizontalDivider()
 }

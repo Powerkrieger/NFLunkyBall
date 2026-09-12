@@ -64,7 +64,7 @@ class LiveSyncHostTest {
         host.start("t1", updates.filterNotNull())
         advanceUntilIdle()
 
-        assertEquals("Not linked — link an organizer account to sync", host.serverSyncStatus.value)
+        assertEquals(SyncState.NotLinked, host.serverSyncStatus.value)
         assertTrue(api.livePushes.isEmpty())
         assertTrue(broadcaster.startedRooms.isEmpty())
         host.stop()
@@ -75,7 +75,7 @@ class LiveSyncHostTest {
         val host = host(this, ble = false)
         host.start("t1", updates.filterNotNull())
         advanceUntilIdle()
-        assertEquals("Synced", host.serverSyncStatus.value)
+        assertEquals(SyncState.Synced, host.serverSyncStatus.value)
 
         updates.value = updates.value!!.copy(name = "Renamed")
         advanceUntilIdle()
@@ -91,10 +91,10 @@ class LiveSyncHostTest {
         api.livePushResult = ServerResult.Failure("500")
         updates.value = updates.value!!.copy(name = "Again")
         advanceUntilIdle()
-        assertEquals("Sync failed: 500", host.serverSyncStatus.value)
+        assertEquals(SyncState.Failed("500"), host.serverSyncStatus.value)
 
         host.stop()
-        assertNull(host.serverSyncStatus.value)
+        assertEquals(SyncState.Off, host.serverSyncStatus.value)
     }
 
     @Test
@@ -106,7 +106,7 @@ class LiveSyncHostTest {
 
         account.value = null
         advanceUntilIdle()
-        assertEquals("Not linked — link an organizer account to sync", host.serverSyncStatus.value)
+        assertEquals(SyncState.NotLinked, host.serverSyncStatus.value)
         updates.value = updates.value!!.copy(name = "While unlinked")
         advanceUntilIdle()
         assertEquals(1, api.livePushes.size)
@@ -114,7 +114,7 @@ class LiveSyncHostTest {
         account.value = testAccount()
         advanceUntilIdle()
         assertEquals(2, api.livePushes.size)
-        assertEquals("Synced", host.serverSyncStatus.value)
+        assertEquals(SyncState.Synced, host.serverSyncStatus.value)
         host.stop()
     }
 }

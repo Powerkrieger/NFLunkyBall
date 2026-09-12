@@ -1,8 +1,5 @@
 package com.example.nflunkyball.ui.viewer
 
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.nflunkyball.ble.LiveReceiver
@@ -25,8 +22,14 @@ import com.example.nflunkyball.server.TournamentSummary
 import com.example.nflunkyball.server.ServerResult
 import com.example.nflunkyball.server.StatsMode
 import com.example.nflunkyball.sync.LiveSyncViewer
+import com.example.nflunkyball.ui.LoadState
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+
+/** An archived tournament as the detail screen shows it: the body plus, when it came from the
+ *  backend rather than the offline cache, the metadata and id maps that make things tappable. */
+data class ArchivedTournament(val tournament: Tournament, val detail: TournamentDetail?)
 
 /** Dependencies come from [com.example.nflunkyball.AppContainer]; every one has a plain-JVM
  *  substitute so this class is unit-testable. [receiver] is null on a device without Bluetooth. */
@@ -51,38 +54,47 @@ class ViewerViewModel(
      *  (viewable offline) — survives the app being killed. See [ViewerTournamentsStore]. */
     val savedTournaments: StateFlow<List<SavedTournament>> = library.tournaments
 
-    var joinPayload by mutableStateOf<JoinPayload?>(null)
-        private set
+    private val _joinPayload = MutableStateFlow<JoinPayload?>(null)
+    /** The join code of the room currently being watched, if any. */
+    val joinPayload: StateFlow<JoinPayload?> = _joinPayload
 
-    var historyTournaments by mutableStateOf<List<TournamentSummary>>(emptyList())
-        private set
-    var competitors by mutableStateOf<List<CompetitorStats>>(emptyList())
-        private set
-    var historyStatus by mutableStateOf<String?>(null)
-        private set
-    var playerStats by mutableStateOf<CompetitorDetailStats?>(null)
-        private set
-    var playerStatsStatus by mutableStateOf<String?>(null)
-        private set
+    private val _history = MutableStateFlow<LoadState<List<TournamentSummary>>>(LoadState.Idle)
+    /** The backend's archive list — its value feeds [savedTournaments] via [ViewerLibrary]; the
+     *  screen only needs the load state. */
+    val history: StateFlow<LoadState<List<TournamentSummary>>> = _history
+
+    private val _competitors = MutableStateFlow<List<CompetitorStats>>(emptyList())
+    val competitors: StateFlow<List<CompetitorStats>> = _competitors
+
+    private val _playerStats = MutableStateFlow<LoadState<CompetitorDetailStats>>(LoadState.Idle)
+    val playerStats: StateFlow<LoadState<CompetitorDetailStats>> = _playerStats
+
+    private val _tournamentDetail = MutableStateFlow<LoadState<ArchivedTournament>>(LoadState.Idle)
+    val tournamentDetail: StateFlow<LoadState<ArchivedTournament>> = _tournamentDetail
+
+    private val _matchDetail = MutableStateFlow<LoadState<MatchDetail>>(LoadState.Idle)
+    val matchDetail: StateFlow<LoadState<MatchDetail>> = _matchDetail
 
     /** Which matches the leaderboard and player pages count (all / singles only / team matches
      *  only) — a view-time choice sent to the backend, which recomputes everything per request.
      *  Session-scoped on purpose: it's a lens, not a setting. */
-    var statsMode by mutableStateOf(StatsMode.ALL)
-        private set
+    private val _statsMode = MutableStateFlow(StatsMode.ALL)
+    val statsMode: StateFlow<StatsMode> = _statsMode
 
     private var lastPlayerStatsId: Int? = null
+    private var lastMatchId: Int? = null
 
     /** Switches the lens and refreshes whatever is currently loaded under it. */
     fun selectStatsMode(mode: StatsMode) {
-        if (mode == statsMode) return
-        statsMode = mode
+        if (mode == _statsMode.value) return
+        _statsMode.value = mode
         loadHistory()
         lastPlayerStatsId?.let { loadPlayerStats(it) }
+        lastMatchId?.let { loadMatchDetail(it) }
     }
 
     init {
-        library.trackLive(liveSync.tournament, currentPayload = { joinPayload }, viewModelScope)
+        library.trackLive(liveSync.tournament, currentPayload = { _joinPayload.value }, viewModelScope)
     }
 
     /** Read fresh each time rather than cached at construction — this ViewModel outlives a
@@ -91,7 +103,7 @@ class ViewerViewModel(
     fun useBleSync(): Boolean = settings.useBleSync()
 
     fun join(payload: JoinPayload) {
-        joinPayload = payload
+        _joinPayload.value = payload
         payload.pw?.let { credentialsStore.saveReadPassword(it) }
         payload.server?.let { credentialsStore.saveViewerServerUrl(it) }
         if (RoomCode.decode(payload.room) == null) return
@@ -107,8 +119,6 @@ class ViewerViewModel(
         entry.joinPayload?.let { join(it) }
     }
 
-    fun decodeCachedTournament(cachedJson: String): Tournament? = library.decode(cachedJson)
-
     /** Everything a read-only backend call needs — null when this device has no way to reach a
      *  server yet (never joined via QR, never linked, never redeemed a viewer invite). */
     private class ReadAccess(val api: ServerApi, val password: String)
@@ -119,11 +129,12 @@ class ViewerViewModel(
     // breaking history/leaderboard loading for them despite being fully linked to the group.
     // The password likewise prefers the live join code's over the stored one.
     private fun readAccess(): ReadAccess? {
-        val server = joinPayload?.server
+        val payload = _joinPayload.value
+        val server = payload?.server
             ?: credentialsStore.loadViewerServerUrl()
             ?: credentialsStore.loadAccount()?.serverUrl
             ?: return null
-        val password = joinPayload?.pw ?: credentialsStore.loadReadPassword() ?: return null
+        val password = payload?.pw ?: credentialsStore.loadReadPassword() ?: return null
         return ReadAccess(serverApi(server), password)
     }
 
@@ -134,46 +145,72 @@ class ViewerViewModel(
     fun loadHistory() {
         val access = readAccess() ?: return
         viewModelScope.launch {
-            historyStatus = "Loading…"
+            _history.value = LoadState.Loading
             when (val result = access.api.listTournaments(access.password)) {
                 is ServerResult.Success -> {
-                    historyTournaments = result.value
-                    historyStatus = null
+                    _history.value = LoadState.Loaded(result.value)
                     library.cacheFromServer(access.api, access.password, result.value)
                 }
-                is ServerResult.Failure -> historyStatus = result.message
+                is ServerResult.Failure -> _history.value = LoadState.Failed(result.message)
             }
-            when (val result = access.api.listCompetitors(access.password, statsMode)) {
-                is ServerResult.Success -> competitors = result.value
+            when (val result = access.api.listCompetitors(access.password, _statsMode.value)) {
+                is ServerResult.Success -> _competitors.value = result.value
                 is ServerResult.Failure -> Unit
             }
         }
     }
 
     fun loadPlayerStats(competitorId: Int) {
-        val access = readAccess() ?: return
-        // Drop the previous player's stats up front so switching players can't show the old
-        // data under the new route (or hide a load failure behind it).
-        playerStats = null
-        playerStatsStatus = "Loading…"
         lastPlayerStatsId = competitorId
+        // Reset up front so switching players can't show the old data under the new route.
+        load(_playerStats) { api, password -> api.getCompetitorStats(competitorId, password, _statsMode.value) }
+    }
+
+    fun loadMatchDetail(matchId: Int) {
+        lastMatchId = matchId
+        load(_matchDetail) { api, password -> api.getMatchDetail(matchId, password, _statsMode.value) }
+    }
+
+    /**
+     * One archived tournament, addressed by its saved-list id ([savedId]) or its backend id
+     * ([serverId], e.g. from a player's Elo history). With a server id on hand the backend's
+     * detail endpoint is preferred — it carries the finish metadata and the id maps that make
+     * match rows and player names tappable; the locally cached body is the offline fallback.
+     */
+    fun loadTournamentDetail(savedId: String?, serverId: Int?) {
+        val saved = savedTournaments.value
+        val entry = saved.find { savedId != null && it.id == savedId } ?: saved.find { serverId != null && it.serverId == serverId }
+        val resolvedServerId = serverId ?: entry?.serverId
+        _tournamentDetail.value = LoadState.Loading
         viewModelScope.launch {
-            when (val result = access.api.getCompetitorStats(competitorId, access.password, statsMode)) {
-                is ServerResult.Success -> {
-                    playerStats = result.value
-                    playerStatsStatus = null
+            var failure: String? = null
+            if (resolvedServerId != null) {
+                when (val result = withReadAccess { api, password -> api.getTournamentDetail(resolvedServerId, password) }) {
+                    is ServerResult.Success -> {
+                        _tournamentDetail.value = LoadState.Loaded(ArchivedTournament(result.value.tournament, result.value))
+                        return@launch
+                    }
+                    is ServerResult.Failure -> failure = result.message
                 }
-                is ServerResult.Failure -> playerStatsStatus = result.message
+            }
+            val cached = entry?.cachedTournamentJson?.let { library.decode(it) }
+            _tournamentDetail.value = when {
+                cached != null -> LoadState.Loaded(ArchivedTournament(cached, detail = null))
+                entry?.cachedTournamentJson != null -> LoadState.Failed("Couldn't read this tournament's saved data")
+                else -> LoadState.Failed(failure ?: "This tournament isn't available yet")
             }
         }
     }
 
-    /** The archived tournament plus its metadata and link maps (see [TournamentDetail]). */
-    suspend fun fetchTournamentDetail(id: Int): ServerResult<TournamentDetail> =
-        withReadAccess { api, password -> api.getTournamentDetail(id, password) }
-
-    suspend fun fetchMatchDetail(id: Int): ServerResult<MatchDetail> =
-        withReadAccess { api, password -> api.getMatchDetail(id, password, statsMode) }
+    private fun <T> load(target: MutableStateFlow<LoadState<T>>, call: suspend (ServerApi, String) -> ServerResult<T>) {
+        target.value = LoadState.Loading
+        viewModelScope.launch {
+            target.value = when (val result = withReadAccess(call)) {
+                is ServerResult.Success -> LoadState.Loaded(result.value)
+                is ServerResult.Failure -> LoadState.Failed(result.message)
+            }
+        }
+    }
 
     private suspend fun <T> withReadAccess(
         call: suspend (ServerApi, String) -> ServerResult<T>

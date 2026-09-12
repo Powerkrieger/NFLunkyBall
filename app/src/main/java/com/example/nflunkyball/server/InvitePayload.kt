@@ -1,9 +1,9 @@
 package com.example.nflunkyball.server
 
+import com.example.nflunkyball.model.AppJson
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
 
 /**
  * What an admin's `python -m scripts.create_invite --server-url ...` invite code decodes to —
@@ -19,7 +19,7 @@ import kotlinx.serialization.json.Json
 data class InvitePayload(val server: String, val token: String)
 
 object InvitePayloadCodec {
-    private val json = Json { ignoreUnknownKeys = true }
+    private val json = AppJson.lenient
 
     @OptIn(ExperimentalEncodingApi::class)
     fun decode(code: String): InvitePayload? = runCatching {

@@ -1,5 +1,6 @@
 package com.example.nflunkyball.ble
 
+import com.example.nflunkyball.model.AppJson
 import android.annotation.SuppressLint
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.le.BluetoothLeAdvertiser
@@ -22,7 +23,6 @@ import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlinx.serialization.json.Json
 
 private const val TAG = "TournamentBroadcaster"
 
@@ -45,10 +45,7 @@ interface LiveBroadcaster {
  */
 class TournamentBroadcaster(private val adapter: BluetoothAdapter, private val context: Context) : LiveBroadcaster {
 
-    // encodeDefaults=false (the kotlinx default) — every default-valued field omitted from the
-    // wire payload shrinks the chunk count on this bandwidth-starved transport; decoding still
-    // fills defaults back in regardless of whether the JSON was explicit about them.
-    private val json = Json
+    private val json = AppJson.compact
 
     private val _emojiEvents = MutableSharedFlow<EmojiPacket>(extraBufferCapacity = 32)
     override val emojiEvents: SharedFlow<EmojiPacket> = _emojiEvents

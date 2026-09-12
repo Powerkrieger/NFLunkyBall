@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -64,7 +66,9 @@ private fun HostingScreenContent(
     val serverSyncStatus by viewModel.serverSyncStatus.collectAsState()
 
     Column(
-        Modifier.fillMaxSize().padding(Spacing.lg),
+        // Scrollable: in landscape the QR alone fills the height, which used to leave the sync
+        // status and "Continue to scoring" unreachable.
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(Spacing.lg),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text("Share this to let people watch", style = MaterialTheme.typography.titleMedium)
@@ -83,7 +87,7 @@ private fun HostingScreenContent(
             val versionText = broadcastVersion?.let { "Broadcasting version $it" } ?: "Starting broadcast…"
             Text(versionText, style = MaterialTheme.typography.bodyMedium)
         } else {
-            Text(serverSyncStatus ?: "Starting sync…", style = MaterialTheme.typography.bodyMedium)
+            Text(serverSyncStatus.label() ?: "Starting sync…", style = MaterialTheme.typography.bodyMedium)
         }
 
         if (account != null) {
