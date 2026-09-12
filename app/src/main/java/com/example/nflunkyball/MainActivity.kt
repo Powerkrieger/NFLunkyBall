@@ -186,7 +186,10 @@ private fun NfLunkyBallApp() {
                     // whichever one it was, rather than assuming a specific next screen. If a
                     // tournament is active, (re)kick off sync now that credentials exist; a
                     // fresh link from Settings with nothing hosted yet is a no-op here.
-                    if (organizerViewModel.tournament.value != null) organizerViewModel.startHosting()
+                    when {
+                        organizerViewModel.hasPendingUpload -> organizerViewModel.retryUpload()
+                        organizerViewModel.tournament.value != null -> organizerViewModel.startHosting()
+                    }
                     navController.popBackStack()
                 }
             )
@@ -243,9 +246,9 @@ private fun NfLunkyBallApp() {
             BracketScreen(
                 viewModel = organizerViewModel,
                 onFinish = { finishInfo ->
-                    organizerViewModel.finishTournament()
-                    organizerViewModel.uploadToHistory(finishInfo)
-                    organizerViewModel.clearTournament()
+                    // Upload runs in the background; if it fails the tournament stays on the
+                    // device and My tournaments shows the error with retry/discard.
+                    organizerViewModel.finishAndUpload(finishInfo)
                     navController.popBackStack(route = Routes.HOME, inclusive = false)
                 },
                 onOpenSettings = { navController.navigate(Routes.TOURNAMENT_SETTINGS) },
@@ -282,6 +285,9 @@ private fun NfLunkyBallApp() {
             HistoryScreen(
                 viewModel = viewerViewModel,
                 hostedTournament = hostedTournament,
+                hostedUploadStatus = organizerViewModel.uploadStatus,
+                onRetryUpload = { organizerViewModel.retryUpload() },
+                onDiscardHosted = { organizerViewModel.discardFinishedTournament() },
                 onOpenTournament = { id -> navController.navigate(Routes.savedTournament(id)) },
                 onReconnected = {
                     navController.navigate(Routes.SCOREBOARD) {

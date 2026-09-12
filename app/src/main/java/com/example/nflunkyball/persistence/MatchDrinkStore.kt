@@ -16,7 +16,7 @@ import kotlinx.serialization.json.Json
  * via [com.example.nflunkyball.server.toUploadPayload], at the very end of a tournament.
  */
 class MatchDrinkStore(context: Context) {
-    private val file = File(context.filesDir, "match_drinks.json")
+    private val file = JsonFile(File(context.filesDir, "match_drinks.json"))
     private val json = Json { ignoreUnknownKeys = true }
 
     private var cache: MutableMap<String, MatchDrinks> = load()
@@ -43,17 +43,17 @@ class MatchDrinkStore(context: Context) {
     }
 
     private fun load(): MutableMap<String, MatchDrinks> {
-        if (!file.exists()) return mutableMapOf()
+        val text = file.readOrNull() ?: return mutableMapOf()
         // Falls back to empty on any parse failure, including the old single-drink-per-match
         // shape from before drinks were tracked per team — this is scratch data for the current
         // in-progress tournament only (wiped by clear() after every upload), so losing a
         // not-yet-uploaded tournament's drinks across an app update that changed this format is
         // an acceptable, narrow edge case rather than something worth a real migration for.
-        return runCatching { json.decodeFromString<Map<String, MatchDrinks>>(file.readText()).toMutableMap() }
+        return runCatching { json.decodeFromString<Map<String, MatchDrinks>>(text).toMutableMap() }
             .getOrDefault(mutableMapOf())
     }
 
     private fun save() {
-        file.writeText(json.encodeToString(cache))
+        file.write(json.encodeToString(cache))
     }
 }

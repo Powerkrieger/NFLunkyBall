@@ -36,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import com.example.nflunkyball.model.ELO_STARTING_RATING
 import com.example.nflunkyball.model.PlayerSeed
 import com.example.nflunkyball.model.Team
+import com.example.nflunkyball.model.TournamentPhase
 import com.example.nflunkyball.model.assignGroupsBySeeding
 import com.example.nflunkyball.model.assignGroupsRandomly
 import com.example.nflunkyball.ui.theme.Spacing
@@ -56,7 +57,11 @@ fun SetupScreen(
     val activeTournament by viewModel.tournament.collectAsState()
     val blocking = activeTournament
     if (blocking != null) {
-        ActiveTournamentGuard(name = blocking.name, onNavigateToMyTournaments = onNavigateToMyTournaments)
+        ActiveTournamentGuard(
+            name = blocking.name,
+            pendingUpload = blocking.phase == TournamentPhase.FINISHED,
+            onNavigateToMyTournaments = onNavigateToMyTournaments
+        )
         return
     }
 
@@ -294,15 +299,20 @@ fun SetupScreen(
 }
 
 @Composable
-private fun ActiveTournamentGuard(name: String, onNavigateToMyTournaments: () -> Unit) {
+private fun ActiveTournamentGuard(name: String, pendingUpload: Boolean, onNavigateToMyTournaments: () -> Unit) {
     Column(
         Modifier.fillMaxSize().padding(Spacing.lg),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text("You already have an active tournament", style = MaterialTheme.typography.headlineSmall)
         Text(
-            "\"$name\" is still in progress on this device. Finish or abandon it before " +
-                "starting another one.",
+            if (pendingUpload) {
+                "\"$name\" is finished but hasn't been uploaded to history yet. Retry the upload " +
+                    "or discard it before starting another one."
+            } else {
+                "\"$name\" is still in progress on this device. Finish or abandon it before " +
+                    "starting another one."
+            },
             style = MaterialTheme.typography.bodyMedium,
             modifier = Modifier.padding(top = Spacing.sm)
         )

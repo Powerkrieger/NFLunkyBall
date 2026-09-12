@@ -1,5 +1,6 @@
 package com.example.nflunkyball.ui.organizer
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -19,6 +20,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import com.example.nflunkyball.model.Match
 import com.example.nflunkyball.model.Team
@@ -47,31 +49,35 @@ fun BracketScreen(
     Scaffold(
         topBar = { OrganizerTopBar("${current.name} — Bracket", viewModel, onOpenSettings) }
     ) { padding ->
-        Column(
-            Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(Spacing.md)
-                .verticalScroll(rememberScrollState())
-        ) {
-            MatchList(
-                matches = current.bracketMatches,
-                teamNames = teamNames,
-                onRecordResult = { match -> pendingMatch = match },
-                modifier = Modifier.padding(top = Spacing.sm)
-            )
-            Button(onClick = { showAddMatch = true }, modifier = Modifier.padding(top = Spacing.md)) {
-                Text("Add bracket match")
+        Box(Modifier.fillMaxSize().padding(padding)) {
+            Column(
+                Modifier
+                    .fillMaxSize()
+                    .padding(Spacing.md)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                MatchList(
+                    matches = current.bracketMatches,
+                    teamNames = teamNames,
+                    onRecordResult = { match -> pendingMatch = match },
+                    modifier = Modifier.padding(top = Spacing.sm)
+                )
+                Button(onClick = { showAddMatch = true }, modifier = Modifier.padding(top = Spacing.md)) {
+                    Text("Add bracket match")
+                }
+                Button(
+                    onClick = {
+                        // Finishing clears the local copy right after (see MainActivity's onFinish) —
+                        // without a linked account nothing was ever uploaded, so that would silently
+                        // lose the whole tournament unless the organizer explicitly says that's fine.
+                        if (viewModel.organizerAccount == null) showUnlinkedWarning = true else showFinishDialog = true
+                    },
+                    modifier = Modifier.fillMaxWidth().padding(top = Spacing.lg, bottom = Spacing.lg)
+                ) { Text("Finish Tournament") }
             }
-            Button(
-                onClick = {
-                    // Finishing clears the local copy right after (see MainActivity's onFinish) —
-                    // without a linked account nothing was ever uploaded, so that would silently
-                    // lose the whole tournament unless the organizer explicitly says that's fine.
-                    if (viewModel.organizerAccount == null) showUnlinkedWarning = true else showFinishDialog = true
-                },
-                modifier = Modifier.fillMaxWidth().padding(top = Spacing.lg, bottom = Spacing.lg)
-            ) { Text("Finish Tournament") }
+            // Viewer emoji reactions (BLE mode only — server mode has no back-channel) float over
+            // whatever the organizer is doing rather than needing their own screen.
+            ReactionsOverlay(viewModel, modifier = Modifier.align(Alignment.BottomEnd).padding(Spacing.md))
         }
     }
 

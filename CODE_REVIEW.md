@@ -77,27 +77,31 @@ ones. Zero string literals remain in the graph.
 `isAlreadyLinked`; `OrganizerViewModel` had already loaded the same two values. Now derived from the
 ViewModel.
 
-### 1.9 Synchronous file I/O on the main thread — *open*
+### 1.9 Synchronous file I/O on the main thread — *fixed (v0.9.3)*
 `TournamentRepository.update`, `ViewerTournamentsStore.upsert` and `MatchDrinkStore.set` write JSON
 files synchronously from UI callbacks (every recorded score, every settings toggle). Files are small
-so this is invisible today, but it's StrictMode-hostile and will show up as jank on slow storage.
-**Recommendation:** make the stores `suspend` and write on `Dispatchers.IO`, or debounce writes
-behind the existing `StateFlow`s.
+so this was invisible, but StrictMode-hostile. **Fixed:** all stores now go through
+`persistence/JsonFile`, which reads once synchronously at construction and queues writes/deletes on
+a shared single-thread executor (strictly ordered, temp-file + rename so a kill mid-write can't
+truncate the file). Store APIs are unchanged.
 
-### 1.10 Upload failures are silent and the tournament is cleared regardless — *open (product decision)*
+### 1.10 Upload failures are silent and the tournament is cleared regardless — *fixed (v0.9.3)*
 `BracketScreen.onFinish` calls `uploadToHistory(...)` then immediately `clearTournament()` and
 navigates home. `uploadStatus` is set by the upload but **never read by any screen**, so a failed
-upload (offline, revoked account) loses the tournament with no feedback. This is the most
-consequential finding in the review. Suggested shape: keep the finished tournament locally until
-the upload succeeds, surface `uploadStatus` on the home/history screen, and offer a retry. Not
-changed here because it alters user-visible flow.
+upload (offline, revoked account) lost the tournament with no feedback. This was the most
+consequential finding in the review. **Fixed:** `finishAndUpload` marks the tournament FINISHED,
+persists the finish-dialog answers (`FinishInfoStore`) and only clears the local copy once the
+server confirms. Until then it appears in My tournaments as "Finished · not uploaded yet · <error>"
+with Retry / Discard; linking an account while one is pending retries automatically; the
+new-tournament guard explains the situation. "Finish without saving" (no account) still clears
+immediately, as the organizer explicitly chose.
 
-### 1.11 `ReactionsOverlay` is never composed — *open (product decision)*
+### 1.11 `ReactionsOverlay` is never composed — *fixed (v0.9.3)*
 Viewers can send emoji reactions and the organizer's broadcaster receives them, but
 `ReactionsOverlay` (the only consumer of `OrganizerViewModel.emojiEvents`) isn't placed on any
-screen, so reactions are dropped. Either wire it into `GroupStageScreen`/`BracketScreen` (a
-one-liner each) or delete the overlay and the emoji plumbing. Left for you to decide; the overlay
-itself is fine.
+screen, so reactions were dropped. **Fixed:** it now floats bottom-right over both scoring
+screens (`GroupStageScreen`, `BracketScreen`). Only ever shows anything in BLE mode — server mode
+has no viewer→organizer channel.
 
 ---
 
@@ -142,7 +146,7 @@ itself is fine.
 | `applicationId` / `namespace` are still `com.example.nflunkyball`. | *Open* — changing the application id makes existing installs a different app; only do it if you ever publish. |
 | README described the project as "freshly scaffolded, no features yet". | **Fixed** — now has a package map and the two sync transports. |
 | CI only ran `assembleRelease`; unit tests never ran on push. | **Fixed** — `testDebugUnitTest` step added before the build. |
-| `.idea/deploymentTargetSelector.xml` and `.idea/vcs.xml` are untracked but not ignored. | *Open* — add `/.idea/deploymentTargetSelector.xml` and `/.idea/vcs.xml` to `.gitignore` if you don't want them committed. |
+| `.idea/deploymentTargetSelector.xml` and `.idea/vcs.xml` were untracked but not ignored. | **Fixed** — added to `.gitignore`. |
 | Dependency versions: AGP 9.0.1 with Compose BOM 2024.09.00 and Kotlin 2.0.21. | *Open* — builds fine, but the BOM is a year behind the AGP; bumping it would let you drop several `@OptIn(ExperimentalMaterial3Api)` annotations and pick up `collectAsStateWithLifecycle`. |
 
 ---
@@ -168,6 +172,10 @@ itself is fine.
 No user-visible behaviour changed except the two bug fixes in §2. Changes are staged but not
 committed.
 
-Suggested follow-ups, in priority order: **1.10** (silent upload failure), **1.11** (wire or remove
-reactions), **1.9** (I/O off the main thread), then **1.1** when there's appetite for a larger
-refactor.
+**v0.9.3 follow-up:** 1.9, 1.10 and 1.11 fixed as described above. Remaining open items are
+**1.1** (ViewModel dependencies/DI — the one large refactor), **1.2** (Settings → organizer VM
+coupling, resolves with 1.1), and the cosmetic ones in §3/§4 (`AppJson`, `formatElo`, detail-screen
+state pattern, `StateFlow` vs `mutableStateOf`, sealed load state, `strings.xml`).
+
+On-device verification still needed for v0.9.3: retry/discard row after a failed upload (airplane
+mode on finish), and reactions appearing on the organizer's scoring screens in BLE mode.

@@ -16,3 +16,5 @@ app/build
 local.properties
 *.jks
 /data/
+/.idea/deploymentTargetSelector.xml
+/.idea/vcs.xml

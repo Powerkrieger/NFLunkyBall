@@ -1,5 +1,6 @@
 package com.example.nflunkyball.ui.organizer
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -17,6 +18,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import com.example.nflunkyball.model.Match
 import com.example.nflunkyball.model.standings
@@ -40,35 +42,39 @@ fun GroupStageScreen(
     Scaffold(
         topBar = { OrganizerTopBar(current.name, viewModel, onOpenSettings) }
     ) { padding ->
-        Column(
-            Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(Spacing.md)
-                .verticalScroll(rememberScrollState())
-        ) {
-            current.groups.forEach { group ->
-                Text(
-                    group.name,
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.padding(top = Spacing.lg)
-                )
-                StandingsTable(
-                    standings = group.standings(),
-                    teamNames = teamNames,
-                    modifier = Modifier.padding(top = Spacing.sm)
-                )
-                MatchList(
-                    matches = group.matches,
-                    teamNames = teamNames,
-                    onRecordResult = { match -> pendingMatch = group.id to match },
-                    modifier = Modifier.padding(top = Spacing.sm)
-                )
+        Box(Modifier.fillMaxSize().padding(padding)) {
+            Column(
+                Modifier
+                    .fillMaxSize()
+                    .padding(Spacing.md)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                current.groups.forEach { group ->
+                    Text(
+                        group.name,
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.padding(top = Spacing.lg)
+                    )
+                    StandingsTable(
+                        standings = group.standings(),
+                        teamNames = teamNames,
+                        modifier = Modifier.padding(top = Spacing.sm)
+                    )
+                    MatchList(
+                        matches = group.matches,
+                        teamNames = teamNames,
+                        onRecordResult = { match -> pendingMatch = group.id to match },
+                        modifier = Modifier.padding(top = Spacing.sm)
+                    )
+                }
+                Button(
+                    onClick = onAdvanceToBracket,
+                    modifier = Modifier.fillMaxWidth().padding(top = Spacing.lg, bottom = Spacing.lg)
+                ) { Text("Advance to Bracket") }
             }
-            Button(
-                onClick = onAdvanceToBracket,
-                modifier = Modifier.fillMaxWidth().padding(top = Spacing.lg, bottom = Spacing.lg)
-            ) { Text("Advance to Bracket") }
+            // Viewer emoji reactions (BLE mode only — server mode has no back-channel) float over
+            // whatever the organizer is doing rather than needing their own screen.
+            ReactionsOverlay(viewModel, modifier = Modifier.align(Alignment.BottomEnd).padding(Spacing.md))
         }
     }
 

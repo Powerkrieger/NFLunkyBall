@@ -43,14 +43,21 @@ import com.example.nflunkyball.server.withLiveStandings
 import com.example.nflunkyball.ui.theme.Spacing
 import java.util.Locale
 
-/** [hostedTournament] is the organizer side's in-progress tournament, if this device is hosting
- *  one. TournamentRepository (behind OrganizerViewModel) is a separate single-slot store from the
+/** [hostedTournament] is the organizer side's own tournament, if this device is hosting one.
+ *  TournamentRepository (behind OrganizerViewModel) is a separate single-slot store from the
  *  viewer's saved-tournaments list, so it wouldn't otherwise show up here at all — the caller
- *  passes it in explicitly rather than this screen reaching into the organizer ViewModel. */
+ *  passes it in explicitly rather than this screen reaching into the organizer ViewModel.
+ *
+ *  A hosted tournament in the FINISHED phase is one whose archive upload hasn't succeeded yet
+ *  (see OrganizerViewModel.finishAndUpload): [hostedUploadStatus] is the last attempt's outcome,
+ *  and the row offers [onRetryUpload] / [onDiscardHosted] instead of resuming hosting. */
 @Composable
 fun HistoryScreen(
     viewModel: ViewerViewModel,
     hostedTournament: Tournament?,
+    hostedUploadStatus: String?,
+    onRetryUpload: () -> Unit,
+    onDiscardHosted: () -> Unit,
     onOpenTournament: (String) -> Unit,
     onReconnected: () -> Unit,
     onResumeHosting: () -> Unit,
@@ -63,7 +70,20 @@ fun HistoryScreen(
     val watchedTournament by viewModel.tournament.collectAsState()
     var tabIndex by remember { mutableIntStateOf(0) }
     var showBluetoothOff by remember { mutableStateOf(false) }
+    var showDiscardConfirm by remember { mutableStateOf(false) }
     val context = LocalContext.current
+
+    if (showDiscardConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDiscardConfirm = false },
+            title = { Text("Discard finished tournament?") },
+            text = { Text("It was never uploaded, so all its results will be lost. This can't be undone.") },
+            confirmButton = {
+                TextButton(onClick = { showDiscardConfirm = false; onDiscardHosted() }) { Text("Discard") }
+            },
+            dismissButton = { TextButton(onClick = { showDiscardConfirm = false }) { Text("Cancel") } }
+        )
+    }
 
     if (showBluetoothOff) {
         AlertDialog(
@@ -95,7 +115,16 @@ fun HistoryScreen(
                 ) {
                     hostedTournament?.let { hosted ->
                         item {
-                            HostedTournamentRow(name = hosted.name, phase = hosted.phase, onClick = onResumeHosting)
+                            if (hosted.phase == TournamentPhase.FINISHED) {
+                                PendingUploadRow(
+                                    name = hosted.name,
+                                    status = hostedUploadStatus,
+                                    onRetry = onRetryUpload,
+                                    onDiscard = { showDiscardConfirm = true }
+                                )
+                            } else {
+                                HostedTournamentRow(name = hosted.name, phase = hosted.phase, onClick = onResumeHosting)
+                            }
                         }
                     }
                     items(saved) { entry ->
@@ -208,6 +237,30 @@ private fun HostedTournamentRow(name: String, phase: TournamentPhase, onClick: (
                 "Hosting · ${phase.name.lowercase().replace('_', ' ')} · tap to continue",
                 style = MaterialTheme.typography.bodySmall
             )
+        }
+    }
+}
+
+/** A finished tournament still on this device because its upload hasn't gone through. */
+@Composable
+private fun PendingUploadRow(name: String, status: String?, onRetry: () -> Unit, onDiscard: () -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.errorContainer,
+            contentColor = MaterialTheme.colorScheme.onErrorContainer
+        )
+    ) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = Spacing.md, vertical = Spacing.sm)) {
+            Text(name, style = MaterialTheme.typography.titleMedium)
+            Text(
+                "Finished · not uploaded yet" + (status?.let { " · $it" } ?: ""),
+                style = MaterialTheme.typography.bodySmall
+            )
+            Row(Modifier.padding(top = Spacing.xs), horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                TextButton(onClick = onRetry) { Text("Retry upload") }
+                TextButton(onClick = onDiscard) { Text("Discard") }
+            }
         }
     }
 }

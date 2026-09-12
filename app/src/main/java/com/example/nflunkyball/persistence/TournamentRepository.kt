@@ -9,7 +9,7 @@ import kotlinx.serialization.json.Json
 
 /** Organizer-side persistence: the in-progress tournament survives the app being killed. */
 class TournamentRepository(context: Context) {
-    private val file = File(context.filesDir, "tournament.json")
+    private val file = JsonFile(File(context.filesDir, "tournament.json"))
     private val json = Json { encodeDefaults = true }
 
     private val _tournament = MutableStateFlow(load())
@@ -32,11 +32,11 @@ class TournamentRepository(context: Context) {
     }
 
     private fun load(): Tournament? {
-        if (!file.exists()) return null
-        return runCatching { json.decodeFromString(Tournament.serializer(), file.readText()) }.getOrNull()
+        val text = file.readOrNull() ?: return null
+        return runCatching { json.decodeFromString(Tournament.serializer(), text) }.getOrNull()
     }
 
     private fun save(tournament: Tournament) {
-        file.writeText(json.encodeToString(Tournament.serializer(), tournament))
+        file.write(json.encodeToString(Tournament.serializer(), tournament))
     }
 }

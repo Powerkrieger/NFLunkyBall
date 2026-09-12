@@ -21,6 +21,7 @@ import com.example.nflunkyball.model.TournamentFinishInfo
 import com.example.nflunkyball.model.TournamentPhase
 import com.example.nflunkyball.model.generateRoundRobinMatches
 import com.example.nflunkyball.persistence.AppSettingsStore
+import com.example.nflunkyball.persistence.FinishInfoStore
 import com.example.nflunkyball.persistence.MatchDrinkStore
 import com.example.nflunkyball.persistence.TournamentRepository
 import com.example.nflunkyball.server.CompetitorStats
@@ -58,6 +59,7 @@ class OrganizerViewModel(application: Application) : AndroidViewModel(applicatio
     private val credentialsStore = ServerCredentialsStore(application)
     private val settingsStore = AppSettingsStore(application)
     private val drinkStore = MatchDrinkStore(application)
+    private val finishInfoStore = FinishInfoStore(application)
     private val bluetoothAdapter: BluetoothAdapter? =
         application.getSystemService(BluetoothManager::class.java)?.adapter
     private val broadcaster = bluetoothAdapter?.let { TournamentBroadcaster(it, application) }
@@ -92,8 +94,16 @@ class OrganizerViewModel(application: Application) : AndroidViewModel(applicatio
     private val _accountSyncStatus = MutableStateFlow<AccountSyncStatus?>(null)
     val accountSyncStatus: StateFlow<AccountSyncStatus?> = _accountSyncStatus
 
+    /** Outcome of the last archive upload attempt for the current tournament, or null if none
+     *  has been made yet — shown on My tournaments while a finished tournament is still waiting
+     *  to be uploaded (see [finishAndUpload]). */
     var uploadStatus by mutableStateOf<String?>(null)
         private set
+
+    /** True while a finished tournament is still on this device because its upload hasn't
+     *  succeeded yet — it stays in My tournaments with retry/discard until it has. */
+    val hasPendingUpload: Boolean
+        get() = tournament.value?.phase == TournamentPhase.FINISHED
 
     /** Sorted by Elo desc (ties broken by name) so the SetupScreen suggestion chips read as a
      *  rough skill ranking rather than an alphabetical list. */
@@ -356,8 +366,38 @@ class OrganizerViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    fun finishTournament() {
+    /**
+     * Marks the tournament finished and uploads it to history. The local copy is only cleared once
+     * the server has confirmed the upload — on failure (offline, revoked account, killed
+     * mid-upload) it stays put, [uploadStatus] carries the error, and My tournaments offers
+     * [retryUpload] / [discardFinishedTournament]. With no account linked there's nothing to
+     * upload to (the organizer explicitly chose "finish without saving" to get here), so the
+     * tournament is simply cleared.
+     */
+    fun finishAndUpload(finishInfo: TournamentFinishInfo) {
         repository.update { it.copy(phase = TournamentPhase.FINISHED) }
+        stopHosting()
+        if (organizerAccount == null) {
+            clearTournament()
+            return
+        }
+        finishInfoStore.set(finishInfo)
+        uploadToHistory(finishInfo)
+    }
+
+    /** Re-attempts the upload of a finished tournament using the finish info saved with it. */
+    fun retryUpload() {
+        if (!hasPendingUpload) return
+        // A tournament finished by an older version (or whose finish-info file was lost) has no
+        // saved info: upload it with just today's date rather than blocking on it.
+        val info = finishInfoStore.get() ?: TournamentFinishInfo(System.currentTimeMillis(), "", "", "")
+        uploadToHistory(info)
+    }
+
+    /** Gives up on uploading a finished tournament and drops it from this device. */
+    fun discardFinishedTournament() {
+        if (!hasPendingUpload) return
+        clearTournament()
     }
 
     /** Called once the organizer is done with a finished tournament (after upload), or when
@@ -367,6 +407,8 @@ class OrganizerViewModel(application: Application) : AndroidViewModel(applicatio
         stopHosting()
         repository.clear()
         drinkStore.clear()
+        finishInfoStore.clear()
+        uploadStatus = null
     }
 
     /** Recorded locally only (see [MatchDrinkStore]) — never touches [repository], so it's never
@@ -445,11 +487,15 @@ class OrganizerViewModel(application: Application) : AndroidViewModel(applicatio
         _accountSyncStatus.value = null
     }
 
-    fun uploadToHistory(finishInfo: TournamentFinishInfo) {
-        val account = organizerAccount ?: return
+    private fun uploadToHistory(finishInfo: TournamentFinishInfo) {
+        val account = organizerAccount ?: run {
+            uploadStatus = "Not linked — link an organizer account to upload"
+            return
+        }
         val current = tournament.value ?: return
+        if (uploadStatus == UPLOADING) return
         viewModelScope.launch {
-            uploadStatus = "Uploading…"
+            uploadStatus = UPLOADING
             // The one and only place drink choices/finish metadata ever leave this device — see
             // MatchDrinkStore and FinishTournamentDialog.
             val payload = current.toUploadPayload(drinkStore.all(), finishInfo)
@@ -457,9 +503,9 @@ class OrganizerViewModel(application: Application) : AndroidViewModel(applicatio
             val signed = UploadSigner.sign(account.privateKeySeed, current.id, bodyJson)
             val result = ServerApi(account.serverUrl)
                 .uploadTournament(account.accountId, signed.timestamp, signed.signatureBase64, bodyJson)
-            uploadStatus = when (result) {
-                is ServerResult.Success -> "Uploaded"
-                is ServerResult.Failure -> "Failed: ${result.message}"
+            when (result) {
+                is ServerResult.Success -> clearTournament()
+                is ServerResult.Failure -> uploadStatus = "Upload failed: ${result.message}"
             }
         }
     }
@@ -467,5 +513,9 @@ class OrganizerViewModel(application: Application) : AndroidViewModel(applicatio
     override fun onCleared() {
         super.onCleared()
         stopHosting()
+    }
+
+    private companion object {
+        const val UPLOADING = "Uploading…"
     }
 }
