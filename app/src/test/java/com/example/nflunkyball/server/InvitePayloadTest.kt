@@ -27,6 +27,18 @@ class InvitePayloadTest {
     }
 
     @Test
+    fun `decodes the code wrapped in the invite QR's login link`() {
+        val decoded = InvitePayloadCodec.decode("https://flunkyball.example.com/login?code=$realPythonInviteCode")
+
+        assertEquals("abc123XYZ", decoded?.token)
+    }
+
+    @Test
+    fun `decode rejects a link without a code`() {
+        assertNull(InvitePayloadCodec.decode("https://flunkyball.example.com/login"))
+    }
+
+    @Test
     fun `decode rejects garbage input`() {
         assertNull(InvitePayloadCodec.decode("not a valid invite code"))
     }
