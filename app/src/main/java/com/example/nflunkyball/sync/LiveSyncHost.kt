@@ -29,7 +29,7 @@ import kotlinx.serialization.json.Json
 class LiveSyncHost(
     private val settings: AppSettings,
     private val broadcaster: LiveBroadcaster?,
-    private val account: () -> OrganizerAccount?,
+    private val account: StateFlow<OrganizerAccount?>,
     private val serverApi: ServerApiFactory,
     private val scope: CoroutineScope
 ) {
@@ -75,8 +75,7 @@ class LiveSyncHost(
         stopServerSync()
     }
 
-    /** Server sync only — what unlinking the account needs (BLE keeps going without one). */
-    fun stopServerSync() {
+    private fun stopServerSync() {
         serverSyncJob?.cancel()
         serverSyncJob = null
         _serverSyncStatus.value = null
@@ -91,18 +90,19 @@ class LiveSyncHost(
     /** Needs a linked account to sign with — unlike BLE, a tournament can exist locally with
      *  none linked yet (credentials lost, or linking skipped for later — see SettingsScreen's
      *  account section and TournamentSettingsScreen's "Add invite token" row), so this surfaces
-     *  that state instead of silently doing nothing. Called again once linking completes. */
+     *  that state instead of silently doing nothing. Follows [account], so linking or unlinking
+     *  (from any screen) starts or stops the pushes without anyone having to call [start] again. */
     private fun startServerSync(tournamentUpdates: Flow<Tournament>) {
-        val account = account()
-        if (account == null) {
-            stopServerSync()
-            _serverSyncStatus.value = "Not linked — link an organizer account to sync"
-            return
-        }
         serverSyncJob?.cancel()
-        _serverSyncStatus.value = "Starting sync…"
         serverSyncJob = scope.launch {
-            tournamentUpdates.collectLatest { current -> pushLiveState(account, current) }
+            account.collectLatest { current ->
+                if (current == null) {
+                    _serverSyncStatus.value = "Not linked — link an organizer account to sync"
+                    return@collectLatest
+                }
+                _serverSyncStatus.value = "Starting sync…"
+                tournamentUpdates.collectLatest { tournament -> pushLiveState(current, tournament) }
+            }
         }
     }
 

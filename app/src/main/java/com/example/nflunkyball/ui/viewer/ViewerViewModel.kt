@@ -9,9 +9,9 @@ import com.example.nflunkyball.ble.LiveReceiver
 import com.example.nflunkyball.ble.RoomCode
 import com.example.nflunkyball.ble.ChunkProgress
 import com.example.nflunkyball.model.Tournament
-import com.example.nflunkyball.model.TournamentPhase
 import com.example.nflunkyball.persistence.AppSettings
 import com.example.nflunkyball.persistence.SavedTournament
+import com.example.nflunkyball.persistence.ViewerLibrary
 import com.example.nflunkyball.persistence.ViewerTournamentsStore
 import com.example.nflunkyball.qr.JoinPayload
 import com.example.nflunkyball.server.CompetitorDetailStats
@@ -21,13 +21,12 @@ import com.example.nflunkyball.server.MatchDetail
 import com.example.nflunkyball.server.ServerApi
 import com.example.nflunkyball.server.ServerApiFactory
 import com.example.nflunkyball.server.TournamentDetail
+import com.example.nflunkyball.server.TournamentSummary
 import com.example.nflunkyball.server.ServerResult
 import com.example.nflunkyball.server.StatsMode
-import com.example.nflunkyball.server.TournamentSummary
 import com.example.nflunkyball.sync.LiveSyncViewer
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
-import kotlinx.serialization.json.Json
 
 /** Dependencies come from [com.example.nflunkyball.AppContainer]; every one has a plain-JVM
  *  substitute so this class is unit-testable. [receiver] is null on a device without Bluetooth. */
@@ -39,8 +38,8 @@ class ViewerViewModel(
     private val serverApi: ServerApiFactory
 ) : ViewModel() {
 
-    private val fetchJson = Json { ignoreUnknownKeys = true }
     private val liveSync = LiveSyncViewer(settings, receiver, serverApi, viewModelScope)
+    private val library = ViewerLibrary(tournamentsStore)
 
     /** The currently watched room's live state, over BLE or server polling — see [LiveSyncViewer]. */
     val tournament: StateFlow<Tournament?> = liveSync.tournament
@@ -50,7 +49,7 @@ class ViewerViewModel(
 
     /** Tournaments this viewer has joined live (reconnectable) or downloaded from the backend
      *  (viewable offline) — survives the app being killed. See [ViewerTournamentsStore]. */
-    val savedTournaments: StateFlow<List<SavedTournament>> = tournamentsStore.tournaments
+    val savedTournaments: StateFlow<List<SavedTournament>> = library.tournaments
 
     var joinPayload by mutableStateOf<JoinPayload?>(null)
         private set
@@ -83,36 +82,7 @@ class ViewerViewModel(
     }
 
     init {
-        // Keep the saved entry for the current room in sync with live BLE state, so a viewer who
-        // was watching when a tournament finished already has it cached — no server round-trip.
-        viewModelScope.launch {
-            tournament.collect { t ->
-                if (t == null) return@collect
-                val payload = joinPayload ?: return@collect
-                val entryId = payload.room.uppercase()
-                val existing = tournamentsStore.tournaments.value.find { it.id == entryId }
-                val alreadyCaptured = existing != null && existing.phase == t.phase && existing.name == t.name &&
-                    (t.phase != TournamentPhase.FINISHED || existing.cachedTournamentJson != null)
-                if (alreadyCaptured) return@collect
-
-                val cachedJson = if (t.phase == TournamentPhase.FINISHED) {
-                    fetchJson.encodeToString(Tournament.serializer(), t)
-                } else {
-                    existing?.cachedTournamentJson
-                }
-                tournamentsStore.upsert(
-                    SavedTournament(
-                        id = entryId,
-                        serverId = existing?.serverId,
-                        name = t.name,
-                        phase = t.phase,
-                        joinPayload = payload,
-                        lastUpdated = System.currentTimeMillis(),
-                        cachedTournamentJson = cachedJson
-                    )
-                )
-            }
-        }
+        library.trackLive(liveSync.tournament, currentPayload = { joinPayload }, viewModelScope)
     }
 
     /** Read fresh each time rather than cached at construction — this ViewModel outlives a
@@ -126,22 +96,9 @@ class ViewerViewModel(
         payload.server?.let { credentialsStore.saveViewerServerUrl(it) }
         if (RoomCode.decode(payload.room) == null) return
 
-        val entryId = payload.room.uppercase()
-        val existing = tournamentsStore.tournaments.value.find { it.id == entryId }
-        tournamentsStore.upsert(
-            SavedTournament(
-                id = entryId,
-                serverId = existing?.serverId,
-                name = existing?.name ?: "Room $entryId",
-                phase = existing?.phase ?: TournamentPhase.SETUP,
-                joinPayload = payload,
-                lastUpdated = System.currentTimeMillis(),
-                cachedTournamentJson = existing?.cachedTournamentJson
-            )
-        )
-
-        // Saving the entry above happens regardless, so reconnecting later (even after a mode
-        // switch in Settings) can still find this room.
+        // Saved regardless of whether any state ever arrives, so reconnecting later (even after
+        // a mode switch in Settings) can still find this room.
+        library.rememberJoin(payload)
         liveSync.join(payload)
     }
 
@@ -150,8 +107,7 @@ class ViewerViewModel(
         entry.joinPayload?.let { join(it) }
     }
 
-    fun decodeCachedTournament(cachedJson: String): Tournament? =
-        runCatching { fetchJson.decodeFromString(Tournament.serializer(), cachedJson) }.getOrNull()
+    fun decodeCachedTournament(cachedJson: String): Tournament? = library.decode(cachedJson)
 
     /** Everything a read-only backend call needs — null when this device has no way to reach a
      *  server yet (never joined via QR, never linked, never redeemed a viewer invite). */
@@ -183,7 +139,7 @@ class ViewerViewModel(
                 is ServerResult.Success -> {
                     historyTournaments = result.value
                     historyStatus = null
-                    result.value.forEach { summary -> cacheFinishedTournament(access.api, access.password, summary) }
+                    library.cacheFromServer(access.api, access.password, result.value)
                 }
                 is ServerResult.Failure -> historyStatus = result.message
             }
@@ -209,41 +165,6 @@ class ViewerViewModel(
                 }
                 is ServerResult.Failure -> playerStatsStatus = result.message
             }
-        }
-    }
-
-    /** Downloads and locally caches a finished tournament's full body, so it appears in
-     *  [savedTournaments] and can be viewed offline afterwards — skips it if already cached.
-     *
-     *  The uploaded body carries the tournament's own UUID, so once downloaded we can derive its
-     *  room code the same way the live-BLE path does ([RoomCode.forTournament]) and store it
-     *  under that same id. That's what folds this into any stale local entry for the same
-     *  tournament (e.g. one left behind at BRACKET because the app was killed before it finished)
-     *  instead of creating a second, disconnected entry — [ViewerTournamentsStore.upsert] replaces
-     *  by id, so the stale unfinished copy is simply gone once this upsert lands. */
-    private suspend fun cacheFinishedTournament(api: ServerApi, password: String, summary: TournamentSummary) {
-        val existingByServerId = tournamentsStore.tournaments.value.find { it.serverId == summary.id }
-        if (existingByServerId?.cachedTournamentJson != null) return
-        when (val detail = api.getTournamentJson(summary.id, password)) {
-            is ServerResult.Success -> {
-                val decoded = decodeCachedTournament(detail.value)
-                val entryId = decoded?.let { RoomCode.encode(RoomCode.forTournament(it.id)) }
-                    ?: existingByServerId?.id
-                    ?: "server:${summary.id}"
-                val existing = tournamentsStore.tournaments.value.find { it.id == entryId }
-                tournamentsStore.upsert(
-                    SavedTournament(
-                        id = entryId,
-                        serverId = summary.id,
-                        name = decoded?.name ?: summary.name,
-                        phase = TournamentPhase.FINISHED,
-                        joinPayload = existing?.joinPayload,
-                        lastUpdated = System.currentTimeMillis(),
-                        cachedTournamentJson = detail.value
-                    )
-                )
-            }
-            is ServerResult.Failure -> Unit
         }
     }
 

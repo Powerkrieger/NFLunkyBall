@@ -22,7 +22,7 @@ ViewModels. The rest is the usual accumulation of duplication and dead code in a
 
 ## 1. Architecture
 
-### 1.1 Two "god" ViewModels with hard-wired dependencies — *open*
+### 1.1 Two "god" ViewModels with hard-wired dependencies — *fixed (v0.10.0–v0.10.4)*
 `OrganizerViewModel` (~470 lines) and `ViewerViewModel` (~310 lines) each instantiate their
 repositories, credential stores, BLE broadcaster/receiver and `ServerApi` directly, and every
 screen takes the whole ViewModel. Consequences:
@@ -32,17 +32,28 @@ screen takes the whole ViewModel. Consequences:
 - The organizer ViewModel mixes at least five concerns: tournament editing, BLE hosting, server live
   sync, account linking, archive upload.
 
-**Recommendation (incremental, no DI framework needed):** pass dependencies through a
-`ViewModelProvider.Factory` (or a tiny `AppContainer` on the `Application`), and split the
-organizer VM's sync/account responsibilities into a `HostingController` and `AccountManager` the VM
-delegates to. Left open because it's a multi-day refactor that touches every screen.
+**Fixed** in five releases (plan: `~/.claude/plans/purring-foraging-backus.md`):
+- `model/TournamentEdits.kt` — every organizer edit is a pure `Tournament` extension (`TournamentEditsTest`).
+- `AppContainer` on `NfLunkyBallApplication` hand-wires one instance of everything and exposes the
+  ViewModel factory; interfaces only where the real thing can't run on the JVM (`AppSettings`,
+  `CredentialsStore`, `ServerApi`/`KtorServerApi`, `LiveBroadcaster`, `LiveReceiver`); file stores
+  take a `File` and are tested for real (`FileStoresTest`).
+- `server/AccountManager` (link/unlink/status — shared by organizer flow and Settings),
+  `server/ArchiveUploader` (finish/retry/discard), `sync/LiveSyncHost` + `sync/LiveSyncViewer`
+  (transport choice, BLE or server; the host follows the account flow so unlinking anywhere stops
+  pushes), `persistence/ViewerLibrary` (saved-list rules), `ui/SettingsViewModel`.
+- Both ViewModels are now ~190-line facades; every extracted class has JVM tests with
+  `FakeServerApi`/`FakeCredentialsStore`/`FakeBroadcaster`/`FakeReceiver`/`FakeAppSettings`
+  (`app/src/test/.../fakes`). 103 unit tests total.
+- Found along the way: the "Uploading…" guard was set inside the coroutine, so a double-tap on
+  Retry could queue two uploads — fixed in `ArchiveUploader`.
 
-### 1.2 UI screens depend on ViewModels from other features — *partially fixed*
+### 1.2 UI screens depend on ViewModels from other features — *fixed*
 - `ui.viewer.HistoryScreen` took an `OrganizerViewModel` just to read the hosted tournament.
   **Fixed:** it now takes `hostedTournament: Tournament?`, passed from the nav graph.
-- `ui.SettingsScreen` still depends on `OrganizerViewModel` and `ui.organizer.AccountSyncStatus`
-  for the account section. *Open* — acceptable until account management moves out of the organizer
-  VM (see 1.1).
+- `ui.SettingsScreen` depended on `OrganizerViewModel` and `ui.organizer.AccountSyncStatus`.
+  **Fixed (v0.10.4):** it has its own `SettingsViewModel` over the shared `AccountManager`;
+  `ui.viewer`/`ui` no longer import `ui.organizer`.
 
 ### 1.3 Persistence-layer type used as a domain type — *fixed*
 `MatchDrinks` lived in `persistence` but was imported by `server.UploadPayload` and
@@ -172,10 +183,11 @@ has no viewer→organizer channel.
 No user-visible behaviour changed except the two bug fixes in §2. Changes are staged but not
 committed.
 
-**v0.9.3 follow-up:** 1.9, 1.10 and 1.11 fixed as described above. Remaining open items are
-**1.1** (ViewModel dependencies/DI — the one large refactor), **1.2** (Settings → organizer VM
-coupling, resolves with 1.1), and the cosmetic ones in §3/§4 (`AppJson`, `formatElo`, detail-screen
-state pattern, `StateFlow` vs `mutableStateOf`, sealed load state, `strings.xml`).
+**v0.9.3 follow-up:** 1.9, 1.10 and 1.11 fixed. **v0.10.x:** 1.1 and 1.2 fixed. Remaining open
+items are the cosmetic ones in §3/§4 (`AppJson`, `formatElo`, detail-screen state pattern,
+`StateFlow` vs `mutableStateOf`, sealed load state, `strings.xml`).
 
-On-device verification still needed for v0.9.3: retry/discard row after a failed upload (airplane
-mode on finish), and reactions appearing on the organizer's scoring screens in BLE mode.
+On-device verification still needed (nothing since v0.9.2 has been run on a phone): cold start
+of v0.10.1+ (custom `Application` + ViewModel factory), retry/discard row after a failed upload
+(airplane mode on finish), reactions on the organizer's scoring screens in BLE mode, and the
+"two edits" BLE propagation test after the sync extraction in v0.10.3.

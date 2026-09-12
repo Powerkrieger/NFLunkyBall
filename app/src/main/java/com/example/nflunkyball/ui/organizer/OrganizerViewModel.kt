@@ -30,10 +30,8 @@ import com.example.nflunkyball.persistence.FinishInfoStore
 import com.example.nflunkyball.persistence.MatchDrinkStore
 import com.example.nflunkyball.persistence.TournamentRepository
 import com.example.nflunkyball.server.AccountManager
-import com.example.nflunkyball.server.AccountSyncStatus
 import com.example.nflunkyball.server.ArchiveUploader
 import com.example.nflunkyball.server.CompetitorStats
-import com.example.nflunkyball.server.CredentialsStore
 import com.example.nflunkyball.server.OrganizerAccount
 import com.example.nflunkyball.server.ServerApiFactory
 import com.example.nflunkyball.server.ServerResult
@@ -48,7 +46,7 @@ import kotlinx.coroutines.launch
  *  Bluetooth. */
 class OrganizerViewModel(
     private val repository: TournamentRepository,
-    private val credentialsStore: CredentialsStore,
+    private val accountManager: AccountManager,
     private val settings: AppSettings,
     private val drinkStore: MatchDrinkStore,
     private val finishInfoStore: FinishInfoStore,
@@ -56,8 +54,7 @@ class OrganizerViewModel(
     private val serverApi: ServerApiFactory
 ) : ViewModel() {
 
-    private val accountManager = AccountManager(credentialsStore, serverApi, viewModelScope)
-    private val liveSync = LiveSyncHost(settings, broadcaster, account = { accountManager.account.value }, serverApi, viewModelScope)
+    private val liveSync = LiveSyncHost(settings, broadcaster, accountManager.account, serverApi, viewModelScope)
     private val uploader = ArchiveUploader(
         repository, drinkStore, finishInfoStore, account = { accountManager.account.value }, serverApi, viewModelScope
     )
@@ -72,7 +69,6 @@ class OrganizerViewModel(
     // Account + archive upload — see AccountManager / ArchiveUploader for the rules.
     val organizerAccount: StateFlow<OrganizerAccount?> = accountManager.account
     val readPassword: StateFlow<String?> = accountManager.readPassword
-    val accountSyncStatus: StateFlow<AccountSyncStatus?> = accountManager.syncStatus
     val uploadStatus: StateFlow<String?> = uploader.uploadStatus
     val hasPendingUpload: Boolean get() = uploader.hasPendingUpload
 
@@ -81,18 +77,19 @@ class OrganizerViewModel(
     var knownCompetitors by mutableStateOf<List<CompetitorStats>>(emptyList())
         private set
 
-    fun checkAccountSyncStatus() = accountManager.checkSyncStatus()
-
     /** Read fresh each time rather than cached at construction — this ViewModel outlives a
      *  single visit to the Settings screen, so a toggle flipped there mid-session must be seen
      *  the next time hosting actually starts. */
     fun useBleSync(): Boolean = settings.useBleSync()
 
-    fun setUseBleSync(enabled: Boolean) = settings.setUseBleSync(enabled)
-
     /** Known players from past tournaments this group has recorded, so the organizer can pick
      *  existing ones instead of retyping — also how a returning organizer confirms their
      *  account is actually registered with the group before starting a new tournament. */
+    init {
+        // Known-player suggestions are the linked group's data; drop them when the link goes.
+        viewModelScope.launch { accountManager.account.collect { if (it == null) knownCompetitors = emptyList() } }
+    }
+
     fun loadKnownCompetitors() {
         val account = organizerAccount.value ?: return
         val password = readPassword.value ?: return
@@ -188,14 +185,6 @@ class OrganizerViewModel(
 
     /** See [AccountManager.link]; the message is user-facing either way. */
     suspend fun linkAccount(inviteCode: String): Result<String> = accountManager.link(inviteCode)
-
-    /** See [AccountManager.unlink]. An in-progress tournament keeps hosting over BLE untouched
-     *  and simply loses server sync until relinked. */
-    fun unlinkAccount() {
-        liveSync.stopServerSync()
-        accountManager.unlink()
-        knownCompetitors = emptyList()
-    }
 
     override fun onCleared() {
         super.onCleared()

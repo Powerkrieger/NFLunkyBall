@@ -28,26 +28,25 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import com.example.nflunkyball.server.AccountSyncStatus
-import com.example.nflunkyball.ui.organizer.OrganizerViewModel
 import com.example.nflunkyball.ui.shared.BackTopBar
 import com.example.nflunkyball.ui.theme.Spacing
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
-    organizerViewModel: OrganizerViewModel,
+    viewModel: SettingsViewModel,
     onBack: () -> Unit,
     onLinkAccount: () -> Unit
 ) {
-    var useBleSync by remember { mutableStateOf(organizerViewModel.useBleSync()) }
+    var useBleSync by remember { mutableStateOf(viewModel.useBleSync()) }
     var showUnlinkConfirm by remember { mutableStateOf(false) }
-    val account = organizerViewModel.organizerAccount.collectAsState().value
-    val syncStatus by organizerViewModel.accountSyncStatus.collectAsState()
+    val account = viewModel.account.collectAsState().value
+    val syncStatus by viewModel.syncStatus.collectAsState()
 
     // Keyed on the account id (not just "is one linked") so unlinking and linking a different
     // one re-checks, rather than showing stale status for whichever account was checked first.
     LaunchedEffect(account?.accountId) {
-        if (account != null) organizerViewModel.checkAccountSyncStatus()
+        if (account != null) viewModel.checkSyncStatus()
     }
 
     Scaffold(
@@ -129,7 +128,7 @@ fun SettingsScreen(
                         checked = useBleSync,
                         onCheckedChange = {
                             useBleSync = it
-                            organizerViewModel.setUseBleSync(it)
+                            viewModel.setUseBleSync(it)
                         }
                     )
                 }
@@ -149,7 +148,7 @@ fun SettingsScreen(
                 )
             },
             confirmButton = {
-                TextButton(onClick = { showUnlinkConfirm = false; organizerViewModel.unlinkAccount() }) {
+                TextButton(onClick = { showUnlinkConfirm = false; viewModel.unlinkAccount() }) {
                     Text("Unlink")
                 }
             },

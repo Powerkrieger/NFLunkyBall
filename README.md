@@ -12,11 +12,16 @@ Single Gradle module (`app`), package `com.example.nflunkyball`:
 | Package | Contents |
 | --- | --- |
 | `model` | Pure domain types (`Tournament`, `Team`, `Group`, `Match`, `MatchDrinks`) and pure logic (round-robin generation, standings, provisional Elo, group seeding). No Android dependencies — fully unit-tested. |
-| `persistence` | On-device stores: the organizer's single in-progress tournament, the viewer's saved/downloaded tournaments, per-match drinks, app settings. |
-| `ble` | Connectionless Bluetooth LE live sync: chunked/gzipped tournament state over advertising, emoji reactions back, room codes. Pure codec parts are unit-tested. |
-| `server` | Backend client (`ServerApi`), its wire DTOs (`ServerModels`), Ed25519 request signing, invite/upload payloads, encrypted credential storage. |
+| `persistence` | On-device stores (all via `JsonFile`, written off the main thread): the organizer's single in-progress tournament, the viewer's saved/downloaded tournaments (`ViewerLibrary` holds the rules), per-match drinks, pending finish info, app settings. |
+| `ble` | Connectionless Bluetooth LE transport: chunked/gzipped tournament state over advertising, emoji reactions back, room codes. `LiveBroadcaster`/`LiveReceiver` are the interfaces the sync layer uses. |
+| `server` | Backend client (`ServerApi` interface, `KtorServerApi`), wire DTOs (`ServerModels`), Ed25519 request signing (`UploadSigner`), `AccountManager` (invite linking), `ArchiveUploader` (finish → upload with retry). |
+| `sync` | Live sync in both roles — `LiveSyncHost` (organizer) and `LiveSyncViewer` (viewer) pick BLE or server per the Settings toggle. |
 | `qr` | Join-code payload and QR rendering. |
-| `ui` | Compose screens, split into `organizer/`, `viewer/`, `shared/` widgets and `theme/`. The two `AndroidViewModel`s (`OrganizerViewModel`, `ViewerViewModel`) own all state and wire the layers above together; `MainActivity` holds the single navigation graph (`Routes`). |
+| `ui` | Compose screens (`organizer/`, `viewer/`, `shared/`, `theme/`) and three thin ViewModels (`OrganizerViewModel`, `ViewerViewModel`, `SettingsViewModel`) that delegate to the classes above. `MainActivity` holds the single navigation graph (`Routes`). |
+
+Dependencies are hand-wired in `AppContainer` (held by `NfLunkyBallApplication`) — no DI framework.
+Everything below the ViewModels runs on the JVM, so `app/src/test` covers it with fakes
+(`fakes/`) rather than instrumentation.
 
 Live sync has two transports, chosen in Settings: server-backed (default, needs internet) or
 peer-to-peer BLE (offline venues). Drink choices and finish metadata are deliberately kept out of

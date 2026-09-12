@@ -29,11 +29,11 @@ class LiveSyncHostTest {
 
     private val broadcaster = FakeBroadcaster()
     private val api = FakeServerApi()
-    private var account: OrganizerAccount? = testAccount()
+    private val account = MutableStateFlow<OrganizerAccount?>(testAccount())
     private val updates = MutableStateFlow<Tournament?>(Tournament(id = "t1", name = "T"))
 
     private fun host(scope: CoroutineScope, ble: Boolean) =
-        LiveSyncHost(FakeAppSettings(bleSync = ble), broadcaster, account = { account }, serverApi = { api }, scope = scope)
+        LiveSyncHost(FakeAppSettings(bleSync = ble), broadcaster, account, serverApi = { api }, scope = scope)
 
     @Test
     fun `BLE mode starts the broadcaster on the tournament's room and relays reactions once`() = runTest {
@@ -59,7 +59,7 @@ class LiveSyncHostTest {
 
     @Test
     fun `server mode without an account reports not linked and pushes nothing`() = runTest {
-        account = null
+        account.value = null
         val host = host(this, ble = false)
         host.start("t1", updates.filterNotNull())
         advanceUntilIdle()
@@ -67,6 +67,7 @@ class LiveSyncHostTest {
         assertEquals("Not linked — link an organizer account to sync", host.serverSyncStatus.value)
         assertTrue(api.livePushes.isEmpty())
         assertTrue(broadcaster.startedRooms.isEmpty())
+        host.stop()
     }
 
     @Test
@@ -85,7 +86,7 @@ class LiveSyncHostTest {
         assertEquals(7, push.accountId)
         assertTrue(push.bodyJson.contains("\"name\":\"Renamed\""))
         val message = UploadSigner.message("t1", push.timestamp, push.bodyJson).toByteArray()
-        assertTrue(Ed25519.verify(account!!.publicKeyBytes, message, Base64.decode(push.signatureBase64)))
+        assertTrue(Ed25519.verify(account.value!!.publicKeyBytes, message, Base64.decode(push.signatureBase64)))
 
         api.livePushResult = ServerResult.Failure("500")
         updates.value = updates.value!!.copy(name = "Again")
@@ -94,5 +95,26 @@ class LiveSyncHostTest {
 
         host.stop()
         assertNull(host.serverSyncStatus.value)
+    }
+
+    @Test
+    fun `server mode follows the account - unlinking stops pushes, relinking resumes them`() = runTest {
+        val host = host(this, ble = false)
+        host.start("t1", updates.filterNotNull())
+        advanceUntilIdle()
+        assertEquals(1, api.livePushes.size)
+
+        account.value = null
+        advanceUntilIdle()
+        assertEquals("Not linked — link an organizer account to sync", host.serverSyncStatus.value)
+        updates.value = updates.value!!.copy(name = "While unlinked")
+        advanceUntilIdle()
+        assertEquals(1, api.livePushes.size)
+
+        account.value = testAccount()
+        advanceUntilIdle()
+        assertEquals(2, api.livePushes.size)
+        assertEquals("Synced", host.serverSyncStatus.value)
+        host.stop()
     }
 }

@@ -28,6 +28,7 @@ import com.example.nflunkyball.model.TournamentPhase
 import com.example.nflunkyball.ui.HomeScreen
 import com.example.nflunkyball.ui.RulebookScreen
 import com.example.nflunkyball.ui.SettingsScreen
+import com.example.nflunkyball.ui.SettingsViewModel
 import com.example.nflunkyball.ui.organizer.BracketScreen
 import com.example.nflunkyball.ui.organizer.GroupStageScreen
 import com.example.nflunkyball.ui.organizer.HostingScreen
@@ -115,6 +116,7 @@ private fun NfLunkyBallApp() {
     val factory = (LocalContext.current.applicationContext as NfLunkyBallApplication).container.viewModelFactory
     val organizerViewModel: OrganizerViewModel = viewModel(factory = factory)
     val viewerViewModel: ViewerViewModel = viewModel(factory = factory)
+    val settingsViewModel: SettingsViewModel = viewModel(factory = factory)
 
     // Evaluated once at composition (a device's link state doesn't change without an explicit
     // navigation afterward), so an already-linked device — organizer or viewer, however that was
@@ -174,7 +176,7 @@ private fun NfLunkyBallApp() {
         }
         composable(Routes.SETTINGS) {
             SettingsScreen(
-                organizerViewModel = organizerViewModel,
+                viewModel = settingsViewModel,
                 onBack = { navController.popBackStack() },
                 onLinkAccount = { navController.navigate(Routes.LINK_ACCOUNT) }
             )
