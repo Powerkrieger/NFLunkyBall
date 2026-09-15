@@ -49,6 +49,14 @@ reads from environment variables (`KEYSTORE_PATH`, `KEYSTORE_PASSWORD`, `KEY_ALI
 To build a signed release locally, set those four environment variables (pointing
 `KEYSTORE_PATH` at your own `.jks` file) and run `./gradlew assembleRelease`.
 
+## Video analysis
+
+Tournament footage from a fixed overhead camera is analysed offline (throw/hit detection,
+player tracking, bottle state) in `data/wm-squads/analysis/` (gitignored, own venv, runs on a
+GPU box). The hardware plan for filming the next tournament — camera choice, geometry, buy
+list, offline camera setup and recording commands — is in
+[docs/tournament-camera-rig.md](docs/tournament-camera-rig.md).
+
 ## AI notice
 
 Project scaffolding, CI pipeline and large parts of the app were built with Claude Code.
