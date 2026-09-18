@@ -3,6 +3,7 @@ package com.example.nflunkyball.persistence
 import com.example.nflunkyball.model.AppJson
 import android.content.Context
 import com.example.nflunkyball.model.MatchDrinks
+import com.example.nflunkyball.model.PenaltyDrinks
 import java.io.File
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
@@ -29,9 +30,12 @@ class MatchDrinkStore(dir: File) {
         val cleaned = MatchDrinks(
             teamA = drinks.teamA?.trim()?.ifBlank { null },
             teamB = drinks.teamB?.trim()?.ifBlank { null },
-            byPlayer = drinks.byPlayer.mapValues { it.value.trim() }.filterValues { it.isNotBlank() }
+            byPlayer = drinks.byPlayer.mapValues { it.value.trim() }.filterValues { it.isNotBlank() },
+            penaltiesByPlayer = drinks.penaltiesByPlayer
+                .filterValues { it.count > 0 }
+                .mapValues { (_, penalty) -> PenaltyDrinks(penalty.count, penalty.drink?.trim()?.ifBlank { null }) }
         )
-        if (cleaned.teamA == null && cleaned.teamB == null && cleaned.byPlayer.isEmpty()) {
+        if (cleaned.teamA == null && cleaned.teamB == null && cleaned.byPlayer.isEmpty() && cleaned.penaltiesByPlayer.isEmpty()) {
             cache.remove(matchId)
         } else {
             cache[matchId] = cleaned

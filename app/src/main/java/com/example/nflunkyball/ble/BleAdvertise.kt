@@ -8,7 +8,9 @@ import android.bluetooth.le.AdvertisingSet
 import android.bluetooth.le.AdvertisingSetCallback
 import android.bluetooth.le.AdvertisingSetParameters
 import android.bluetooth.le.BluetoothLeAdvertiser
+import android.os.Build
 import android.util.Log
+import androidx.annotation.RequiresApi
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.delay
 
@@ -71,6 +73,7 @@ suspend fun BluetoothLeAdvertiser.burst(payload: ByteArray, durationMs: Long) {
  * [BleCapability.supportsExtendedAdvertising] first — this assumes the hardware/OS combo
  * actually supports it.
  */
+@RequiresApi(Build.VERSION_CODES.O)
 @SuppressLint("MissingPermission")
 suspend fun BluetoothLeAdvertiser.burstExtended(payload: ByteArray, durationMs: Long) {
     val parameters = AdvertisingSetParameters.Builder()

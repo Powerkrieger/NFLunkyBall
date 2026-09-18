@@ -69,6 +69,47 @@ class TournamentLogicTest {
     }
 
     @Test
+    fun `a three-way tie with a head-to-head cycle keeps the group's team order`() {
+        // A beat B, B beat C, C beat A: every pairwise comparison points the other way round the
+        // circle, so no head-to-head order exists and the organizer's order is kept as is.
+        val group = Group(
+            id = "g1",
+            name = "Group A",
+            teamIds = listOf("C", "A", "B"),
+            matches = listOf(
+                Match("m1", "A", "B", MatchResult(winnerId = "A", winnerScore = 5)),
+                Match("m2", "B", "C", MatchResult(winnerId = "B", winnerScore = 5)),
+                Match("m3", "C", "A", MatchResult(winnerId = "C", winnerScore = 5))
+            )
+        )
+
+        assertEquals(listOf("C", "A", "B"), group.standings().map { it.teamId })
+    }
+
+    @Test
+    fun `a two-way tie below the leader is still broken by head-to-head`() {
+        val group = Group(
+            id = "g1",
+            name = "Group A",
+            teamIds = listOf("A", "B", "C", "D"),
+            matches = listOf(
+                Match("m1", "A", "B", MatchResult(winnerId = "A", winnerScore = 5)),
+                Match("m2", "A", "C", MatchResult(winnerId = "A", winnerScore = 5)),
+                Match("m3", "A", "D", MatchResult(winnerId = "A", winnerScore = 5)),
+                Match("m4", "B", "C", MatchResult(winnerId = "C", winnerScore = 5)),
+                Match("m5", "B", "D", MatchResult(winnerId = "B", winnerScore = 5)),
+                Match("m6", "C", "D", MatchResult(winnerId = "D", winnerScore = 5))
+            )
+        )
+        // A 3-0; B, C, D all 1-2 — a three-way tie again, kept in team order.
+        assertEquals(listOf("A", "B", "C", "D"), group.standings().map { it.teamId })
+
+        // Now with D beaten by C too: B 1-2, C 2-1, D 1-2 -> C second, then B/D tied and B beat D.
+        val decided = group.copy(matches = group.matches.dropLast(1) + Match("m6", "C", "D", MatchResult(winnerId = "C", winnerScore = 5)))
+        assertEquals(listOf("A", "C", "B", "D"), decided.standings().map { it.teamId })
+    }
+
+    @Test
     fun `standings with no results yet has zero wins and losses for everyone`() {
         val group = Group(id = "g1", name = "Group A", teamIds = listOf("A", "B"))
         val standings = group.standings()

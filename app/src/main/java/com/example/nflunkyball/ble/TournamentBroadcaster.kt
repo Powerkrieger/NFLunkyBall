@@ -5,6 +5,7 @@ import android.annotation.SuppressLint
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.le.BluetoothLeAdvertiser
 import android.content.Context
+import android.os.Build
 import android.util.Log
 import com.example.nflunkyball.model.Tournament
 import kotlinx.coroutines.CancellationException
@@ -105,7 +106,7 @@ class TournamentBroadcaster(private val adapter: BluetoothAdapter, private val c
         Log.d(TAG, "Broadcasting v=$version roomId=$roomId rawBytes=${rawBytes.size} gzipBytes=${bytes.size} extended=$useExtended")
 
         val legacyChunks = chunkOrNull(roomId, version, bytes, BleConstants.MAX_CHUNK_PAYLOAD_BYTES, BleConstants.TYPE_STATE_CHUNK)
-        val extendedChunks = if (useExtended) {
+        val extendedChunks = if (useExtended && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             chunkOrNull(roomId, version, bytes, BleCapability.extendedChunkPayloadBytes(context), BleConstants.TYPE_STATE_CHUNK_EXTENDED)
         } else null
 
@@ -155,7 +156,7 @@ class TournamentBroadcaster(private val adapter: BluetoothAdapter, private val c
         while (currentCoroutineContext().isActive) {
             for (chunkPacket in chunks) {
                 val packetBytes = PacketCodec.encodeStateChunk(chunkPacket)
-                if (useExtended) {
+                if (useExtended && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                     advertiser.burstExtended(packetBytes, BleConstants.CHUNK_INTERVAL_MS)
                 } else {
                     advertiser.burst(packetBytes, BleConstants.CHUNK_INTERVAL_MS)

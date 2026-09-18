@@ -1,6 +1,7 @@
 package com.example.nflunkyball.persistence
 
 import com.example.nflunkyball.model.MatchDrinks
+import com.example.nflunkyball.model.PenaltyDrinks
 import com.example.nflunkyball.model.Team
 import com.example.nflunkyball.model.Tournament
 import com.example.nflunkyball.model.TournamentFinishInfo
@@ -80,13 +81,26 @@ class FileStoresTest {
     @Test
     fun `drink store trims, drops empty entries and survives reopen`() {
         val store = MatchDrinkStore(dir)
-        store.set("m1", MatchDrinks(teamA = " Beer ", byPlayer = mapOf("Anna" to "Cider", "Ben" to "  ")))
+        store.set(
+            "m1",
+            MatchDrinks(
+                teamA = " Beer ",
+                byPlayer = mapOf("Anna" to "Cider", "Ben" to "  "),
+                penaltiesByPlayer = mapOf("Anna" to PenaltyDrinks(2, " Schnaps "), "Ben" to PenaltyDrinks(0))
+            )
+        )
         store.set("m2", MatchDrinks(teamA = "  ", teamB = null))
+        // Penalties alone are worth keeping.
+        store.set("m3", MatchDrinks(penaltiesByPlayer = mapOf("Cid" to PenaltyDrinks(1))))
         JsonFile.awaitIdle()
 
         val reopened = MatchDrinkStore(dir).all()
-        assertEquals(setOf("m1"), reopened.keys)
-        assertEquals(MatchDrinks(teamA = "Beer", byPlayer = mapOf("Anna" to "Cider")), reopened["m1"])
+        assertEquals(setOf("m1", "m3"), reopened.keys)
+        assertEquals(
+            MatchDrinks(teamA = "Beer", byPlayer = mapOf("Anna" to "Cider"), penaltiesByPlayer = mapOf("Anna" to PenaltyDrinks(2, "Schnaps"))),
+            reopened["m1"]
+        )
+        assertEquals(MatchDrinks(penaltiesByPlayer = mapOf("Cid" to PenaltyDrinks(1))), reopened["m3"])
 
         store.clear()
         JsonFile.awaitIdle()

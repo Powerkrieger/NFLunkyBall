@@ -9,7 +9,10 @@ import com.example.nflunkyball.model.Tournament
 import com.example.nflunkyball.model.TournamentFinishInfo
 import com.example.nflunkyball.model.TournamentPhase
 import kotlinx.serialization.Serializable
-import java.time.Instant
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import java.util.TimeZone
 
 /**
  * Mirrors [Tournament] field-for-field, plus two additions: [UploadMatchResult.drinkA]/[UploadMatchResult.drinkB].
@@ -88,6 +91,13 @@ data class UploadMatchResult(
     val winnerPenalties: Map<String, UploadPenalty> = emptyMap()
 )
 
+/** ISO-8601 UTC to the second, e.g. "2023-05-17T00:00:00Z". java.time would need API 26 or core
+ *  library desugaring; minSdk is 24. */
+private fun isoUtc(millis: Long): String =
+    SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US)
+        .apply { timeZone = TimeZone.getTimeZone("UTC") }
+        .format(Date(millis))
+
 fun Tournament.toUploadPayload(
     drinksByMatchId: Map<String, MatchDrinks>,
     finishInfo: TournamentFinishInfo? = null
@@ -134,7 +144,7 @@ fun Tournament.toUploadPayload(
         bracketMatches = bracketMatches.map { it.toUpload() },
         phase = phase,
         squadSize = squadSize,
-        date = finishInfo?.let { Instant.ofEpochMilli(it.dateMillis).toString() },
+        date = finishInfo?.let { isoUtc(it.dateMillis) },
         location = finishInfo?.location?.trim()?.ifBlank { null },
         referees = finishInfo?.referees?.trim()?.ifBlank { null },
         comment = finishInfo?.comment?.trim()?.ifBlank { null },

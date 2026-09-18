@@ -36,7 +36,8 @@ data class TeamStanding(
  * Sorted by wins desc. Ties between exactly two teams are broken by their head-to-head
  * result if they've played; anything beyond a pairwise tie falls back to the group's team
  * order (i.e. the organizer's own ordering) since a general N-way round-robin tiebreak isn't
- * well-defined.
+ * well-defined — and applying head-to-head pairwise inside a three-way cycle (A beat B, B beat
+ * C, C beat A) would give the sort a non-transitive comparator.
  */
 fun Group.standings(): List<TeamStanding> {
     val wins = teamIds.associateWith { 0 }.toMutableMap()
@@ -54,15 +55,14 @@ fun Group.standings(): List<TeamStanding> {
         }?.result?.winnerId
 
     val standings = teamIds.map { TeamStanding(it, wins[it] ?: 0, losses[it] ?: 0) }
-    return standings.sortedWith { a, b ->
-        val winCompare = b.wins - a.wins
-        if (winCompare != 0) return@sortedWith winCompare
-        when (headToHeadWinner(a.teamId, b.teamId)) {
-            a.teamId -> -1
-            b.teamId -> 1
-            else -> 0
+    // groupBy keeps the group's team order within each tie.
+    return standings.groupBy { it.wins }.entries
+        .sortedByDescending { it.key }
+        .flatMap { (_, tied) ->
+            if (tied.size != 2) return@flatMap tied
+            val (first, second) = tied
+            if (headToHeadWinner(first.teamId, second.teamId) == second.teamId) listOf(second, first) else tied
         }
-    }
 }
 
 /**

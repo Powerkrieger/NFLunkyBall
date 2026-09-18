@@ -1,12 +1,12 @@
 <resources>
-    <string name="app_name">NFLunkyBall</string>
+    <string name="app_name" translatable="false">NFLunkyBall</string>
 
     <string name="home_rulebook">Rulebook</string>
     <string name="home_settings">Settings</string>
     <string name="home_my_tournaments">My tournaments</string>
     <string name="home_host">Host a tournament</string>
     <string name="home_join">Join a tournament</string>
-    <string name="home_version">v%1$s</string>
+    <string name="home_version" translatable="false">v%1$s</string>
     <string name="rulebook_title">Rulebook</string>
     <string name="rulebook_rule_1">Der Schiedsrichter hat immer Recht.</string>
     <string name="settings_title">Settings</string>
@@ -119,13 +119,13 @@
     <string name="setup_teams">Teams</string>
     <string name="setup_teams_hint">Teams can be any size, and sides don\'t have to match — 2 v 3 is fine.</string>
     <string name="setup_groups">Groups</string>
-    <string name="setup_group_bullet">• %1$s</string>
+    <string name="setup_group_bullet" translatable="false">• %1$s</string>
     <string name="setup_players">Players</string>
     <string name="setup_pick_members">Pick the players for the next team, then add it</string>
     <string name="setup_next_team">Next team: %1$s</string>
     <string name="setup_add_team">Add team (%1$d)</string>
     <string name="setup_known_players">Known players</string>
-    <string name="setup_known_player_chip">%1$s (%2$s)</string>
+    <string name="setup_known_player_chip" translatable="false">%1$s (%2$s)</string>
     <string name="setup_auto_assign">Auto-assign to groups</string>
     <string name="setup_random_groups">Random groups</string>
     <string name="setup_assign_group">Assign group</string>
@@ -135,7 +135,7 @@
     <string name="setup_active_pending">\"%1$s\" is finished but hasn\'t been uploaded to history yet. Retry the upload or discard it before starting another one.</string>
     <string name="setup_active_in_progress">\"%1$s\" is still in progress on this device. Finish or abandon it before starting another one.</string>
     <string name="setup_go_my_tournaments">Go to My tournaments</string>
-    <string name="action_remove_short">✕</string>
+    <string name="action_remove_short" translatable="false">✕</string>
     <string name="tsettings_title">Tournament settings</string>
     <string name="tsettings_show_code">Show viewer code</string>
     <string name="tsettings_add_token">Add invite token</string>
@@ -178,7 +178,7 @@
     <string name="history_competitor_row">%1$s · %2$dW %3$dL</string>
     <string name="detail_location">Location: %1$s</string>
     <string name="detail_referees">Referees: %1$s</string>
-    <string name="detail_member_indented">    %1$s</string>
+    <string name="detail_member_indented" translatable="false">    %1$s</string>
     <string name="scoreboard_bracket">Bracket</string>
     <string name="join_bad_qr">That QR code doesn\'t look like an NFLunkyBall join code.</string>
     <string name="join_title">Join a tournament</string>
@@ -197,7 +197,7 @@
     <string name="match_seconds_on_counter_named">%1$s: %2$d seconds on the counter</string>
     <string name="match_winner">Winner</string>
     <string name="match_loser">Loser</string>
-    <string name="match_elo_line">Elo %1$s → %2$s (%3$s)</string>
+    <string name="match_elo_line" translatable="false">Elo %1$s → %2$s (%3$s)</string>
     <string name="match_drink">Drink: %1$s</string>
     <string name="player_title_fallback">Player</string>
     <string name="player_summary">%1$dW %2$dL · Elo %3$s</string>
@@ -214,7 +214,7 @@
     <string name="player_best_matchup">Best matchup</string>
     <string name="player_toughest_matchup">Toughest matchup</string>
     <string name="player_nemesis">Nemesis (most played)</string>
-    <string name="player_elo_point_tournament">%1$s (%2$s)</string>
+    <string name="player_elo_point_tournament" translatable="false">%1$s (%2$s)</string>
     <string name="player_with_teammates"> with %1$s</string>
     <string name="player_elo_point_match">%1$s · vs %2$s%3$s (%4$s)</string>
     <string name="player_won_short">W</string>

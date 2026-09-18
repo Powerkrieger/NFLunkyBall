@@ -4,6 +4,8 @@ import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothManager
 import android.content.Context
 import android.os.Build
+import androidx.annotation.ChecksSdkIntAtLeast
+import androidx.annotation.RequiresApi
 
 object BleCapability {
 
@@ -29,6 +31,7 @@ object BleCapability {
      * sends, and a capable host's extended chunks are just bigger versions of the exact same
      * wire format (no protocol change on the receive side).
      */
+    @ChecksSdkIntAtLeast(api = Build.VERSION_CODES.O)
     fun supportsExtendedAdvertising(context: Context): Boolean {
         val adapter = bluetoothAdapter(context) ?: return false
         return adapter.isEnabled &&
@@ -37,6 +40,7 @@ object BleCapability {
     }
 
     /** Real per-device ceiling for one extended-advertising chunk's payload, already reduced by [BleConstants.HEADER_SIZE_BYTES] and capped at [BleConstants.MAX_EXTENDED_CHUNK_PAYLOAD_BYTES] for headroom. */
+    @RequiresApi(Build.VERSION_CODES.O)
     fun extendedChunkPayloadBytes(context: Context): Int {
         val adapter = bluetoothAdapter(context) ?: return BleConstants.MAX_CHUNK_PAYLOAD_BYTES
         val deviceMax = adapter.leMaximumAdvertisingDataLength - BleConstants.HEADER_SIZE_BYTES
