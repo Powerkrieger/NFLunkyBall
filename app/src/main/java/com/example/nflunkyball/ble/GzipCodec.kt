@@ -16,6 +16,24 @@ object GzipCodec {
         return out.toByteArray()
     }
 
+    /**
+     * Inflates [bytes], refusing to grow past [MAX_DECOMPRESSED_BYTES]. The input arrives over
+     * BLE advertising from whoever is nearby, and gzip can expand ~1000x — without a cap a
+     * deliberately crafted broadcast could make every viewer allocate tens of megabytes.
+     * A real tournament is well under 100 KB uncompressed.
+     */
     fun decompress(bytes: ByteArray): ByteArray =
-        GZIPInputStream(bytes.inputStream()).use { it.readBytes() }
+        GZIPInputStream(bytes.inputStream()).use { input ->
+            val out = ByteArrayOutputStream()
+            val buffer = ByteArray(8 * 1024)
+            while (true) {
+                val read = input.read(buffer)
+                if (read < 0) break
+                require(out.size() + read <= MAX_DECOMPRESSED_BYTES) { "Decompressed payload exceeds $MAX_DECOMPRESSED_BYTES bytes" }
+                out.write(buffer, 0, read)
+            }
+            out.toByteArray()
+        }
+
+    const val MAX_DECOMPRESSED_BYTES = 4 * 1024 * 1024
 }
