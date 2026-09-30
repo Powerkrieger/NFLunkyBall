@@ -41,7 +41,8 @@ class ViewerLibrary(private val store: ViewerTournamentsStore, private val now: 
                 phase = existing?.phase ?: TournamentPhase.SETUP,
                 joinPayload = payload,
                 lastUpdated = now(),
-                cachedTournamentJson = existing?.cachedTournamentJson
+                cachedTournamentJson = existing?.cachedTournamentJson,
+                date = existing?.date ?: SavedTournamentList.isoDay(now())
             )
         )
     }
@@ -71,7 +72,8 @@ class ViewerLibrary(private val store: ViewerTournamentsStore, private val now: 
                 phase = t.phase,
                 joinPayload = payload,
                 lastUpdated = now(),
-                cachedTournamentJson = cachedJson
+                cachedTournamentJson = cachedJson,
+                date = existing?.date ?: SavedTournamentList.isoDay(now())
             )
         )
     }
@@ -82,12 +84,23 @@ class ViewerLibrary(private val store: ViewerTournamentsStore, private val now: 
      * room code can be derived the same way the live path does ([RoomCode.forTournament]) and
      * the entry stored under that same id: a backend sync folds into (replaces) any stale local
      * entry for the same tournament instead of creating a second, disconnected one. Falls back
-     * to `"server:<id>"` only if a downloaded body somehow fails to decode.
+     * to `"server:<id>"` only if a downloaded body somehow fails to decode. A cached entry whose
+     * name no longer matches the server's is re-downloaded (the backend may have renumbered or
+     * renamed it); otherwise only its date is refreshed.
      */
     suspend fun cacheFromServer(api: ServerApi, password: String, summaries: List<TournamentSummary>) {
         for (summary in summaries) {
+            val date = summary.date.take(10)
             val existingByServerId = store.tournaments.value.find { it.serverId == summary.id }
-            if (existingByServerId?.cachedTournamentJson != null) continue
+            // A name mismatch means the server id now points at a different tournament (ids get
+            // renumbered on the backend) or it was renamed — either way the cache is stale.
+            val stale = existingByServerId != null && existingByServerId.name != summary.name
+            if (existingByServerId?.cachedTournamentJson != null && !stale) {
+                // Already cached — just backfill/correct the date (entries cached before dates
+                // were stored have none), leaving lastUpdated alone.
+                if (existingByServerId.date != date) store.upsert(existingByServerId.copy(date = date))
+                continue
+            }
             val body = when (val result = api.getTournamentJson(summary.id, password)) {
                 is ServerResult.Success -> result.value
                 is ServerResult.Failure -> continue
@@ -96,6 +109,9 @@ class ViewerLibrary(private val store: ViewerTournamentsStore, private val now: 
             val entryId = decoded?.let { RoomCode.encode(RoomCode.forTournament(it.id)) }
                 ?: existingByServerId?.id
                 ?: "server:${summary.id}"
+            // The stale entry held some other tournament; that one gets its own entry under its
+            // new server id, so this copy would only be a duplicate.
+            if (stale && existingByServerId!!.id != entryId) store.remove(existingByServerId.id)
             val existing = store.tournaments.value.find { it.id == entryId }
             store.upsert(
                 SavedTournament(
@@ -105,7 +121,8 @@ class ViewerLibrary(private val store: ViewerTournamentsStore, private val now: 
                     phase = TournamentPhase.FINISHED,
                     joinPayload = existing?.joinPayload,
                     lastUpdated = now(),
-                    cachedTournamentJson = body
+                    cachedTournamentJson = body,
+                    date = date
                 )
             )
         }

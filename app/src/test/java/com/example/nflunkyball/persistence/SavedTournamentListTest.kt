@@ -7,14 +7,23 @@ import org.junit.Test
 
 class SavedTournamentListTest {
 
-    private fun entry(id: String, lastUpdated: Long, phase: TournamentPhase = TournamentPhase.SETUP) =
-        SavedTournament(id = id, name = id, phase = phase, lastUpdated = lastUpdated)
+    private fun entry(id: String, lastUpdated: Long, phase: TournamentPhase = TournamentPhase.SETUP, date: String? = null) =
+        SavedTournament(id = id, name = id, phase = phase, lastUpdated = lastUpdated, date = date)
 
     @Test
     fun `upsert adds a new entry and sorts by most recently updated first`() {
         val list = SavedTournamentList.upsert(emptyList(), entry("A", 100))
         val updated = SavedTournamentList.upsert(list, entry("B", 200))
         assertEquals(listOf("B", "A"), updated.map { it.id })
+    }
+
+    @Test
+    fun `upsert orders by tournament date, not by when the entry was saved`() {
+        var list = emptyList<SavedTournament>()
+        list = SavedTournamentList.upsert(list, entry("WM9", 100, date = "2025-06-01"))
+        list = SavedTournamentList.upsert(list, entry("WM7", 200, date = "2023-06-01"))
+        list = SavedTournamentList.upsert(list, entry("WM10", 50, date = "2026-06-01"))
+        assertEquals(listOf("WM10", "WM9", "WM7"), list.map { it.id })
     }
 
     @Test

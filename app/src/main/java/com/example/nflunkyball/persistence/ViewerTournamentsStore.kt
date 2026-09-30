@@ -5,6 +5,9 @@ import android.content.Context
 import com.example.nflunkyball.model.TournamentPhase
 import com.example.nflunkyball.qr.JoinPayload
 import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.serialization.Serializable
@@ -28,7 +31,11 @@ data class SavedTournament(
     val phase: TournamentPhase,
     val joinPayload: JoinPayload? = null,
     val lastUpdated: Long,
-    val cachedTournamentJson: String? = null
+    val cachedTournamentJson: String? = null,
+    /** When the tournament took place, as ISO `yyyy-MM-dd` — the backend's date for archived
+     *  tournaments, otherwise the day it was first seen. What the list is ordered by; null only
+     *  for entries saved before this field existed. */
+    val date: String? = null
 )
 
 /** Pure merge logic, kept separate from file I/O so it's unit-testable without an Android Context. */
@@ -37,8 +44,17 @@ object SavedTournamentList {
 
     fun upsert(current: List<SavedTournament>, entry: SavedTournament): List<SavedTournament> =
         (current.filterNot { it.id == entry.id } + entry)
-            .sortedByDescending { it.lastUpdated }
+            .sortedWith(chronological)
             .take(MAX_ENTRIES)
+
+    /** Newest tournament first by [SavedTournament.date]; [SavedTournament.lastUpdated] breaks
+     *  ties and stands in for the date on legacy entries that don't have one. */
+    private val chronological =
+        compareByDescending<SavedTournament> { it.date ?: isoDay(it.lastUpdated) }.thenByDescending { it.lastUpdated }
+
+    /** Local calendar day as `yyyy-MM-dd` — SimpleDateFormat, since java.time needs API 26. */
+    fun isoDay(epochMillis: Long): String =
+        SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date(epochMillis))
 
     fun remove(current: List<SavedTournament>, id: String): List<SavedTournament> =
         current.filterNot { it.id == id }

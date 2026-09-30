@@ -103,4 +103,33 @@ class ViewerLibraryTest {
         library.cacheFromServer(api, "pw", listOf(summary))
         assertEquals(1, store.tournaments.value.size)
     }
+
+    @Test
+    fun `an already cached archive gets its date backfilled without a re-download`() = runTest {
+        store.upsert(SavedTournament(id = "OLD1", serverId = 9, name = "Old", phase = TournamentPhase.FINISHED, lastUpdated = 5, cachedTournamentJson = "{}"))
+        val api = FakeServerApi()
+        api.tournamentJsonResult = ServerResult.Failure("must not be called")
+
+        library.cacheFromServer(api, "pw", listOf(TournamentSummary(id = 9, name = "Old", date = "2024-05-18T00:00:00", phase = "FINISHED")))
+
+        val entry = store.tournaments.value.single()
+        assertEquals("2024-05-18", entry.date)
+        assertEquals(5L, entry.lastUpdated)
+    }
+
+    @Test
+    fun `a server id that now points at a different tournament replaces the stale cached one`() = runTest {
+        // Cached back when server id 7 was the 2026 WM; the backend has since moved it to id 10.
+        store.upsert(SavedTournament(id = "OLD1", serverId = 7, name = "7te WM (2026)", phase = TournamentPhase.FINISHED, lastUpdated = 5, cachedTournamentJson = "{}"))
+        val api = FakeServerApi()
+        api.tournamentJsonResult = ServerResult.Success(tournamentJson(Tournament(id = "wm7_2023", name = "7te WM (2023)", phase = TournamentPhase.FINISHED)))
+
+        library.cacheFromServer(api, "pw", listOf(TournamentSummary(id = 7, name = "7te WM (2023)", date = "2023-09-01", phase = "FINISHED")))
+
+        val entry = store.tournaments.value.single()
+        assertEquals(7, entry.serverId)
+        assertEquals("7te WM (2023)", entry.name)
+        assertEquals("2023-09-01", entry.date)
+        assertEquals("7te WM (2023)", library.decode(entry.cachedTournamentJson!!)?.name)
+    }
 }
