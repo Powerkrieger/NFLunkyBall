@@ -96,10 +96,32 @@ fun Tournament.suggestedFinalStandings(): List<String> {
     )
 }
 
-/** Same starting rating/K-factor as the backend's persisted Elo (`app/stats.py`'s
- *  `_elo_ratings`) — keep the two in sync if either changes. */
+/** The group's own "Elo Rechner" formula, same as the backend's persisted Elo (`app/stats.py`'s
+ *  `elo_k_factor`/`elo_expected`) — keep the two in sync if either changes. Expected score on a
+ *  600-point scale; K 60 for the knockout games that decide the title and podium, 50 otherwise. */
 const val ELO_STARTING_RATING = 1000.0
-const val ELO_K_FACTOR = 32.0
+const val ELO_DIVISOR = 600.0
+const val ELO_K_GROUP = 50.0
+const val ELO_K_KNOCKOUT = 60.0
+
+private val MINOR_BRACKET_WORDS = listOf("lower", "loser", "verlierer", "trost", "consolation")
+private val PLACEMENT_GAME = Regex("""(?:platz|place)\s*(\d+)""", RegexOption.IGNORE_CASE)
+
+/** K for one match, from its round label: only bracket matches carry one, and labels are free
+ *  text. Lower-bracket/consolation games and placement games for 5th and below count like group
+ *  games; every other bracket match (Achtel-/Viertel-/Halbfinale, Finale, Spiel um Platz 3, the
+ *  default round) is a knockout game. */
+fun eloKFactor(roundLabel: String?): Double {
+    if (roundLabel.isNullOrBlank()) return ELO_K_GROUP
+    val label = roundLabel.lowercase()
+    if (MINOR_BRACKET_WORDS.any { it in label }) return ELO_K_GROUP
+    val place = PLACEMENT_GAME.find(label)?.groupValues?.get(1)?.toIntOrNull()
+    if (place != null && place >= 5) return ELO_K_GROUP
+    return ELO_K_KNOCKOUT
+}
+
+fun eloExpected(rating: Double, opponent: Double): Double =
+    1.0 / (1.0 + 10.0.pow((opponent - rating) / ELO_DIVISOR))
 
 data class ProvisionalStanding(val winDelta: Int, val lossDelta: Int, val eloDelta: Double)
 
@@ -128,9 +150,9 @@ fun Tournament.provisionalPlayerStandings(): Map<String, ProvisionalStanding> {
         val sideB = membersByTeamId[match.teamBId] ?: continue
         val ratingA = sideA.map { ratings[it] ?: ELO_STARTING_RATING }.average()
         val ratingB = sideB.map { ratings[it] ?: ELO_STARTING_RATING }.average()
-        val expectedA = 1.0 / (1.0 + 10.0.pow((ratingB - ratingA) / 400.0))
+        val expectedA = eloExpected(ratingA, ratingB)
         val winnerIsA = result.winnerId == match.teamAId
-        val delta = ELO_K_FACTOR * ((if (winnerIsA) 1.0 else 0.0) - expectedA)
+        val delta = eloKFactor(match.roundLabel) * ((if (winnerIsA) 1.0 else 0.0) - expectedA)
         sideA.forEach { ratings[it] = (ratings[it] ?: ELO_STARTING_RATING) + delta }
         sideB.forEach { ratings[it] = (ratings[it] ?: ELO_STARTING_RATING) - delta }
 

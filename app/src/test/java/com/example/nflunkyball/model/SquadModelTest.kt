@@ -74,11 +74,12 @@ class SquadModelTest {
         val byPlayer = tournament.provisionalPlayerStandings()
         val byTeam = tournament.provisionalStandings()
 
-        val expectedX = 1.0 / (1.0 + Math.pow(10.0, (984.0 - 1016.0) / 400.0))
-        val delta2 = ELO_K_FACTOR * (0.0 - expectedX)
-        assertEquals(16.0 + delta2, byPlayer.getValue("Anna").eloDelta, 1e-9)
+        // Group matches: K 50, so match 1 is +/-25 and match 2 is played at 1025 vs 975.
+        val expectedX = 1.0 / (1.0 + Math.pow(10.0, (975.0 - 1025.0) / 600.0))
+        val delta2 = ELO_K_GROUP * (0.0 - expectedX)
+        assertEquals(25.0 + delta2, byPlayer.getValue("Anna").eloDelta, 1e-9)
         assertEquals(byPlayer.getValue("Anna").eloDelta, byPlayer.getValue("Ben").eloDelta, 1e-9)
-        assertEquals(-16.0 - delta2, byPlayer.getValue("Cid").eloDelta, 1e-9)
+        assertEquals(-25.0 - delta2, byPlayer.getValue("Cid").eloDelta, 1e-9)
         assertEquals(1, byPlayer.getValue("Dee").winDelta)
         assertEquals(1, byPlayer.getValue("Dee").lossDelta)
         assertEquals(byPlayer.getValue("Anna").eloDelta, byTeam.getValue("x").eloDelta, 1e-9)

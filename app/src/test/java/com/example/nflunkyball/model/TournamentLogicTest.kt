@@ -197,4 +197,23 @@ class TournamentLogicTest {
             assertEquals(0.0, it.eloDelta, 0.0001)
         }
     }
+
+    @Test
+    fun `elo K is 50 for group and minor bracket games and 60 for title knockouts`() {
+        // Mirrors the backend's tests/test_elo.py.
+        listOf(
+            null, "", "Spiel um Platz 5", "Spiel um Platz 11", "Lower Bracket Viertelfinale",
+            "Verlierer Viertelfinale", "Consolation final", "Place 9"
+        ).forEach { assertEquals(it.toString(), ELO_K_GROUP, eloKFactor(it), 0.0) }
+        listOf(
+            "Achtelfinale", "Viertelfinale", "Halbfinale", "Finale", "Spiel um Platz 3", "Final",
+            "Semifinal", "Bracket", "K.-o.-Runde"
+        ).forEach { assertEquals(it, ELO_K_KNOCKOUT, eloKFactor(it), 0.0) }
+    }
+
+    @Test
+    fun `elo expected score uses the group's 600 point scale`() {
+        // 6te WM, Gruppe A Spiel_1 in the group's sheet: Torben 885.39 vs Christian 1078.2.
+        assertEquals(0.3230182002676823, eloExpected(885.39, 1078.2), 1e-12)
+    }
 }
