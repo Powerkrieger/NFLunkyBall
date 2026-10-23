@@ -1,0 +1,95 @@
+package de.powerizzle.nflunkyball.persistence
+
+import de.powerizzle.nflunkyball.model.AppJson
+import android.content.Context
+import de.powerizzle.nflunkyball.model.TournamentPhase
+import de.powerizzle.nflunkyball.qr.JoinPayload
+import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.builtins.ListSerializer
+
+/**
+ * One tournament a viewer knows about, either because they joined it live over BLE ([joinPayload]
+ * lets them reconnect) or because it was downloaded from the backend ([serverId] lets it be
+ * re-fetched). [id] is the dedupe key: the 4-char room code, known the instant a [JoinPayload] is
+ * decoded (before any BLE data arrives) for anything joined live, and derived from the
+ * downloaded body's own tournament id (see `ViewerViewModel.cacheFinishedTournament`) for
+ * anything discovered via the backend — both paths land on the same code for the same tournament,
+ * so a backend sync naturally folds into (replaces) a stale local entry rather than duplicating
+ * it. Falls back to `"server:<id>"` only if a downloaded body somehow fails to decode.
+ */
+@Serializable
+data class SavedTournament(
+    val id: String,
+    val serverId: Int? = null,
+    val name: String,
+    val phase: TournamentPhase,
+    val joinPayload: JoinPayload? = null,
+    val lastUpdated: Long,
+    val cachedTournamentJson: String? = null,
+    /** When the tournament took place, as ISO `yyyy-MM-dd` — the backend's date for archived
+     *  tournaments, otherwise the day it was first seen. What the list is ordered by; null only
+     *  for entries saved before this field existed. */
+    val date: String? = null
+)
+
+/** Pure merge logic, kept separate from file I/O so it's unit-testable without an Android Context. */
+object SavedTournamentList {
+    const val MAX_ENTRIES = 30
+
+    fun upsert(current: List<SavedTournament>, entry: SavedTournament): List<SavedTournament> =
+        (current.filterNot { it.id == entry.id } + entry)
+            .sortedWith(chronological)
+            .take(MAX_ENTRIES)
+
+    /** Newest tournament first by [SavedTournament.date]; [SavedTournament.lastUpdated] breaks
+     *  ties and stands in for the date on legacy entries that don't have one. */
+    private val chronological =
+        compareByDescending<SavedTournament> { it.date ?: isoDay(it.lastUpdated) }.thenByDescending { it.lastUpdated }
+
+    /** Local calendar day as `yyyy-MM-dd` — SimpleDateFormat, since java.time needs API 26. */
+    fun isoDay(epochMillis: Long): String =
+        SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date(epochMillis))
+
+    fun remove(current: List<SavedTournament>, id: String): List<SavedTournament> =
+        current.filterNot { it.id == id }
+}
+
+/** Viewer-side persistence: recently joined and downloaded tournaments survive the app being
+ *  killed, so reconnecting or browsing history never requires re-scanning a QR code. */
+class ViewerTournamentsStore(dir: File) {
+    constructor(context: Context) : this(context.filesDir)
+
+    private val file = JsonFile(File(dir, "viewer_tournaments.json"))
+    private val json = AppJson.lenient
+    private val listSerializer = ListSerializer(SavedTournament.serializer())
+
+    private val _tournaments = MutableStateFlow(load())
+    val tournaments: StateFlow<List<SavedTournament>> = _tournaments
+
+    fun upsert(entry: SavedTournament) {
+        val updated = SavedTournamentList.upsert(_tournaments.value, entry)
+        _tournaments.value = updated
+        save(updated)
+    }
+
+    fun remove(id: String) {
+        val updated = SavedTournamentList.remove(_tournaments.value, id)
+        _tournaments.value = updated
+        save(updated)
+    }
+
+    private fun load(): List<SavedTournament> {
+        val text = file.readOrNull() ?: return emptyList()
+        return runCatching { json.decodeFromString(listSerializer, text) }.getOrNull() ?: emptyList()
+    }
+
+    private fun save(list: List<SavedTournament>) {
+        file.write(json.encodeToString(listSerializer, list))
+    }
+}

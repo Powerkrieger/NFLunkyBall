@@ -1,0 +1,153 @@
+package de.powerizzle.nflunkyball.server
+
+import de.powerizzle.nflunkyball.model.Group
+import de.powerizzle.nflunkyball.model.Match
+import de.powerizzle.nflunkyball.model.MatchDrinks
+import de.powerizzle.nflunkyball.model.PenaltyDrinks
+import de.powerizzle.nflunkyball.model.Team
+import de.powerizzle.nflunkyball.model.Tournament
+import de.powerizzle.nflunkyball.model.TournamentFinishInfo
+import de.powerizzle.nflunkyball.model.TournamentPhase
+import kotlinx.serialization.Serializable
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import java.util.TimeZone
+
+/**
+ * Mirrors [Tournament] field-for-field, plus two additions: [UploadMatchResult.drinkA]/[UploadMatchResult.drinkB].
+ * Kept as a genuinely separate type (not just extra nullable fields bolted onto the shared model)
+ * so that BLE broadcasting and server-backed live sync — which both serialize the real
+ * [Tournament] object directly — can never end up carrying drink choices, by construction rather
+ * than by convention. Only [toUploadPayload] ever builds one of these, from the local-only
+ * [de.powerizzle.nflunkyball.persistence.MatchDrinkStore], and only for the final "upload to
+ * history" call.
+ */
+@Serializable
+data class UploadTournament(
+    val id: String,
+    val name: String,
+    val teams: List<Team> = emptyList(),
+    val groups: List<UploadGroup> = emptyList(),
+    val bracketMatches: List<UploadMatch> = emptyList(),
+    val phase: TournamentPhase = TournamentPhase.SETUP,
+    val squadSize: Int = 1,
+    // Organizer-entered at finish time (see TournamentFinishInfo) — date is ISO-8601 (UTC), all
+    // null if the tournament was finished without ever going through that dialog (e.g. finished
+    // unlinked, with nothing to save anyway).
+    val date: String? = null,
+    val location: String? = null,
+    val referees: String? = null,
+    val comment: String? = null,
+    /** Team ids, best first (see [TournamentFinishInfo.finalStandings]). */
+    val finalStandings: List<String> = emptyList()
+)
+
+@Serializable
+data class UploadGroup(
+    val id: String,
+    val name: String,
+    val teamIds: List<String>,
+    val matches: List<UploadMatch> = emptyList(),
+    val rounds: Int = 1,
+    val knockoutStage: Boolean = false
+)
+
+@Serializable
+data class UploadMatch(
+    val id: String,
+    val teamAId: String,
+    val teamBId: String,
+    val result: UploadMatchResult? = null,
+    val roundLabel: String? = null,
+    val sequence: Int? = null
+)
+
+/** One losing player's counter plus what they drank — the upload-only shape of [PlayerResult]. */
+@Serializable
+data class UploadPlayerResult(
+    val player: String,
+    val seconds: Int,
+    val forfeitedDrinks: Int = 0,
+    val drink: String? = null,
+    val penaltyDrinks: Int = 0,
+    val penaltyDrink: String? = null
+)
+
+/** A winning player's penalty drinks (losers carry theirs in [UploadPlayerResult]). */
+@Serializable
+data class UploadPenalty(val drinks: Int, val drink: String? = null)
+
+@Serializable
+data class UploadMatchResult(
+    val winnerId: String,
+    val winnerScore: Int,
+    // Per-team drinks, the singles-era fields. Still sent (as the first member's drink on each
+    // side) so an older backend keeps working; [losers]/[winnerDrinks] are the per-player record.
+    val drinkA: String? = null,
+    val drinkB: String? = null,
+    val losers: List<UploadPlayerResult> = emptyList(),
+    val winnerDrinks: Map<String, String> = emptyMap(),
+    val winnerPenalties: Map<String, UploadPenalty> = emptyMap()
+)
+
+/** ISO-8601 UTC to the second, e.g. "2023-05-17T00:00:00Z". java.time would need API 26 or core
+ *  library desugaring; minSdk is 24. */
+private fun isoUtc(millis: Long): String =
+    SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US)
+        .apply { timeZone = TimeZone.getTimeZone("UTC") }
+        .format(Date(millis))
+
+fun Tournament.toUploadPayload(
+    drinksByMatchId: Map<String, MatchDrinks>,
+    finishInfo: TournamentFinishInfo? = null
+): UploadTournament {
+    val teamsById = teams.associateBy { it.id }
+    fun Match.toUpload() = UploadMatch(
+        id = id,
+        teamAId = teamAId,
+        teamBId = teamBId,
+        result = result?.let { result ->
+            val drinks = drinksByMatchId[id]
+            val winnerIsA = result.winnerId == teamAId
+            val losingTeam = teamsById[if (winnerIsA) teamBId else teamAId]
+            val winningTeam = teamsById[if (winnerIsA) teamAId else teamBId]
+            val losingDrink = if (winnerIsA) drinks?.teamB else drinks?.teamA
+            val winningDrink = if (winnerIsA) drinks?.teamA else drinks?.teamB
+            val penalties: Map<String, PenaltyDrinks> = drinks?.penaltiesByPlayer.orEmpty()
+            val losers = result.loserResults(losingTeam?.name ?: "").map { entry ->
+                val penalty = penalties[entry.player]
+                UploadPlayerResult(
+                    entry.player, entry.seconds, entry.forfeitedDrinks,
+                    drinks?.byPlayer?.get(entry.player) ?: losingDrink,
+                    penaltyDrinks = penalty?.count ?: 0,
+                    penaltyDrink = penalty?.drink
+                )
+            }
+            val winners = winningTeam?.memberNames.orEmpty()
+            val winnerDrinks = winners
+                .mapNotNull { player -> (drinks?.byPlayer?.get(player) ?: winningDrink)?.let { player to it } }
+                .toMap()
+            val winnerPenalties = winners
+                .mapNotNull { player -> penalties[player]?.let { player to UploadPenalty(it.count, it.drink) } }
+                .toMap()
+            UploadMatchResult(result.winnerId, result.winnerScore, drinks?.teamA, drinks?.teamB, losers, winnerDrinks, winnerPenalties)
+        },
+        roundLabel = roundLabel,
+        sequence = sequence
+    )
+    return UploadTournament(
+        id = id,
+        name = name,
+        teams = teams,
+        groups = groups.map { UploadGroup(it.id, it.name, it.teamIds, it.matches.map { m -> m.toUpload() }, it.rounds, it.knockoutStage) },
+        bracketMatches = bracketMatches.map { it.toUpload() },
+        phase = phase,
+        squadSize = squadSize,
+        date = finishInfo?.let { isoUtc(it.dateMillis) },
+        location = finishInfo?.location?.trim()?.ifBlank { null },
+        referees = finishInfo?.referees?.trim()?.ifBlank { null },
+        comment = finishInfo?.comment?.trim()?.ifBlank { null },
+        finalStandings = finishInfo?.finalStandings.orEmpty()
+    )
+}

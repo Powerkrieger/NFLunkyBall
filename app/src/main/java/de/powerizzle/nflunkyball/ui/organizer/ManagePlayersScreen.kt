@@ -1,0 +1,147 @@
+package de.powerizzle.nflunkyball.ui.organizer
+
+import androidx.compose.ui.res.stringResource
+import de.powerizzle.nflunkyball.R
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import de.powerizzle.nflunkyball.model.Group
+import de.powerizzle.nflunkyball.model.Team
+import de.powerizzle.nflunkyball.ui.shared.RenameDialog
+import de.powerizzle.nflunkyball.ui.shared.BackTopBar
+import de.powerizzle.nflunkyball.ui.shared.DropdownField
+import de.powerizzle.nflunkyball.ui.theme.Spacing
+
+@Composable
+fun ManagePlayersScreen(viewModel: OrganizerViewModel, onBack: () -> Unit) {
+    val tournament by viewModel.tournament.collectAsState()
+    val current = tournament ?: return
+
+    var newPlayerName by remember { mutableStateOf("") }
+    var newPlayerGroupId by remember { mutableStateOf(current.groups.firstOrNull()?.id ?: "") }
+    var renamingTeam by remember { mutableStateOf<Team?>(null) }
+
+    fun groupNameFor(teamId: String): String? = current.groups.firstOrNull { teamId in it.teamIds }?.name
+
+    Scaffold(
+        topBar = {
+            BackTopBar(title = stringResource(R.string.players_title), onBack = onBack)
+        }
+    ) { padding ->
+        Column(Modifier.fillMaxSize().padding(padding).padding(Spacing.md)) {
+            if (current.groups.isEmpty()) {
+                Text(
+                    stringResource(R.string.players_need_group),
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            } else {
+                OutlinedTextField(
+                    value = newPlayerName,
+                    onValueChange = { newPlayerName = it },
+                    label = {
+                        Text(
+                            stringResource(if (current.squadSize > 1) R.string.players_members_label else R.string.player_name)
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                if (current.groups.size > 1) {
+                    DropdownField(
+                        label = stringResource(R.string.players_group_label),
+                        options = current.groups.map { it.id to it.name },
+                        selectedLabel = current.groups.firstOrNull { it.id == newPlayerGroupId }?.name
+                            ?: current.groups.first().name,
+                        onSelect = { newPlayerGroupId = it },
+                        modifier = Modifier.fillMaxWidth().padding(top = Spacing.sm)
+                    )
+                }
+                Button(
+                    onClick = {
+                        val groupId = newPlayerGroupId.ifBlank { current.groups.first().id }
+                        viewModel.addPlayer(groupId, newPlayerName)
+                        newPlayerName = ""
+                    },
+                    enabled = newPlayerName.isNotBlank(),
+                    modifier = Modifier.fillMaxWidth().padding(top = Spacing.sm)
+                ) { Text(stringResource(R.string.action_add)) }
+            }
+
+            HorizontalDivider(Modifier.padding(vertical = Spacing.md))
+
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                items(current.teams, key = { it.id }) { team ->
+                    val removable = viewModel.canRemovePlayer(team.id)
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                    ) {
+                        Row(
+                            Modifier.fillMaxWidth().padding(horizontal = Spacing.md, vertical = Spacing.sm),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(Modifier.weight(1f)) {
+                                Text(team.name, style = MaterialTheme.typography.bodyLarge)
+                                Text(
+                                    groupNameFor(team.id) ?: stringResource(R.string.players_no_group),
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                                if (!removable) {
+                                    Text(
+                                        stringResource(R.string.players_has_results),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.error
+                                    )
+                                }
+                            }
+                            IconButton(onClick = { renamingTeam = team }) {
+                                Icon(Icons.Default.Edit, contentDescription = stringResource(R.string.rename_named, team.name))
+                            }
+                            IconButton(onClick = { viewModel.removePlayer(team.id) }, enabled = removable) {
+                                Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.remove_named, team.name))
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    renamingTeam?.let { team ->
+        RenameDialog(
+            title = stringResource(R.string.player_rename_title),
+            initialValue = team.name,
+            onDismiss = { renamingTeam = null },
+            onConfirm = { newName ->
+                viewModel.renamePlayer(team.id, newName)
+                renamingTeam = null
+            }
+        )
+    }
+}

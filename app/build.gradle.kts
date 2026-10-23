@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.nflunkyball"
+    namespace = "de.powerizzle.nflunkyball"
     compileSdk {
         version = release(36) {
             minorApiLevel = 1
@@ -13,11 +13,11 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.example.nflunkyball"
+        applicationId = "de.powerizzle.nflunkyball"
         minSdk = 24
         targetSdk = 36
-        versionCode = 54
-        versionName = "0.15.0"
+        versionCode = 55
+        versionName = "0.16.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

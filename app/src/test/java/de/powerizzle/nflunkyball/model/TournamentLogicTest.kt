@@ -1,0 +1,219 @@
+package de.powerizzle.nflunkyball.model
+
+import org.junit.Assert.assertEquals
+import org.junit.Test
+
+class TournamentLogicTest {
+
+    private fun team(id: String) = Team(id, id)
+
+    @Test
+    fun `round robin generates every pair exactly once`() {
+        val group = Group(id = "g1", name = "Group A", teamIds = listOf("A", "B", "C", "D"))
+        val matches = group.generateRoundRobinMatches()
+
+        assertEquals(6, matches.size) // C(4,2)
+        val pairs = matches.map { setOf(it.teamAId, it.teamBId) }.toSet()
+        assertEquals(6, pairs.size) // all unique
+        assertEquals(
+            setOf(
+                setOf("A", "B"), setOf("A", "C"), setOf("A", "D"),
+                setOf("B", "C"), setOf("B", "D"), setOf("C", "D")
+            ),
+            pairs
+        )
+    }
+
+    @Test
+    fun `standings sort by wins descending`() {
+        val group = Group(
+            id = "g1",
+            name = "Group A",
+            teamIds = listOf("A", "B", "C"),
+            matches = listOf(
+                Match("m1", "A", "B", MatchResult(winnerId = "A", winnerScore = 12)),
+                Match("m2", "A", "C", MatchResult(winnerId = "A", winnerScore = 8)),
+                Match("m3", "B", "C", MatchResult(winnerId = "B", winnerScore = 20))
+            )
+        )
+
+        val standings = group.standings()
+
+        assertEquals(listOf("A", "B", "C"), standings.map { it.teamId })
+        assertEquals(2, standings[0].wins)
+        assertEquals(1, standings[1].wins)
+        assertEquals(0, standings[2].wins)
+    }
+
+    @Test
+    fun `tied teams broken by head-to-head result`() {
+        // A and B both have 1 win, 1 loss overall, but A beat B directly.
+        val group = Group(
+            id = "g1",
+            name = "Group A",
+            teamIds = listOf("B", "A"), // deliberately out of "expected" order
+            matches = listOf(
+                Match("m1", "A", "B", MatchResult(winnerId = "A", winnerScore = 5)),
+                Match("m2", "A", "C", MatchResult(winnerId = "C", winnerScore = 5)),
+                Match("m3", "B", "C", MatchResult(winnerId = "B", winnerScore = 5))
+            )
+        )
+
+        val standings = group.standings()
+
+        // A and C both have 1-1, B has 1-1 too actually all tied at 1 win 1 loss (3-team full tie);
+        // only A vs B head-to-head is directly resolvable, A must precede B.
+        val aIndex = standings.indexOfFirst { it.teamId == "A" }
+        val bIndex = standings.indexOfFirst { it.teamId == "B" }
+        assert(aIndex < bIndex) { "A beat B head-to-head, so A should rank above B" }
+    }
+
+    @Test
+    fun `a three-way tie with a head-to-head cycle keeps the group's team order`() {
+        // A beat B, B beat C, C beat A: every pairwise comparison points the other way round the
+        // circle, so no head-to-head order exists and the organizer's order is kept as is.
+        val group = Group(
+            id = "g1",
+            name = "Group A",
+            teamIds = listOf("C", "A", "B"),
+            matches = listOf(
+                Match("m1", "A", "B", MatchResult(winnerId = "A", winnerScore = 5)),
+                Match("m2", "B", "C", MatchResult(winnerId = "B", winnerScore = 5)),
+                Match("m3", "C", "A", MatchResult(winnerId = "C", winnerScore = 5))
+            )
+        )
+
+        assertEquals(listOf("C", "A", "B"), group.standings().map { it.teamId })
+    }
+
+    @Test
+    fun `a two-way tie below the leader is still broken by head-to-head`() {
+        val group = Group(
+            id = "g1",
+            name = "Group A",
+            teamIds = listOf("A", "B", "C", "D"),
+            matches = listOf(
+                Match("m1", "A", "B", MatchResult(winnerId = "A", winnerScore = 5)),
+                Match("m2", "A", "C", MatchResult(winnerId = "A", winnerScore = 5)),
+                Match("m3", "A", "D", MatchResult(winnerId = "A", winnerScore = 5)),
+                Match("m4", "B", "C", MatchResult(winnerId = "C", winnerScore = 5)),
+                Match("m5", "B", "D", MatchResult(winnerId = "B", winnerScore = 5)),
+                Match("m6", "C", "D", MatchResult(winnerId = "D", winnerScore = 5))
+            )
+        )
+        // A 3-0; B, C, D all 1-2 — a three-way tie again, kept in team order.
+        assertEquals(listOf("A", "B", "C", "D"), group.standings().map { it.teamId })
+
+        // Now with D beaten by C too: B 1-2, C 2-1, D 1-2 -> C second, then B/D tied and B beat D.
+        val decided = group.copy(matches = group.matches.dropLast(1) + Match("m6", "C", "D", MatchResult(winnerId = "C", winnerScore = 5)))
+        assertEquals(listOf("A", "C", "B", "D"), decided.standings().map { it.teamId })
+    }
+
+    @Test
+    fun `standings with no results yet has zero wins and losses for everyone`() {
+        val group = Group(id = "g1", name = "Group A", teamIds = listOf("A", "B"))
+        val standings = group.standings()
+        assertEquals(2, standings.size)
+        standings.forEach {
+            assertEquals(0, it.wins)
+            assertEquals(0, it.losses)
+        }
+    }
+
+    @Test
+    fun `provisional standings give the winner a positive elo delta and the loser a negative one`() {
+        val tournament = Tournament(
+            id = "t1",
+            name = "Test Cup",
+            teams = listOf(team("A"), team("B")),
+            groups = listOf(
+                Group(
+                    id = "g1",
+                    name = "Group A",
+                    teamIds = listOf("A", "B"),
+                    matches = listOf(Match("m1", "A", "B", MatchResult(winnerId = "A", winnerScore = 12)))
+                )
+            )
+        )
+
+        val standings = tournament.provisionalStandings()
+
+        assertEquals(1, standings.getValue("A").winDelta)
+        assertEquals(0, standings.getValue("A").lossDelta)
+        assertEquals(1, standings.getValue("B").lossDelta)
+        assert(standings.getValue("A").eloDelta > 0) { "Winner's elo delta should be positive" }
+        assert(standings.getValue("B").eloDelta < 0) { "Loser's elo delta should be negative" }
+        // Zero-sum for a two-player match.
+        assertEquals(standings.getValue("A").eloDelta, -standings.getValue("B").eloDelta, 0.0001)
+    }
+
+    @Test
+    fun `provisional leaderboard sorts by wins desc, ties broken by elo delta desc`() {
+        // B beats C first (raising B's rating), then A beats B while B is elevated — so A and B
+        // both end up with 1 win, but A's win (over a now-higher-rated opponent) is worth more
+        // Elo than B's win over C, even though B also has a loss dragging its Elo down further.
+        val tournament = Tournament(
+            id = "t1",
+            name = "Test Cup",
+            teams = listOf(team("A"), team("B"), team("C")),
+            groups = listOf(
+                Group(
+                    id = "g1",
+                    name = "Group A",
+                    teamIds = listOf("A", "B", "C"),
+                    matches = listOf(
+                        Match("m1", "B", "C", MatchResult(winnerId = "B", winnerScore = 5)),
+                        Match("m2", "A", "B", MatchResult(winnerId = "A", winnerScore = 5))
+                    )
+                )
+            )
+        )
+
+        val leaderboard = tournament.provisionalLeaderboard()
+
+        assertEquals(listOf("A", "B", "C"), leaderboard.map { it.first })
+        assertEquals(1, leaderboard[0].second.winDelta) // A
+        assertEquals(1, leaderboard[1].second.winDelta) // B, tied on wins with A
+        assert(leaderboard[0].second.eloDelta > leaderboard[1].second.eloDelta) {
+            "A's win over a boosted opponent should be worth more Elo than B's win over C"
+        }
+        assertEquals(0, leaderboard[2].second.winDelta) // C, fewer wins, ranks last regardless of Elo
+    }
+
+    @Test
+    fun `provisional standings are zero when no matches have a result yet`() {
+        val tournament = Tournament(
+            id = "t1",
+            name = "Test Cup",
+            teams = listOf(team("A"), team("B")),
+            groups = listOf(Group(id = "g1", name = "Group A", teamIds = listOf("A", "B")))
+        )
+
+        val standings = tournament.provisionalStandings()
+
+        standings.values.forEach {
+            assertEquals(0, it.winDelta)
+            assertEquals(0, it.lossDelta)
+            assertEquals(0.0, it.eloDelta, 0.0001)
+        }
+    }
+
+    @Test
+    fun `elo K is 50 for group and minor bracket games and 60 for title knockouts`() {
+        // Mirrors the backend's tests/test_elo.py.
+        listOf(
+            null, "", "Spiel um Platz 5", "Spiel um Platz 11", "Lower Bracket Viertelfinale",
+            "Verlierer Viertelfinale", "Consolation final", "Place 9"
+        ).forEach { assertEquals(it.toString(), ELO_K_GROUP, eloKFactor(it), 0.0) }
+        listOf(
+            "Achtelfinale", "Viertelfinale", "Halbfinale", "Finale", "Spiel um Platz 3", "Final",
+            "Semifinal", "Bracket", "K.-o.-Runde"
+        ).forEach { assertEquals(it, ELO_K_KNOCKOUT, eloKFactor(it), 0.0) }
+    }
+
+    @Test
+    fun `elo expected score uses the group's 600 point scale`() {
+        // 6te WM, Gruppe A Spiel_1 in the group's sheet: Torben 885.39 vs Christian 1078.2.
+        assertEquals(0.3230182002676823, eloExpected(885.39, 1078.2), 1e-12)
+    }
+}

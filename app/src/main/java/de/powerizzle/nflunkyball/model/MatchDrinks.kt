@@ -1,0 +1,24 @@
+package de.powerizzle.nflunkyball.model
+
+import kotlinx.serialization.Serializable
+
+/** Each player can be drinking something different, so this is never tied to who won.
+ *  [teamA]/[teamB] are the singles-era per-side fields (still what the current result dialog
+ *  records); [byPlayer] is the per-player record squads need and takes precedence per player
+ *  when present.
+ *
+ *  Deliberately NOT part of [MatchResult]/[Tournament] — see
+ *  [de.powerizzle.nflunkyball.persistence.MatchDrinkStore] for why it's kept out of anything that
+ *  gets broadcast or live-synced. */
+@Serializable
+data class MatchDrinks(
+    val teamA: String? = null,
+    val teamB: String? = null,
+    val byPlayer: Map<String, String> = emptyMap(),
+    /** Penalty drinks handed out during the match, per player (winners included). */
+    val penaltiesByPlayer: Map<String, PenaltyDrinks> = emptyMap()
+)
+
+/** [drink] only when the penalty drinks were something other than the player's own drink. */
+@Serializable
+data class PenaltyDrinks(val count: Int, val drink: String? = null)
