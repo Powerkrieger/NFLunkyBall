@@ -7,7 +7,7 @@ own phones and browse history, leaderboards and player stats.
 
 ## Layout
 
-Single Gradle module (`app`), package `com.example.nflunkyball`:
+Single Gradle module (`app`), package `de.powerizzle.nflunkyball`:
 
 | Package | Contents |
 | --- | --- |
@@ -60,3 +60,7 @@ list, offline camera setup and recording commands — is in
 ## AI notice
 
 Project scaffolding, CI pipeline and large parts of the app were built with Claude Code.
+
+## License
+
+MIT, see [LICENSE](LICENSE).
